@@ -69,7 +69,7 @@ bash tools/build-wine-dlls.sh
 
 啟動與操作（GUI 類 Wine 程式需在 Terminal.app 內執行）：
 
-- `tools/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程。`plain` 無 trace（效能比較）；其餘模式只對 `MapleStory.exe` 開 Wine 頻道並記錄執行緒數與 socket。`SYNC`、`GFX`、`WZCACHE`、`HUD=1`（Metal FPS HUD）、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
+- `tools/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程。`plain` 無 trace（效能比較）；其餘模式只對 `MapleStory.exe` 開 Wine 頻道並記錄執行緒數與 socket。`SYNC`、`GFX`（`dxmt|d3dmetal|dxvk|wined3d`；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`WZCACHE`、`HUD=1`（Metal FPS HUD）、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
 - `tools/wgui.sh list|click|sclick|shot|fg|key`：在 bottle 內列出 Wine 視窗、點擊、按鍵、截圖。預設經 Terminal.app 執行並取回輸出，已在 Terminal.app 內可加 `--here`。
 - `tools/auto-start.sh`：等登入器視窗出現後以 `SendInput` 點「開始遊戲」，直到 `MapleStory.exe` 啟動。
 - `tools/shot-game.sh [輸出檔] [視窗標題]`：擷取遊戲視窗（被遮住也可，螢幕鎖定時不行）。

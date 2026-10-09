@@ -89,6 +89,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
 - 路徑、bundle id 或 LaunchDaemon label 改變：同步 cask 範本的 `uninstall quit:` 與 `zap`（對應本文件「外部狀態」中 `uninstall.sh` 刪除的項目）。cask 的 `uninstall script:` 以 `#{appdir}/MacMeow.app/Contents/Resources/scripts/uninstall.sh cask` 執行打包的腳本，App 名稱或腳本位置改變時一起改。
 - Homebrew 改變程序命令列（`brew.rb <子指令>`）或 upgrade 時的 uninstall 流程：`uninstall.sh cask` 判斷不出時會當作移除，每次 `brew upgrade` 都會還原修補、刪除 App 設定並要求密碼；更新 `brew_subcommand`。Caskroom 的 `.metadata/config.json` 格式改變時更新 `homebrew_app`。
 - 發佈附件命名、dmg 內容、bundle id 或簽章 Team ID 改變：舊版 App 的 `update.sh` 會拒絕更新；改變前先讓 `update.sh` 支援新格式並發佈一版。換 Team ID 時更新 `common.sh` 的 `MACMEOW_TEAM_ID`，使用者需手動下載一次。
+- Cyder 改變圖形後端的啟動環境（`cyder-common.sh` 的 `cyder_apply_gptk_launch_environment`、`CYDER_GRAPHICS_*`、engine 的 `lib64/apple_gptk` 連結）：同步 `tools/run-game.sh` 的 `GFX` 設定（[technical-notes.md](technical-notes.md) #13）。
 - 登入器改名：更新 `common.sh` 的 `LAUNCHER_EXE` 與 `launcher-dock.sh` 的 `REG_SECTION`（`user.reg` 以 `\x` 跳脫非 ASCII 字元）。
 - 伺服器要求的 `MapleStory.exe` 版本改變：更新 `README.md` 系統需求。
 - macOS 28 移除一般用途的 Rosetta 2：Apple 公告 macOS 27 是最後一個完整支援 Rosetta 的版本（macOS 26.4 起啟動 Intel 程式會跳出淘汰通知），macOS 28 起只保留給「仰賴 Intel 框架、已不再維護的舊遊戲」，是否涵蓋 Wine 未說明。整條執行鏈都依賴 Rosetta：Cyder engine 是 x86_64 Wine，`wineserver_kill` 以 `arch -x86_64` 執行，`patches/bin` 的 DLL 與 `patch-cyder-loopback.sh` 的指令序列也都針對 x86_64 engine。若 Cyder 改用原生 ARM64 Wine（CrossOver 已有 ARM64 預覽版，以 FEX 模擬 x86），上述修補都要重新驗證或重做。macOS 28 確認相容（或確認不支援）後，更新 `README.md` 已知問題與系統需求，以及 `docs/known-issues.md`。
