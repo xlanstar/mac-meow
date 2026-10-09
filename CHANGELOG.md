@@ -6,6 +6,7 @@ List each change under `## Unreleased` as it lands
 ## Unreleased
 
 - `MacMeow.app` 新增一鍵更新：自動檢查新版本，按「更新」即下載、安裝並重新開啟 App，網路中斷時會等待並從中斷處繼續下載；也可從選單「檢查更新⋯」手動檢查
+- `uninstall.sh` 會把 Cyder 設定（語系、繪圖後端、同步機制）還原為原值，並加回遊戲資料夾的下載隔離標記（舊版已修改的項目沒有記錄原值，無法還原）
 
 ## 0.2.0 — 2026-10-09
 

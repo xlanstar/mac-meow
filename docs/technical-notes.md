@@ -46,7 +46,7 @@
 ## 8. 一般卡頓
 
 - 根因：Cyder 預設不開 MSync。
-- 修補：`play.sh` 設定 `msync=true`。
+- 修補：`cyder-settings.sh`（由 `play.sh` 呼叫）設定 `msync=true`。
 
 ## 9. 人多的地方很卡（Themida VM × Rosetta SMC，未解）
 

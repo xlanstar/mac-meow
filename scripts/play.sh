@@ -160,31 +160,12 @@ else
   }
 fi
 
-# 5. Cyder 全域設定。Cyder 只在「直接啟動 MapleStory.exe」時套用楓之谷設定；
-#    經由登入器啟動時要改成全域設定，子程序才會繼承。
-#    同步機制預設 MSync（Cyder 預設關閉，此時每次同步都經 wineserver，楓之谷會明顯卡頓）。
-case "${MAPLE_SYNC:-msync}" in
-  msync) want_msync=true want_esync=false ;;
-  esync) want_msync=false want_esync=true ;;
-  none) want_msync=false want_esync=false ;;
-  *) die "MAPLE_SYNC 只能是 msync|esync|none" ;;
-esac
+# 5. Cyder 全域設定（wineLocale、graphicsBackend、同步機制；原值備份，uninstall.sh 還原）
 progress settings "檢查 Cyder 設定 ..."
-[[ -f "$CYDER_SETTINGS" ]] || echo '{"schemaVersion":1}' >"$CYDER_SETTINGS"
-set_setting() { # set_setting <key> <type> <value>
-  [[ "$(cyder_setting "$1")" == "$3" ]] && return 0
-  /usr/bin/plutil -replace "$1" "-$2" "$3" "$CYDER_SETTINGS"
-  echo "已設定 Cyder：$1=$3"
-  wine_running && echo "注意：Cyder 正在執行，設定要等全部遊戲關閉後才會生效"
-  return 0
-}
-set_setting wineLocale string zh_TW
-set_setting graphicsBackend string dxmt
-set_setting msync bool "$want_msync"
-set_setting esync bool "$want_esync"
+bash "$SCRIPT_DIR/cyder-settings.sh" apply # 已符合時不修改
 
-# 6. 移除 macOS 下載隔離標記（只動 xattr，不動檔案內容）
-/usr/bin/xattr -dr com.apple.quarantine "$GAME_DIR" 2>/dev/null || true
+# 6. 移除 macOS 下載隔離標記（只動 xattr，不動檔案內容；原標記記錄下來，uninstall.sh 加回）
+bash "$SCRIPT_DIR/quarantine.sh" clear || echo "注意：無法移除遊戲資料夾的下載隔離標記"
 
 # 7. 照官方教學：從「認證器」啟動，等待 HostShield 通道
 progress launch "啟動 認證器.exe ..."

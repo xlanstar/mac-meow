@@ -60,7 +60,7 @@ bash scripts/play.sh status                   # 檢查通道／程序
 bash scripts/uninstall.sh
 ```
 
-會還原 Cyder engine 的修補、移除本機網路位址與 LaunchDaemon（需要密碼），以及 App 的設定與記錄。遊戲、Cyder 與其設定不會被刪除。
+會還原 Cyder engine 的修補與 Cyder 設定的原值、加回遊戲資料夾的下載隔離標記、移除本機網路位址與 LaunchDaemon（需要密碼），以及 App 的設定與記錄。遊戲、Cyder 與其設定不會被刪除。
 
 ## 已知問題
 

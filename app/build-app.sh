@@ -52,7 +52,7 @@ iconutil -c icns -o "$RES/AppIcon.icns" "$WORK/AppIcon.iconset"
 
 # 只打包使用者流程（scripts/ 下的腳本與共用函式）；uninstall.sh 需要 repo 內的 tools/，不打包。
 for s in play.sh report.sh setup-loopback.sh patch-cyder-loopback.sh patch-cyder-dlls.sh patch-cyder-winemac.sh \
-  launcher-dock.sh session.sh update.sh; do
+  cyder-settings.sh quarantine.sh launcher-dock.sh session.sh update.sh; do
   install -m 755 "$ROOT/scripts/$s" "$RES/scripts/$s"
 done
 install -m 644 "$ROOT/scripts/lib/common.sh" "$RES/scripts/lib/common.sh"
