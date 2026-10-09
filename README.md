@@ -1,5 +1,9 @@
 # mac-meow：在 Apple Silicon Mac 上玩貓貓谷
 
+[![最新版本](https://img.shields.io/github/v/release/xlanstar/mac-meow?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/xlanstar/mac-meow/releases/latest)
+
+**[⬇ 下載最新版 MacMeow.app](https://github.com/xlanstar/mac-meow/releases/latest)**（在頁面下方「Assets」點 `MacMeow-<版本>.zip`）
+
 讓 Apple Silicon（M 系列）Mac **不用虛擬機**，透過 [Cyder](https://github.com/dspp779/CyderBits)（Wine）執行台版楓之谷私服「貓貓谷」的原版登入流程。
 
 原則：**不破解、不修改** 遊戲與登入器檔案，完整照原本流程執行：
@@ -23,7 +27,7 @@
 
 1. 安裝 Cyder：下載後把 `Cyder.app` 拖到「應用程式」，開啟一次讓它建立 Windows 環境。
 2. 取得 `MacMeow.app`：
-   - 從 Releases 下載 `MacMeow-<版本>.zip` 並解壓縮；或
+   - 從 [最新版 Release](https://github.com/xlanstar/mac-meow/releases/latest) 下載 `MacMeow-<版本>.zip` 並解壓縮；或
    - 自行建置（需要 Xcode 或 `xcode-select --install`）：`bash app/build-app.sh` → `dist/MacMeow.app`
 3. 把 `MacMeow.app` 拖到「應用程式」，雙擊開啟。
    - Releases 的 App 經過 Apple 公證，第一次開啟時按「打開」即可。
