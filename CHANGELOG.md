@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- 改以 `.dmg` 發佈：開啟後把 `MacMeow.app` 拖到「應用程式」即可安裝，不必再解壓縮 zip
+
 ## 0.1.0 — 2026-10-09
 
 首次釋出：可在 Apple Silicon Mac 以 Cyder 執行貓貓谷原版登入流程並進入遊戲，不修改任何遊戲或登入器檔案。

@@ -33,7 +33,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
   - 啟動：依序檢查 Cyder、遊戲資料夾（`NSOpenPanel`，以 porcelain 驗證）、Cyder 初始化（開啟 Cyder 等待 prefix）、迴路位址（`osascript … with administrator privileges` 執行 `setup-loopback.sh install`），再以 `MACMEOW_PROGRESS=1` 執行 `play.sh`，解析 `@@STEP <id> <訊息>`（`common.sh` 的 `progress`）顯示進度。
   - 全部關閉：確認後執行 `play.sh stop`。
 - `app/make-icon.swift`：以 Core Graphics 繪製 App 圖示，建置時轉成 `AppIcon.icns`。
-- `app/build-app.sh`：以 `swiftc` 編譯 `app/Sources` 與圖示（中間檔在 `build/app/`），產生 `dist/MacMeow.app` 與 zip（ad-hoc 簽章），把 `scripts/` 使用者腳本（含 `lib/`）與 `patches/bin`（含 `SHA256SUMS`）放進 `Contents/Resources`。
+- `app/build-app.sh`：以 `swiftc` 編譯 `app/Sources` 與圖示（中間檔在 `build/app/`），產生 `dist/MacMeow.app` 與可拖曳安裝的 `dist/MacMeow-<版本>.dmg`（內含 App 與 `/Applications` 捷徑；預設 ad-hoc 簽章），把 `scripts/` 使用者腳本（含 `lib/`）與 `patches/bin`（含 `SHA256SUMS`）放進 `Contents/Resources`。
 
 所有修改 engine 的 `apply`／`restore` 在 Cyder 的 Wine 執行中都會拒絕。`restore` 只在目前檔案仍是本專案修補版時才寫回備份；engine 已被 Cyder 更新時只刪除過期備份，避免把舊檔蓋回新 engine。
 

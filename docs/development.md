@@ -16,7 +16,7 @@
 ## 建置與測試
 
 ```sh
-bash app/build-app.sh                              # dist/MacMeow.app 與 zip（預設 ad-hoc 簽章）
+bash app/build-app.sh                              # dist/MacMeow.app 與 dmg（預設 ad-hoc 簽章）
 open dist/MacMeow.app                              # 開啟 App；記錄在 ~/Library/Logs/MacMeow/launcher.log
 bash scripts/play.sh status --porcelain            # App 讀取的狀態（key=value）
 GAME_DIR=~/Games/MapleStory bash scripts/play.sh   # 直接跑使用者流程
@@ -102,7 +102,7 @@ bash tools/build-wine-dlls.sh
 |---|---|
 | 都未設定 | ad-hoc 簽章 |
 | `MACMEOW_SIGN_ID` | Hardened Runtime + 安全時間戳記簽章，不公證 |
-| 兩者都設定 | 上述簽章後，以 `notarytool submit --wait` 公證 zip，`stapler staple` 把票證釘進 App 後重新打包 zip |
+| 兩者都設定 | 上述簽章後，以 `notarytool submit --wait` 公證 App（暫時 zip），`stapler staple` 把票證釘進 App 後才打包 dmg；dmg 再以同一憑證簽章、公證並 `stapler staple`（共公證兩次，App 與 dmg 離線都能通過 Gatekeeper） |
 
 App 本身只有一個 Mach-O，`scripts/` 與 Windows DLL 是資源檔，由 bundle 簽章封存；Hardened Runtime 不需要額外 entitlement（App 只以 `Process` 呼叫系統的 `/bin/bash`、`osascript`）。公證失敗時 `build-app.sh` 會印出 `xcrun notarytool log <id>` 指令查看原因。
 
@@ -121,13 +121,13 @@ gh run watch                          # 等 CI 完成
 - `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck`、`patches/bin/SHA256SUMS` 與 DLL 相符、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
   - 例外：`MACMEOW_ALLOW_ADHOC=1` 跳過簽章檢查，`build` 產生 ad-hoc 版本，release notes 改為教使用者到「系統設定 → 隱私權與安全性」按「仍要打開」。只在無法公證時使用（CI 不使用）。
 - `prepare`：把 `## Unreleased` 下的項目移到 `## X.Y.Z — YYYY-MM-DD`，上方留一個空的 `## Unreleased`。
-- `build`：以 `git archive vX.Y.Z` 取出原始碼到 `build/release/X.Y.Z/` 再執行 `app/build-app.sh`，所以未提交的檔案不會進入產物。解壓縮 zip 驗證 `codesign`、`CFBundleShortVersionString`，以及公證票證（`stapler validate`）與 Gatekeeper 評估（`spctl` 須為 `Notarized Developer ID`），並產生：
-  - `MacMeow-X.Y.Z.zip`、`MacMeow-X.Y.Z.zip.sha256`
-  - `release-notes.md`：CHANGELOG 該版內容 + 安裝方式 + zip 的 SHA-256 + `patches/SOURCES.md` 的 LGPL 原始碼表（Release 內附修補版 Wine DLL，必須附上）。
+- `build`：以 `git archive vX.Y.Z` 取出原始碼到 `build/release/X.Y.Z/` 再執行 `app/build-app.sh`，所以未提交的檔案不會進入產物。驗證 dmg 的簽章、公證票證與 Gatekeeper 評估（`spctl --type open --context context:primary-signature`），再掛載 dmg 驗證內含 `Applications` 捷徑，以及 App 的 `codesign`、`CFBundleShortVersionString`、公證票證（`stapler validate`）與 Gatekeeper 評估（`spctl` 須為 `Notarized Developer ID`），並產生：
+  - `MacMeow-X.Y.Z.dmg`、`MacMeow-X.Y.Z.dmg.sha256`
+  - `release-notes.md`：CHANGELOG 該版內容 + 安裝方式 + dmg 的 SHA-256 + `patches/SOURCES.md` 的 LGPL 原始碼表（Release 內附修補版 Wine DLL，必須附上）。
 - `publish`：`git push --atomic origin main vX.Y.Z`。需要 `origin` remote。
 - `ci`（只在 CI 執行）：確認 tag 的 `VERSION` 為 X.Y.Z、`CHANGELOG.md` 有 `## X.Y.Z` 段落、tag 在 `origin/main` 上，再執行 `build`、`draft` 與 `release`，push tag 即正式發佈，不經人工審核草稿。
 - `draft`：以 `dist/release/X.Y.Z/` 的產物建立 GitHub Release 草稿；草稿已存在時覆蓋附件與說明，已正式發佈則拒絕。CI 無法使用時可在本機 `build` 後執行（需 `gh auth login`）。
-- `release`：下載草稿的 zip 與 `.sha256`，驗證 SHA-256、`codesign`、公證票證、Gatekeeper 與 App 版本後，以 `gh release edit --draft=false --latest` 正式發佈；CI 由 `ci` 呼叫，CI 無法使用時可在本機 `draft` 後執行。repo 首頁的 Releases 區塊與 README 的下載連結（`releases/latest`）即指向此版。已正式發佈時只印出網址。
+- `release`：下載草稿的 dmg 與 `.sha256`，驗證 SHA-256、`codesign`、公證票證、Gatekeeper 與 App 版本後，以 `gh release edit --draft=false --latest` 正式發佈；CI 由 `ci` 呼叫，CI 無法使用時可在本機 `draft` 後執行。repo 首頁的 Releases 區塊與 README 的下載連結（`releases/latest`）即指向此版。已正式發佈時只印出網址。
 
 ### GitHub Actions
 
@@ -147,9 +147,9 @@ Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `
 
 ### 冒煙測試
 
-Agent shell 無法啟動 GUI Wine 程式；這一步需在 Terminal.app 或 Finder 由人執行，或在回報中寫明未執行。CI 會直接正式發佈，所以 `publish` 前必須以本機 `build` 的產物完整測試；發佈後可再以 `gh release download vX.Y.Z --pattern '*.zip' -D <暫存資料夾>` 下載正式附件重做第 1 步。
+Agent shell 無法啟動 GUI Wine 程式；這一步需在 Terminal.app 或 Finder 由人執行，或在回報中寫明未執行。CI 會直接正式發佈，所以 `publish` 前必須以本機 `build` 的產物完整測試；發佈後可再以 `gh release download vX.Y.Z --pattern '*.dmg' -D <暫存資料夾>` 下載正式附件重做第 1 步。
 
-1. 結束 Cyder 的 Wine 程序後，把 zip 解壓縮到暫存資料夾，加上 quarantine 模擬下載：`xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");Safari;" MacMeow.app`，雙擊開啟：應只出現「從網際網路下載」的確認，不能出現「無法驗證開發者」或「Apple 無法檢查」。
+1. 結束 Cyder 的 Wine 程序後，把 dmg 複製到暫存資料夾，加上 quarantine 模擬下載：`xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");Safari;" MacMeow-X.Y.Z.dmg`。雙擊 dmg：視窗內應有 `MacMeow.app` 與 `Applications` 捷徑；把 App 拖到「應用程式」後開啟：應只出現「從網際網路下載」的確認，不能出現「無法驗證開發者」或「Apple 無法檢查」。
 2. `bash scripts/play.sh status`：4 個 HostShield 位址在 `37601-37630` 監聽，`貓貓TMS登入器.exe` 在執行。
 3. 按「開始遊戲」，進入遊戲並登入角色。
 4. 若本版改了修補或外部狀態：`bash scripts/uninstall.sh` 後各 `check` 回報未修補，再以 App 重新套用一次。

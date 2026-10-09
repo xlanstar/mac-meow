@@ -8,7 +8,7 @@
 #   publish  push main 與 tag；GitHub Actions（.github/workflows/release.yml）接著執行 ci，正式發佈 Release
 #   ci       CI 專用：確認 tag 在 origin/main 上、VERSION 與 CHANGELOG 一致，再執行 build、draft 與 release
 #   build    從 tag vX.Y.Z 以 git archive 取出乾淨原始碼到 build/release/，執行 app/build-app.sh，
-#            產物放到 dist/release/X.Y.Z/：MacMeow-X.Y.Z.zip、.sha256、release-notes.md
+#            產物放到 dist/release/X.Y.Z/：MacMeow-X.Y.Z.dmg、.sha256、release-notes.md
 #            需設定 MACMEOW_SIGN_ID 與 MACMEOW_NOTARY_PROFILE（環境變數或 .env；Developer ID 簽章＋公證）；
 #            MACMEOW_ALLOW_ADHOC=1 可改發未公證的 ad-hoc 版本
 #   draft    以 dist/release/X.Y.Z/ 的產物建立或更新 GitHub Release 草稿（需 gh 登入或 GH_TOKEN）
@@ -115,27 +115,38 @@ cmd_prepare() {
   echo "下一步：bash tools/release.sh build ${v} 並冒煙測試，再 publish ${v}（push 後由 GitHub Actions 建置並正式發佈）"
 }
 
-# verify_zip <zip> <X.Y.Z>：解壓縮後簽章有效、（非 ad-hoc 時）已公證且 Gatekeeper 認可、版本正確
-verify_zip() {
-  local zip="$1" v="$2" chk
-  chk="$(mktemp -d)"
-  ditto -x -k "$zip" "$chk"
-  codesign --verify --deep --strict "$chk/MacMeow.app" || die "zip 內 App 簽章驗證失敗"
+# verify_dmg <dmg> <X.Y.Z>：dmg（非 ad-hoc 時）已簽章、公證；掛載後 App 簽章有效、已公證且 Gatekeeper 認可、版本正確
+verify_dmg() {
+  local dmg="$1" v="$2" chk mnt
+  if ! adhoc_release; then
+    codesign --verify "$dmg" || die "dmg 簽章驗證失敗"
+    xcrun stapler validate -q "$dmg" || die "dmg 沒有公證票證"
+    spctl --assess --type open --context context:primary-signature -vv "$dmg" 2>&1 \
+      | grep 'source=Notarized Developer ID' >/dev/null \
+      || die "Gatekeeper 未認可 dmg（spctl --assess --type open --context context:primary-signature -vv）"
+    ok "dmg：Notarized Developer ID"
+  fi
+  chk="$(mktemp -d)"; mnt="$chk/mnt"
+  hdiutil attach -nobrowse -readonly -noautoopen -quiet -mountpoint "$mnt" "$dmg" || die "無法掛載 ${dmg}"
+  ditto "$mnt/MacMeow.app" "$chk/MacMeow.app"
+  [[ -L "$mnt/Applications" ]] || { hdiutil detach -quiet "$mnt"; die "dmg 內缺少「應用程式」捷徑"; }
+  hdiutil detach -quiet "$mnt" || die "無法卸載 ${mnt}"
+  codesign --verify --deep --strict "$chk/MacMeow.app" || die "dmg 內 App 簽章驗證失敗"
   ok "codesign"
   if ! adhoc_release; then
-    xcrun stapler validate -q "$chk/MacMeow.app" || die "zip 內 App 沒有公證票證"
+    xcrun stapler validate -q "$chk/MacMeow.app" || die "dmg 內 App 沒有公證票證"
     spctl --assess --type exec -vv "$chk/MacMeow.app" 2>&1 | grep 'source=Notarized Developer ID' >/dev/null \
-      || die "Gatekeeper 未認可 zip 內 App（spctl --assess --type exec -vv）"
-    ok "Gatekeeper：Notarized Developer ID"
+      || die "Gatekeeper 未認可 dmg 內 App（spctl --assess --type exec -vv）"
+    ok "App：Notarized Developer ID"
   fi
   [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$chk/MacMeow.app/Contents/Info.plist")" == "$v" ]] \
-    || die "zip 內 App 版本不是 ${v}"
+    || die "dmg 內 App 版本不是 ${v}"
   ok "App 版本 ${v}"
   rm -rf "$chk"
 }
 
 cmd_build() {
-  local v="$1" src out zip
+  local v="$1" src out dmg
   git rev-parse -q --verify "refs/tags/v$v" >/dev/null || die "找不到 tag v${v}，請先執行 prepare"
   src="$ROOT/build/release/$v"
   out="$ROOT/dist/release/$v"
@@ -151,11 +162,11 @@ cmd_build() {
     bash "$src/app/build-app.sh"
   fi
 
-  zip="MacMeow-$v.zip"
-  cp "$src/dist/$zip" "$out/"
-  ( cd "$out" && shasum -a 256 "$zip" >"$zip.sha256" )
+  dmg="MacMeow-$v.dmg"
+  cp "$src/dist/$dmg" "$out/"
+  ( cd "$out" && shasum -a 256 "$dmg" >"$dmg.sha256" )
 
-  verify_zip "$out/$zip" "$v"
+  verify_dmg "$out/$dmg" "$v"
 
   {
     changelog_section "$v" | awk 'NF{for(;b>0;b--)print ""; s=1; print; next} s{b++}'   # 去掉頭尾空行
@@ -163,12 +174,12 @@ cmd_build() {
     echo "## 安裝"
     echo
     if adhoc_release; then
-      echo "下載 \`$zip\`，解壓縮後把 \`MacMeow.app\` 拖到「應用程式」。本版未經 Apple 公證：第一次開啟被擋時，到「系統設定 → 隱私權與安全性」按「仍要打開」。詳見 README。"
+      echo "下載 \`$dmg\`，開啟後把 \`MacMeow.app\` 拖到視窗中的 Applications（應用程式）。本版未經 Apple 公證：第一次開啟被擋時，到「系統設定 → 隱私權與安全性」按「仍要打開」。詳見 README。"
     else
-      echo "下載 \`$zip\`，解壓縮後把 \`MacMeow.app\` 拖到「應用程式」並開啟。詳見 README。"
+      echo "下載 \`$dmg\`，開啟後把 \`MacMeow.app\` 拖到視窗中的 Applications（應用程式），再從「應用程式」開啟。詳見 README。"
     fi
     echo
-    echo "SHA-256：\`$(cut -d' ' -f1 "$out/$zip.sha256")\`"
+    echo "SHA-256：\`$(cut -d' ' -f1 "$out/$dmg.sha256")\`"
     echo
     echo "## 授權與原始碼（LGPL）"
     echo
@@ -180,7 +191,7 @@ cmd_build() {
   echo "產物：$out"
   ls -1 "$out" | sed 's/^/  /'
   [[ -n "${GITHUB_ACTIONS:-}" ]] \
-    || echo "請先冒煙測試 ${out}/${zip}；正式發佈用 publish（由 CI 建置），CI 無法使用時改用 draft ${v} 與 release ${v}"
+    || echo "請先冒煙測試 ${out}/${dmg}；正式發佈用 publish（由 CI 建置），CI 無法使用時改用 draft ${v} 與 release ${v}"
 }
 
 cmd_publish() {
@@ -209,7 +220,7 @@ cmd_ci() {
 
 cmd_draft() {
   local v="$1" out="$ROOT/dist/release/$1" state
-  local assets=("$out/MacMeow-$v.zip" "$out/MacMeow-$v.zip.sha256")
+  local assets=("$out/MacMeow-$v.dmg" "$out/MacMeow-$v.dmg.sha256")
   [[ -f "${assets[0]}" && -f "${assets[1]}" && -f "$out/release-notes.md" ]] || die "找不到 ${out} 的產物，請先執行 build"
   command -v gh >/dev/null || die "需要 gh（brew install gh）"
   if state="$(gh release view "v$v" --json isDraft --jq .isDraft 2>/dev/null)"; then
@@ -226,7 +237,7 @@ cmd_draft() {
 }
 
 cmd_release() {
-  local v="$1" zip="MacMeow-$1.zip" state tmp
+  local v="$1" dmg="MacMeow-$1.dmg" state tmp
   command -v gh >/dev/null || die "需要 gh（brew install gh）"
   echo "正式發佈 ${v}："
   state="$(gh release view "v$v" --json isDraft --jq .isDraft 2>/dev/null)" \
@@ -239,10 +250,10 @@ cmd_release() {
 
   # 驗證的是使用者實際會下載的附件，而非本機 dist/
   tmp="$(mktemp -d)"
-  gh release download "v$v" --pattern "$zip" --pattern "$zip.sha256" -D "$tmp"
-  ( cd "$tmp" && shasum -a 256 -c "$zip.sha256" >/dev/null ) || die "${zip} 與 ${zip}.sha256 不符"
+  gh release download "v$v" --pattern "$dmg" --pattern "$dmg.sha256" -D "$tmp"
+  ( cd "$tmp" && shasum -a 256 -c "$dmg.sha256" >/dev/null ) || die "${dmg} 與 ${dmg}.sha256 不符"
   ok "SHA-256"
-  verify_zip "$tmp/$zip" "$v"
+  verify_dmg "$tmp/$dmg" "$v"
   rm -rf "$tmp"
 
   gh release edit "v$v" --draft=false --latest >/dev/null

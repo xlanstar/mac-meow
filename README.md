@@ -2,7 +2,7 @@
 
 [![最新版本](https://img.shields.io/github/v/release/xlanstar/mac-meow?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/xlanstar/mac-meow/releases/latest)
 
-**[⬇ 下載最新版 MacMeow.app](https://github.com/xlanstar/mac-meow/releases/latest)**（在頁面下方「Assets」點 `MacMeow-<版本>.zip`）
+**[⬇ 下載最新版 MacMeow.app](https://github.com/xlanstar/mac-meow/releases/latest)**（在頁面下方「Assets」點 `MacMeow-<版本>.dmg`）
 
 讓 Apple Silicon（M 系列）Mac **不用虛擬機**，透過 [Cyder](https://github.com/dspp779/CyderBits)（Wine）執行台版楓之谷私服「貓貓谷」的原版登入流程。
 
@@ -27,15 +27,11 @@
 
 1. 安裝 Cyder：下載後把 `Cyder.app` 拖到「應用程式」，開啟一次讓它建立 Windows 環境。
 2. 取得 `MacMeow.app`：
-   - 從 [最新版 Release](https://github.com/xlanstar/mac-meow/releases/latest) 下載 `MacMeow-<版本>.zip` 並解壓縮；或
-   - 自行建置（需要 Xcode 或 `xcode-select --install`）：`bash app/build-app.sh` → `dist/MacMeow.app`
-3. 把 `MacMeow.app` 拖到「應用程式」，雙擊開啟。
+   - 從 [最新版 Release](https://github.com/xlanstar/mac-meow/releases/latest) 下載 `MacMeow-<版本>.dmg`；或
+   - 自行建置（需要 Xcode 或 `xcode-select --install`）：`bash app/build-app.sh` → `dist/MacMeow-<版本>.dmg`
+3. 雙擊開啟 `.dmg`，在出現的視窗中把 `MacMeow.app` 拖到旁邊的「Applications」（應用程式）資料夾，再從「應用程式」開啟 `MacMeow.app`。
    - Releases 的 App 經過 Apple 公證，第一次開啟時按「打開」即可。
-4. 按「開始遊戲」。第一次使用時，程式會依序：
-   - 請你選擇遊戲資料夾（預設會找 `~/Games/MapleStory`）
-   - 要求輸入電腦密碼，加入本機網路位址（只需一次，之後開機自動套用）
-   - 自動套用 Cyder 修補、安裝 VB6 執行環境、調整 Cyder 設定
-5. 貓貓谷登入器出現後，按「開始遊戲」，在遊戲內輸入帳號密碼。
+   - 安裝完成後可以在 Finder 側邊欄退出「MacMeow」磁碟，並刪除 `.dmg`。
 
 之後每次只要開啟 `MacMeow.app` 按「開始遊戲」即可。App 視窗會顯示環境檢查清單與連線通道狀態；遊戲執行中可以按「全部關閉」或「重新啟動」（會一併關閉其他 Cyder 遊戲）。同步機制等選項在選單「MacMeow → 設定⋯」。記錄檔在 `~/Library/Logs/MacMeow/launcher.log`，也可以在 App 內展開「詳細記錄」查看。
 
