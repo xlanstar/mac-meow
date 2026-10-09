@@ -421,14 +421,14 @@ private struct SyncCard: View {
                 Text("Wine 設定")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
-                if launcher.syncDirty {
+                if launcher.settingsDirty {
                     Text("下次「開始遊戲」時套用")
                         .font(.caption)
                         .foregroundStyle(.orange)
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.15), value: launcher.syncDirty)
+            .animation(.easeInOut(duration: 0.15), value: launcher.settingsDirty)
             .padding(.bottom, 6)
             HStack(spacing: 12) {
                 Image(systemName: "arrow.triangle.2.circlepath")
@@ -452,8 +452,48 @@ private struct SyncCard: View {
                 .fixedSize()
             }
             .padding(.vertical, 7)
+            Divider()
+            ToggleRow(
+                symbol: "xmark.app", title: "遊戲關閉時自動收尾",
+                help: "遊戲關閉後，自動關閉登入器、HostShield 等背景程式，Wine 也會跟著結束。不會關閉其他 Cyder 遊戲。",
+                isOn: $launcher.config.autoClose)
+            Divider()
+            ToggleRow(
+                symbol: "dock.rectangle", title: "登入器不顯示在 Dock",
+                help: "Dock 只留下遊戲的圖示。需要登入器視窗時，用選單「遊戲 → 顯示登入器」（⌘L）。",
+                isOn: $launcher.config.hideLauncherDock)
         }
         .modifier(Card(padding: 14))
+    }
+}
+
+private struct ToggleRow: View {
+    let symbol: String
+    let title: String
+    let help: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.orange)
+                .frame(width: 22)
+            HStack(spacing: 4) {
+                Text(title).font(.system(size: 13, weight: .medium))
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .help(help)
+            }
+            Spacer(minLength: 8)
+            Toggle(title, isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .tint(Theme.orange)
+        }
+        .padding(.vertical, 7)
     }
 }
 

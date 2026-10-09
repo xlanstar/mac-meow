@@ -16,6 +16,7 @@ List each change under `## Unreleased` as it lands
 - 關閉遊戲後自動關閉登入器、HostShield 等背景程式，Wine 也會完整結束，不必再按「全部關閉」；不影響其他 Cyder 遊戲（`AUTO_CLOSE=0` 可停用）
 - 登入器不再顯示在 Dock，Dock 只留遊戲的圖示（修補 Cyder 的 `winemac.so`，`uninstall.sh` 會還原；`HIDE_LAUNCHER_DOCK=0` 可停用）
 - 自動收尾與「全部關閉」會一併結束 Cyder 每次啟動後遺留的背景程序
+- `MacMeow.app` 的「Wine 設定」新增「遊戲關閉時自動收尾」與「登入器不顯示在 Dock」開關；選單新增「遊戲 → 顯示登入器」（⌘L）
 
 ## 0.1.0 — 2026-10-09
 

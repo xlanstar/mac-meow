@@ -28,9 +28,12 @@ final class Launcher: ObservableObject {
             Task { await refresh() }
         }
     }
-    /// 上次成功「開始遊戲」時套用的同步機制；與 config.sync 不同表示有尚未套用的變更。
-    @Published private(set) var appliedSync = AppConfig.load().sync
-    var syncDirty: Bool { config.sync != appliedSync }
+    /// 上次成功「開始遊戲」時套用的設定；與 config 不同表示有尚未套用的變更。
+    @Published private(set) var applied = AppConfig.load()
+    var settingsDirty: Bool {
+        config.sync != applied.sync || config.autoClose != applied.autoClose
+            || config.hideLauncherDock != applied.hideLauncherDock
+    }
 
     private let logFile = LogFile()
     private var pollTask: Task<Void, Never>?
@@ -98,11 +101,12 @@ final class Launcher: ObservableObject {
 
         // 3. 已在執行
         if s.running {
-            let choice = await Dialog.ask(
-                "貓貓谷已經在執行中", "登入器或遊戲視窗仍開著。",
-                buttons: ["好", "全部關閉後重新啟動"])
+            var buttons = ["好", "全部關閉後重新啟動"]
+            if s.launcherPid != nil { buttons.append("顯示登入器") }
+            let choice = await Dialog.ask("貓貓谷已經在執行中", "登入器或遊戲視窗仍開著。", buttons: buttons)
             guard choice == 1 else {
                 phase = .idle
+                if choice == 2 { showLauncher() }
                 return
             }
             guard await stopAll(confirm: false) else { return }
@@ -132,7 +136,7 @@ final class Launcher: ObservableObject {
 
         // 6. play.sh：修補、VB6、Cyder 設定、啟動認證器並等待通道
         phase = .working("正在啟動貓貓谷…")
-        let sync = config.sync
+        let launched = config
         var env = config.environment
         env["MACMEOW_PROGRESS"] = "1"
         var lastError: String?
@@ -159,7 +163,7 @@ final class Launcher: ObservableObject {
         await refresh()
         if exitCode == 0 {
             phase = .launched
-            appliedSync = sync
+            applied = launched
             record("完成：登入器已啟動")
         } else {
             fail(lastStep, lastError ?? "啟動沒有完成。")
@@ -270,6 +274,14 @@ final class Launcher: ObservableObject {
                 buttons: ["開啟下載頁", "取消"])
             if choice == 0 { NSWorkspace.shared.open(AppPaths.cyderDownload) }
         }
+    }
+
+    /// 把登入器帶到前景。登入器不在 Dock 時（launcher-dock.sh），Wine 會在程式被啟用時還原縮到最小的視窗。
+    func showLauncher() {
+        guard let pid = status.launcherPid,
+            let app = NSRunningApplication(processIdentifier: pid)
+        else { return }
+        app.activate(options: [.activateAllWindows])
     }
 
     func openCyder() {

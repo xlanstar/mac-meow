@@ -40,6 +40,10 @@
 
 之後每次只要開啟 `MacMeow.app` 按「開始遊戲」即可。App 視窗會顯示環境檢查清單與連線通道狀態；遊戲執行中可以按「全部關閉」或「重新啟動」（會一併關閉其他 Cyder 遊戲）。同步機制可以在 App 首頁的「Wine 設定」切換。記錄檔在 `~/Library/Logs/MacMeow/launcher.log`，也可以在 App 內展開「詳細記錄」查看。
 
+- 關閉遊戲後，登入器、HostShield 等背景程式會在幾秒內自動關閉，不必再按「全部關閉」；其他 Cyder 遊戲不受影響。
+- Dock 只會出現遊戲的圖示，登入器不顯示在 Dock。需要登入器視窗時，選單「遊戲 → 顯示登入器」（⌘L）。
+- 這兩項可以在「Wine 設定」關閉，下次「開始遊戲」時套用。
+
 ### 不用 App，改用指令
 
 ```sh
@@ -54,7 +58,7 @@ bash scripts/play.sh status                   # 檢查通道／程序
 bash scripts/uninstall.sh
 ```
 
-會還原 Cyder engine 的修補、移除本機網路位址與 LaunchDaemon（需要密碼），以及 App 的設定與記錄。遊戲、Cyder 與其設定不會被刪除。
+會還原 Cyder engine 的修補與登入器的 Dock 設定、移除本機網路位址與 LaunchDaemon（需要密碼），以及 App 的設定與記錄。遊戲、Cyder 與其設定不會被刪除。
 
 ## 已知問題
 

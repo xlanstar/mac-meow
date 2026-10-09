@@ -19,6 +19,7 @@ struct MacMeowApp: App {
                     .keyboardShortcut("r")
                 Button("全部關閉…") { Task { await launcher.stopAll() } }
                     .keyboardShortcut(".")
+                ShowLauncherButton(launcher: launcher)
                 Divider()
                 Button("選擇遊戲資料夾…") { Task { await launcher.chooseGameDir() } }
                 Button("設定本機網路位址…") { Task { await launcher.setupLoopback() } }
@@ -32,6 +33,17 @@ struct MacMeowApp: App {
                 Button("專案網頁") { NSWorkspace.shared.open(AppPaths.repo) }
             }
         }
+    }
+}
+
+/// 選單「顯示登入器」：登入器執行中才可用（需要觀察狀態，所以獨立成 View）。
+private struct ShowLauncherButton: View {
+    @ObservedObject var launcher: Launcher
+
+    var body: some View {
+        Button("顯示登入器") { launcher.showLauncher() }
+            .keyboardShortcut("l")
+            .disabled(launcher.status.launcherPid == nil)
     }
 }
 

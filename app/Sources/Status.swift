@@ -15,6 +15,9 @@ struct EnvStatus: Equatable {
     var helpers = false
     var launcher = false
     var game = false
+    /// 登入器的 PID（「顯示登入器」用；登入器不在 Dock 時沒有其他方式叫出視窗）。
+    var launcherPid: pid_t?
+    var watching = false
     var tunnels = 0
     var tunnelsTotal = 4
 
@@ -36,6 +39,8 @@ struct EnvStatus: Equatable {
         helpers = flag("helpers")
         launcher = flag("launcher")
         game = flag("game")
+        launcherPid = v["launcher_pid"].flatMap { pid_t($0) }
+        watching = flag("watching")
         tunnels = Int(v["tunnels"] ?? "") ?? 0
         tunnelsTotal = Int(v["tunnels_total"] ?? "") ?? 4
     }
