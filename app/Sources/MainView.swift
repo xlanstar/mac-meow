@@ -457,11 +457,6 @@ private struct SyncCard: View {
                 symbol: "xmark.app", title: "遊戲關閉時自動收尾",
                 help: "遊戲關閉後，自動關閉登入器、HostShield 等背景程式，Wine 也會跟著結束。不會關閉其他 Cyder 遊戲。",
                 isOn: $launcher.config.autoClose)
-            Divider()
-            ToggleRow(
-                symbol: "dock.rectangle", title: "登入器不顯示在 Dock",
-                help: "Dock 只留下遊戲的圖示。需要登入器視窗時，用選單「遊戲 → 顯示登入器」（⌘L）。",
-                isOn: $launcher.config.hideLauncherDock)
         }
         .modifier(Card(padding: 14))
     }

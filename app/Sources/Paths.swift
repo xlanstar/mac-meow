@@ -44,8 +44,6 @@ struct AppConfig: Equatable {
     var sync: SyncMode = .msync
     /// 遊戲關閉時自動關閉登入器與背景程式（play.sh 的 AUTO_CLOSE）。
     var autoClose = true
-    /// 登入器不顯示在 Dock（play.sh 的 HIDE_LAUNCHER_DOCK）。
-    var hideLauncherDock = true
 
     static func load() -> AppConfig {
         var config = AppConfig()
@@ -57,7 +55,6 @@ struct AppConfig: Equatable {
             case "GAME_DIR": config.gameDir = value.isEmpty ? nil : value
             case "MAPLE_SYNC": config.sync = SyncMode(rawValue: value) ?? .msync
             case "AUTO_CLOSE": config.autoClose = value != "0"
-            case "HIDE_LAUNCHER_DOCK": config.hideLauncherDock = value != "0"
             default: break
             }
         }
@@ -69,7 +66,6 @@ struct AppConfig: Equatable {
         if let gameDir { text += "GAME_DIR=\(gameDir)\n" }
         text += "MAPLE_SYNC=\(sync.rawValue)\n"
         text += "AUTO_CLOSE=\(autoClose ? 1 : 0)\n"
-        text += "HIDE_LAUNCHER_DOCK=\(hideLauncherDock ? 1 : 0)\n"
         try? FileManager.default.createDirectory(at: AppPaths.supportDir, withIntermediateDirectories: true)
         try? text.write(to: AppPaths.configFile, atomically: true, encoding: .utf8)
     }
@@ -79,7 +75,6 @@ struct AppConfig: Equatable {
         var env = [
             "MAPLE_SYNC": sync.rawValue,
             "AUTO_CLOSE": autoClose ? "1" : "0",
-            "HIDE_LAUNCHER_DOCK": hideLauncherDock ? "1" : "0",
         ]
         if let gameDir { env["GAME_DIR"] = gameDir }
         return env

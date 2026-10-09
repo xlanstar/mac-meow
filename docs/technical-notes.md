@@ -59,7 +59,7 @@
 - 已試無效：Rosetta 隱藏環境變數（`ROSETTA_*`、`CAMBRIA_*`）、MAP_JIT、一般 RWX、共享或檔案映射、不可執行頁。
 - 結論：根治需改動遊戲記憶體，會碰到 Themida/NGS 防外掛，不採用。使用者只能避開人多的頻道與地圖。
 
-## 10. Dock 上有兩個楓之谷圖示（登入器不能隱藏）
+## 10. Dock 上有兩個楓之谷圖示（隱藏登入器會讓遊戲斷線，未採用）
 
 - 症狀：開始遊戲後，Dock 上同時有登入器與遊戲兩個 `wine` 圖示。登入器會一直把自己縮到最小，手動打開又會立刻縮小。
 - 根因：每個 Wine 程式都是獨立的 macOS 程序。`winemac.drv` 在程式第一次顯示視窗時（`-[WineApplicationController transformProcessToForeground:]`）把它設成一般 App（`NSApplicationActivationPolicyRegular`），之後不會改回。登入器在遊戲執行期間要轉發遊戲連線（見 [architecture.md](architecture.md) 的連線路徑），不能關閉。
@@ -74,7 +74,10 @@
   - 「已轉成前景程式就返回」的檢查從 `policy == Regular` 改成 `policy != Prohibited`，避免 Accessory 程式每次顯示視窗都重建選單並搶走焦點。
   - `launcher-dock.sh` 只對 `貓貓TMS登入器.exe` 寫入 `AppDefaults\貓貓TMS登入器.exe\Mac Driver\CaptureDisplaysForFullscreen=y`。其他程式（包含 `MapleStory.exe`）的值是預設的 `n`，行為不變。這個值原本只影響全螢幕時是否鎖定螢幕，登入器不會全螢幕。
   - 登入器沒有 Dock 圖示時，Wine 會在程式被啟用時還原縮到最小的視窗（`applicationDidBecomeActive:` → `unminimizeWindowIfNoneVisible`），MacMeow 的「顯示登入器」就是啟用該程序。
-- 結果：`lsappinfo` 顯示登入器為 `UIElement`，Dock 的項目清單中沒有登入器；登入器視窗照常顯示並完成載入。
+- 結果：`lsappinfo` 顯示登入器為 `UIElement`，Dock 的項目清單中沒有登入器；登入器視窗照常顯示並完成載入。但按「開始遊戲」後，遊戲顯示「與登入伺服器連線中斷」：
+  - 遊戲的連線經過登入器在 `202.80.104.28:37629` 的轉發；此時直接連 HostShield（`127.145.37.1:37629`）可立即收到伺服器的 handshake，經登入器轉發則沒有回應。
+  - 同一台機器把登入器改回一般 App（刪除登錄值）後，遊戲可以正常登入。輔助程式在視窗縮到最小後轉發停擺的確切原因（例如 macOS 對沒有可見視窗的輔助程式節流）尚未查明。
+  - 結論：改為實驗性，預設關閉（`HIDE_LAUNCHER_DOCK=1` 才套用），App 不提供選項；未啟用時 `play.sh` 會刪除登錄值並還原 `winemac.so`。
 
 ## 11. 關閉遊戲後登入器與 Wine 程式殘留
 

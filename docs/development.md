@@ -23,7 +23,6 @@ GAME_DIR=~/Games/MapleStory bash scripts/play.sh   # 直接跑使用者流程
 bash scripts/play.sh status                        # 通道／程序狀態
 bash scripts/patch-cyder-dlls.sh check             # 各修補也都有 check
 bash scripts/session.sh status                     # 遊戲階段監看；記錄在 ~/Library/Logs/MacMeow/session.log
-lsappinfo list | grep -A4 '"wine"'                 # 登入器應為 type="UIElement"（不在 Dock），遊戲為 "Foreground"
 ```
 
 ## 提交前檢查（prek）

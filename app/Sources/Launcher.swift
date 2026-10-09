@@ -32,7 +32,6 @@ final class Launcher: ObservableObject {
     @Published private(set) var applied = AppConfig.load()
     var settingsDirty: Bool {
         config.sync != applied.sync || config.autoClose != applied.autoClose
-            || config.hideLauncherDock != applied.hideLauncherDock
     }
 
     private let logFile = LogFile()
@@ -276,7 +275,7 @@ final class Launcher: ObservableObject {
         }
     }
 
-    /// 把登入器帶到前景。登入器不在 Dock 時（launcher-dock.sh），Wine 會在程式被啟用時還原縮到最小的視窗。
+    /// 把登入器帶到前景；Wine 會在程式被啟用時還原縮到最小的視窗。
     func showLauncher() {
         guard let pid = status.launcherPid,
             let app = NSRunningApplication(processIdentifier: pid)

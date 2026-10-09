@@ -20,11 +20,11 @@ MapleStory.exe → 202.80.104.28:37629（lo0 alias）
 使用者流程（只能用 macOS 內建指令）：
 
 - `scripts/lib/common.sh`：所有使用者腳本共用的路徑、常數（遊戲檔案、HostShield 與迴路位址）與函式（`wine_running`、`wineserver_kill` 等）。
-- `scripts/play.sh`：入口。依序檢查前置條件、處理前次殘留程序、套用 loopback、DLL 與 winemac 修補（winemac 失敗只警告）、`vb6run`、登入器 Dock 設定（`launcher-dock.sh`）、Cyder 設定（`wineLocale=zh_TW`、`graphicsBackend=dxmt`、`msync`），再以 `open -a Cyder` 開 `認證器.exe`，等待 4 個 HostShield 位址都在監聽，最後啟動 `session.sh start`（登入器已在執行時也會補啟動）。`play.sh status` 顯示狀態，`status --porcelain` 輸出給 App 讀的 `key=value`，`stop` 關閉 shared bottle 內所有 Windows 程式。設 `MACMEOW_PROGRESS=1` 時各步驟訊息改為 `@@STEP <id> <訊息>`。
+- `scripts/play.sh`：入口。依序檢查前置條件、處理前次殘留程序、套用 loopback 與 DLL 修補、`vb6run`、Cyder 設定（`wineLocale=zh_TW`、`graphicsBackend=dxmt`、`msync`），再以 `open -a Cyder` 開 `認證器.exe`，等待 4 個 HostShield 位址都在監聽，最後啟動 `session.sh start`（登入器已在執行時也會補啟動）。`play.sh status` 顯示狀態，`status --porcelain` 輸出給 App 讀的 `key=value`，`stop` 關閉 shared bottle 內所有 Windows 程式。設 `MACMEOW_PROGRESS=1` 時各步驟訊息改為 `@@STEP <id> <訊息>`。
 - `scripts/setup-loopback.sh install|uninstall|status`：lo0 alias 與 LaunchDaemon `tw.macmeow.loopback`。位址清單是 `common.sh` 的 `LOOPBACK_IPS`。唯一需要 root 的步驟。
 - `scripts/patch-cyder-loopback.sh check|apply|restore`：wineserver 1 byte 修補；指令序列找不到或不唯一就不修改。
 - `scripts/patch-cyder-dlls.sh check|apply|restore`：以 `patches/bin` 的 DLL 取代 engine 內建版；先比對 `SHA256SUMS`，只套用到 CrossOver 基底 26.3.0。
-- `scripts/patch-cyder-winemac.sh check|apply|restore`：改 engine `winemac.so` 兩段指令，讓設了 `CaptureDisplaysForFullscreen=y` 的程式成為沒有 Dock 圖示的輔助程式（[technical-notes.md](technical-notes.md) #10）。只套用到 SHA-256 已知的 `winemac.so`；其他版本 `apply` 回傳 2、不修改。
+- `scripts/patch-cyder-winemac.sh check|apply|restore`（實驗性，只在 `HIDE_LAUNCHER_DOCK=1` 時由 `play.sh` 套用；未設定且 Wine 沒在執行時 `play.sh` 會還原）：改 engine `winemac.so` 兩段指令，讓設了 `CaptureDisplaysForFullscreen=y` 的程式成為沒有 Dock 圖示的輔助程式（[technical-notes.md](technical-notes.md) #10）。只套用到 SHA-256 已知的 `winemac.so`；其他版本 `apply` 回傳 2、不修改。
 - `scripts/launcher-dock.sh status|hide|show`：在 shared bottle 登錄寫入或刪除 `AppDefaults\貓貓TMS登入器.exe\Mac Driver\CaptureDisplaysForFullscreen=y`（以 Wine 的 `reg.exe`；`status` 直接讀 `user.reg`）。
 - `scripts/session.sh start|watch|close|status|cleanup`：遊戲階段監看（[technical-notes.md](technical-notes.md) #11）。`start` 以 `nohup` 在背景執行 `watch`，PID 記在 `session-watch.pid`，記錄寫到 `session.log`；同時只有一個，wineserver PID 改變（Wine 結束）就退出。本專案程式的判斷在 `common.sh` 的 `session_procs`。
 - `scripts/report.sh [log <記錄檔> [行數]|bundle <輸出.zip> [記錄檔]]`：問題回報用的診斷資訊。預設輸出環境摘要（Markdown：App／macOS／Cyder／engine 版本、Cyder 設定、`MapleStory.exe` 大小與雜湊前綴、修補 `check`、`status --porcelain`）；`bundle` 以 `ditto` 打包摘要、`play.sh status`、記錄檔最後 5000 行與 7 天內的 MacMeow 當機報告。所有輸出經 `redact()` 隱藏家目錄、`/Users/<名稱>`、使用者名稱（3 字元以上）與 HostShield 程序參數中的 token；不讀取 `login.txt`。App 以 `MACMEOW_VERSION` 傳入版本。
@@ -37,7 +37,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
   - 啟動：依序檢查 Cyder、遊戲資料夾（`NSOpenPanel`，以 porcelain 驗證）、Cyder 初始化（開啟 Cyder 等待 prefix）、迴路位址（`osascript … with administrator privileges` 執行 `setup-loopback.sh install`），再以 `MACMEOW_PROGRESS=1` 執行 `play.sh`，解析 `@@STEP <id> <訊息>`（`common.sh` 的 `progress`）顯示進度。
   - 全部關閉：確認後執行 `play.sh stop`。
   - 顯示登入器：以 porcelain 的 `launcher_pid` 啟用登入器程序（`NSRunningApplication.activate`）；Wine 會還原縮到最小的視窗。
-  - 「Wine 設定」卡：同步機制、遊戲關閉時自動收尾、登入器不顯示在 Dock，存在 config 並以環境變數傳給 `play.sh`。
+  - 「Wine 設定」卡：同步機制、遊戲關閉時自動收尾，存在 config 並以環境變數傳給 `play.sh`。
   - 回報問題（`BugReport.swift`）：sheet 表單，以 `report.sh` 與 `report.sh log` 取得預覽內容；送出時以 `report.sh bundle` 在 `~/Library/Logs/MacMeow/reports/` 產生診斷檔並在 Finder 選取，再開啟 `issues/new?template=bug_report.yml&<欄位 id>=…` 預先填好 `.github/ISSUE_TEMPLATE/bug_report.yml` 的欄位（網址超過 7000 字元時先刪減記錄再截短文字）。沒有後端；改欄位 id 時兩邊一起改。
 - `app/make-icon.swift`：以 Core Graphics 繪製 App 圖示，建置時轉成 `AppIcon.icns`。
 - `app/make-dmg-background.swift`：繪製 dmg 視窗背景（1x／2x，`tiffutil` 合成 `background.tiff`）。版面座標與 `build-app.sh` 中 Finder 排版的視窗大小、圖示位置必須一致。
@@ -59,11 +59,11 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
 - Cyder engine `~/.cyder/runtime/Engines/wine-x86_64`：wineserver 與 DLL 被修補，開發時 `bin/wine` 可能被重新簽章；原檔備份為 `*.macmeow-orig`，DLL 另有 `*.macmeow-applied` 標記 → `patch-cyder-*.sh restore`、`tools/sign-debug.sh restore`（還原後刪除備份）。
 - Cyder bottle `~/Library/Application Support/Cyder/bottles/shared`：安裝 `vb6run` → 保留。
 - Cyder engine `lib/wine/x86_64-unix/winemac.so`：兩段指令被修補並重新 ad-hoc 簽章；原檔備份為 `winemac.so.macmeow-orig` → `patch-cyder-winemac.sh restore`。
-- Cyder shared bottle 登錄（`user.reg`）：`HKCU\Software\Wine\AppDefaults\貓貓TMS登入器.exe\Mac Driver` 的 `CaptureDisplaysForFullscreen="y"` → `launcher-dock.sh show`（`uninstall.sh` 呼叫；App 關閉「登入器不顯示在 Dock」時 `play.sh` 也會呼叫）。
+- Cyder shared bottle 登錄（`user.reg`）：`HKCU\Software\Wine\AppDefaults\貓貓TMS登入器.exe\Mac Driver` 的 `CaptureDisplaysForFullscreen="y"` → `launcher-dock.sh show`（`uninstall.sh` 呼叫；`HIDE_LAUNCHER_DOCK` 不是 `1` 時 `play.sh` 也會呼叫）。
 - Cyder 的程序：`session.sh` 在 Wine 結束後結束 Cyder 遺留的 `CyderSwift --sentinel-connect`（只限 `--fifo` 已刪除或 PPID 為 1 者）→ 不需還原。
 - Cyder `settings.json`：`wineLocale`、`graphicsBackend`、`msync`、`esync` → 保留，`uninstall.sh` 提示使用者自行調整。
 - lo0 alias 與 `/Library/LaunchDaemons/tw.macmeow.loopback.plist` → `setup-loopback.sh uninstall`。
-- `~/Library/Application Support/MacMeow/config`（`GAME_DIR=`、`MAPLE_SYNC=`、`AUTO_CLOSE=`、`HIDE_LAUNCHER_DOCK=`）與 `session-watch.pid`、`~/Library/Logs/MacMeow/`（`launcher.log`、`session.log`、回報診斷檔 `reports/`）、App 偏好設定 `tw.macmeow.launcher`（SwiftUI 視窗位置）與 `~/Library/Saved Application State/tw.macmeow.launcher.savedState` → `uninstall.sh` 刪除。
+- `~/Library/Application Support/MacMeow/config`（`GAME_DIR=`、`MAPLE_SYNC=`、`AUTO_CLOSE=`）與 `session-watch.pid`、`~/Library/Logs/MacMeow/`（`launcher.log`、`session.log`、回報診斷檔 `reports/`）、App 偏好設定 `tw.macmeow.launcher`（SwiftUI 視窗位置）與 `~/Library/Saved Application State/tw.macmeow.launcher.savedState` → `uninstall.sh` 刪除。
 
 ## 環境變數
 
@@ -71,7 +71,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
 - `CYDER_ENGINE`（預設 `~/.cyder/runtime/Engines/wine-x86_64`）：Cyder engine 路徑。
 - `MAPLE_SYNC`（預設 `msync`，可為 `none|msync|esync`）：寫入 Cyder 設定的同步模式。
 - `AUTO_CLOSE`（預設 `1`）：`0` 時 `play.sh` 不啟動 `session.sh`，遊戲關閉後不自動收尾。
-- `HIDE_LAUNCHER_DOCK`（預設 `1`）：`1` 時 `play.sh` 執行 `launcher-dock.sh hide`，`0` 時執行 `show`。
+- `HIDE_LAUNCHER_DOCK`（預設 `0`，實驗性）：`1` 時 `play.sh` 套用 winemac 修補並執行 `launcher-dock.sh hide`，否則執行 `show` 並還原 winemac 修補。開啟後遊戲會與登入伺服器斷線（[technical-notes.md](technical-notes.md) #10），App 不提供這個選項。
 
 ## 外部變動時要更新的地方
 

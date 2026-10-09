@@ -7,7 +7,7 @@
 #   bash scripts/play.sh status     # 查看迴路位址、通道與 Wine 程序狀態
 #   bash scripts/play.sh status --porcelain   # 機器可讀的 key=value 狀態（MacMeow.app 使用）
 #   bash scripts/play.sh stop       # 關閉 Cyder shared bottle 內所有 Windows 程式（含其他 Cyder 遊戲）
-# 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none、AUTO_CLOSE=1|0、HIDE_LAUNCHER_DOCK=1|0
+# 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none、AUTO_CLOSE=1|0、HIDE_LAUNCHER_DOCK=0|1
 # （見 docs/architecture.md）
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -129,9 +129,14 @@ fi
 progress patch "檢查 Cyder engine 修補 ..."
 bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check >/dev/null 2>&1 || bash "$SCRIPT_DIR/patch-cyder-loopback.sh" apply
 bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check >/dev/null 2>&1 || bash "$SCRIPT_DIR/patch-cyder-dlls.sh" apply
-#    winemac：讓登入器可以不顯示在 Dock。只是外觀，engine 不是已知版本時照常啟動。
-bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check >/dev/null 2>&1 \
-  || bash "$SCRIPT_DIR/patch-cyder-winemac.sh" apply || echo "注意：無法套用 winemac 修補，登入器會照常顯示在 Dock"
+#    winemac：讓登入器可以不顯示在 Dock（實驗性，預設關閉：會讓遊戲與登入伺服器斷線，
+#    見 docs/technical-notes.md #10）。關閉時把先前套用的修補還原。
+if [[ "${HIDE_LAUNCHER_DOCK:-0}" == 1 ]]; then
+  bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check >/dev/null 2>&1 \
+    || bash "$SCRIPT_DIR/patch-cyder-winemac.sh" apply || echo "注意：無法套用 winemac 修補，登入器會照常顯示在 Dock"
+elif bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check >/dev/null 2>&1 && wine_stopped; then
+  bash "$SCRIPT_DIR/patch-cyder-winemac.sh" restore
+fi
 
 # 4. 認證器.exe 是 VB6 程式，需要 VB6 runtime
 if ! vb6_installed; then
@@ -143,7 +148,7 @@ if ! vb6_installed; then
 fi
 
 # 4b. 登入器的 Dock 圖示（Wine 登錄；需要 patch-cyder-winemac.sh 的修補才有作用）
-if [[ "${HIDE_LAUNCHER_DOCK:-1}" == 1 ]]; then
+if [[ "${HIDE_LAUNCHER_DOCK:-0}" == 1 ]]; then
   bash "$SCRIPT_DIR/launcher-dock.sh" status >/dev/null 2>&1 || {
     progress settings "設定登入器不顯示在 Dock ..."
     bash "$SCRIPT_DIR/launcher-dock.sh" hide || echo "注意：無法設定登入器的 Dock 圖示"

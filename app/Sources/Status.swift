@@ -15,7 +15,7 @@ struct EnvStatus: Equatable {
     var helpers = false
     var launcher = false
     var game = false
-    /// 登入器的 PID（「顯示登入器」用；登入器不在 Dock 時沒有其他方式叫出視窗）。
+    /// 登入器的 PID（選單「顯示登入器」用）。
     var launcherPid: pid_t?
     var watching = false
     var tunnels = 0
