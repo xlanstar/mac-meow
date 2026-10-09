@@ -5,6 +5,7 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- 從終端機執行 `scripts/play.sh` 等腳本時沿用 `MacMeow.app` 的遊戲資料夾與遊戲設定；覆寫設定的環境變數改名為 `MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`、`MACMEOW_HUD`、`MACMEOW_MAX_FPS`、`MACMEOW_AUTO_CLOSE`、`MACMEOW_HIDE_LAUNCHER_DOCK`
 - `MacMeow.app` 首頁的「Wine 設定」改名為「遊戲設定」
 - `MacMeow.app` 的「遊戲設定」新增「圖形後端」：預設改用 D3DMetal（需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時自動改用 DXMT），也可改選 DXMT
 - `MacMeow.app` 的「遊戲設定」新增「FPS 上限」：60、120、144 或不限制（預設），DXMT 與 D3DMetal 都適用

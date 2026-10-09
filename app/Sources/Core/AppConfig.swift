@@ -1,6 +1,6 @@
 import Foundation
 
-/// Cyder 的同步機制（傳給 play.sh 的 SYNC）。
+/// Cyder 的同步機制（設定檔的 SYNC）。
 enum SyncMode: String, CaseIterable, Identifiable {
     case msync, esync, none
     var id: String { rawValue }
@@ -13,7 +13,7 @@ enum SyncMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// Cyder 的圖形後端（傳給 play.sh 的 GRAPHICS_BACKEND）。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷。
+/// Cyder 的圖形後端（設定檔的 GRAPHICS_BACKEND）。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷。
 enum GraphicsBackend: String, CaseIterable, Identifiable {
     case d3dmetal, dxmt
     var id: String { rawValue }
@@ -25,7 +25,7 @@ enum GraphicsBackend: String, CaseIterable, Identifiable {
     }
 }
 
-/// FPS 上限（傳給 play.sh 的 MAX_FPS）。選項與 Cyder 的 dxvkFrameRate 相同。
+/// FPS 上限（設定檔的 MAX_FPS）。選項與 Cyder 的 dxvkFrameRate 相同。
 enum FPSCap: String, CaseIterable, Identifiable {
     case fps60 = "60"
     case fps120 = "120"
@@ -39,14 +39,16 @@ enum FPSCap: String, CaseIterable, Identifiable {
 struct GameSettings: Equatable {
     var sync: SyncMode = .msync
     var graphicsBackend: GraphicsBackend = .d3dmetal
-    /// Metal 效能 HUD，顯示 FPS（play.sh 的 HUD）。
+    /// Metal 效能 HUD，顯示 FPS（設定檔的 HUD）。
     var metalHUD = false
     var fpsCap: FPSCap = .unlimited
-    /// 遊戲關閉時自動關閉登入器與背景程式（play.sh 的 AUTO_CLOSE）。
+    /// 遊戲關閉時自動關閉登入器與背景程式（設定檔的 AUTO_CLOSE）。
     var autoClose = true
 }
 
-/// App 設定。存檔與傳給 scripts/ 的環境變數使用同一組 KEY=VALUE。
+/// App 設定，存在 ~/Library/Application Support/MacMeow/config（每行 KEY=VALUE）。
+/// scripts/lib/common.sh 的 load_settings 也直接讀同一個設定檔；
+/// 傳給 scripts/ 的環境變數名稱為 `MACMEOW_` + KEY（GAME_DIR 不加前綴），會蓋過設定檔的值。
 struct AppConfig: Equatable {
     /// nil 表示沒選過，由 common.sh 使用預設資料夾。
     var gameDir: String?
@@ -60,7 +62,7 @@ struct AppConfig: Equatable {
         self.settings = settings
     }
 
-    /// 由 KEY=VALUE 還原；缺少或無效的值使用預設值。
+    /// 由設定檔的 KEY=VALUE 還原；缺少或無效的值使用預設值。
     /// MAPLE_SYNC 是 0.3.0 以前的 key，下次存檔時改寫成 SYNC。
     init(values v: [String: String]) {
         let defaults = GameSettings()
@@ -72,23 +74,28 @@ struct AppConfig: Equatable {
         settings.autoClose = v["AUTO_CLOSE"].map { $0 != "0" } ?? defaults.autoClose
     }
 
-    /// 傳給 scripts/ 的環境變數。
-    var environment: [String: String] {
-        var env = [
+    /// 設定檔的 KEY=VALUE；GAME_DIR 只在選過時才有。
+    var values: [String: String] {
+        var v = [
             "SYNC": settings.sync.rawValue,
             "GRAPHICS_BACKEND": settings.graphicsBackend.rawValue,
             "HUD": settings.metalHUD ? "1" : "0",
             "MAX_FPS": settings.fpsCap.rawValue,
             "AUTO_CLOSE": settings.autoClose ? "1" : "0",
         ]
-        if let gameDir { env["GAME_DIR"] = gameDir }
-        return env
+        if let gameDir { v["GAME_DIR"] = gameDir }
+        return v
+    }
+
+    /// 傳給 scripts/ 的環境變數：`MACMEOW_` + KEY，GAME_DIR 維持原名。
+    var environment: [String: String] {
+        Dictionary(uniqueKeysWithValues: values.map { ($0 == "GAME_DIR" ? $0 : "MACMEOW_\($0)", $1) })
     }
 
     /// 設定檔內容（每行 KEY=VALUE）。
     var fileContents: String {
-        let env = environment
-        return Self.keys.compactMap { key in env[key].map { "\(key)=\($0)\n" } }.joined()
+        let v = values
+        return Self.keys.compactMap { key in v[key].map { "\(key)=\($0)\n" } }.joined()
     }
 }
 

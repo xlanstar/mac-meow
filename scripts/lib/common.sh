@@ -7,8 +7,7 @@ MACMEOW_COMMON_LOADED=1
 # 以管理員權限執行時 HOME 可能未設定；bash 的 ~ 在 HOME 未設定時改查 passwd。
 : "${HOME:=$(cd ~ && pwd)}"
 
-# ---------- 路徑（可用環境變數覆寫） ----------
-GAME_DIR="${GAME_DIR:-$HOME/Games/MapleStory}"
+# ---------- 路徑（可用環境變數覆寫；GAME_DIR 見下方「設定」） ----------
 CYDER_ENGINE="${CYDER_ENGINE:-$HOME/.cyder/runtime/Engines/wine-x86_64}"
 CYDER_ENGINE="${CYDER_ENGINE%/}" # 去掉結尾斜線，供路徑前綴比對（sign-debug.sh 等）
 CYDER_SUPPORT="$HOME/Library/Application Support/Cyder"
@@ -20,6 +19,63 @@ WINESERVER_BIN="$CYDER_ENGINE/bin/wineserver"
 MACMEOW_SUPPORT="$HOME/Library/Application Support/MacMeow"
 MACMEOW_LOGS="$HOME/Library/Logs/MacMeow"
 MACMEOW_CACHE="$HOME/Library/Caches/MacMeow" # update.sh 下載的新版
+MACMEOW_CONFIG="$MACMEOW_SUPPORT/config"     # App 的設定檔（app/Sources/Core/AppConfig.swift）
+
+# ---------- 設定 ----------
+# 每行「名稱 預設值 允許值」。值的來源依序為：環境變數 MACMEOW_<名稱>、設定檔的 <名稱>=、預設值；
+# 結果存在 MACMEOW_<名稱>。遊戲資料夾同理，但環境變數名稱是 GAME_DIR。
+# 從終端機執行時也會沿用 App 的設定；App 端的預設值與選項見 AppConfig.swift。
+MACMEOW_SETTINGS="SYNC msync msync|esync|none
+GRAPHICS_BACKEND d3dmetal d3dmetal|dxmt
+HUD 0 0|1
+MAX_FPS unlimited 60|120|144|unlimited
+AUTO_CLOSE 1 0|1
+HIDE_LAUNCHER_DOCK 0 0|1"
+
+# setting_allowed <名稱> <值>：值是該設定允許的值（GAME_DIR 只要不是空字串）。
+setting_allowed() {
+  local name _default allowed
+  if [[ "$1" == GAME_DIR ]]; then
+    [[ -n "$2" ]]
+    return
+  fi
+  while read -r name _default allowed; do
+    if [[ "$name" == "$1" ]]; then
+      [[ "|$allowed|" == *"|$2|"* ]]
+      return
+    fi
+  done <<<"$MACMEOW_SETTINGS"
+  return 1
+}
+
+# load_settings：決定各設定的值（載入本檔時執行）。設定檔中的無效值視為未設定（與 App 相同）；
+# 環境變數的值由 validate_settings 檢查。
+load_settings() {
+  local key val var name default _allowed
+  if [[ -r "$MACMEOW_CONFIG" ]]; then
+    while IFS='=' read -r key val || [[ -n "$key" ]]; do
+      setting_allowed "$key" "$val" || continue
+      var="MACMEOW_$key"
+      [[ "$key" == GAME_DIR ]] && var=GAME_DIR
+      [[ -n "${!var:-}" ]] || printf -v "$var" '%s' "$val"
+    done <"$MACMEOW_CONFIG"
+  fi
+  while read -r name default _allowed; do
+    var="MACMEOW_$name"
+    [[ -n "${!var:-}" ]] || printf -v "$var" '%s' "$default"
+  done <<<"$MACMEOW_SETTINGS"
+  GAME_DIR="${GAME_DIR:-$HOME/Games/MapleStory}"
+  GAME_DIR="${GAME_DIR%/}" # 去掉結尾斜線，供路徑前綴比對（session_procs 等）
+}
+
+# validate_settings：有不允許的值就結束。只在要套用設定時呼叫（play.sh、cyder-settings.sh check|apply）。
+validate_settings() {
+  local name _default allowed var
+  while read -r name _default allowed; do
+    var="MACMEOW_$name"
+    setting_allowed "$name" "${!var}" || die "${var} 只能是 ${allowed}"
+  done <<<"$MACMEOW_SETTINGS"
+}
 
 # ---------- MacMeow.app 發佈 ----------
 # 一鍵更新（update.sh）只從這個 repo 的 Release 下載，且新版必須符合 MACMEOW_REQUIREMENT；
@@ -144,7 +200,7 @@ vb6_installed() { [[ -f "$CYDER_PREFIX/drive_c/windows/syswow64/msvbvm60.dll" ]]
 progress() {
   local id="$1"
   shift
-  if [[ -n "${MACMEOW_PROGRESS:-}" ]]; then echo "@@STEP $id $*"; else echo "$*"; fi
+  if [[ "${MACMEOW_PROGRESS:-0}" == 1 ]]; then echo "@@STEP $id $*"; else echo "$*"; fi
 }
 
 # wineservers：這個 engine 執行中的 wineserver，每行「PID shared|other」（是否為 shared bottle 的 server）。
@@ -301,3 +357,5 @@ dmg_attach() {
     hdiutil attach "${h[@]}" "$1"
   fi
 }
+
+load_settings

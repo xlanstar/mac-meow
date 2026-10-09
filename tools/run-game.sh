@@ -12,13 +12,15 @@
 #   server   trace + 前景 wineserver -d1 協定紀錄（含 suspend_thread 等請求者；量大，只適合短時間重現）
 #
 # 環境變數：
-#   SYNC=msync|esync|none（預設 msync，與 play.sh 相同）  GRAPHICS_BACKEND=dxmt|d3dmetal|dxvk|wined3d（預設 d3dmetal，沒有 GPTK 時改用 dxmt）
+#   MACMEOW_SYNC、MACMEOW_GRAPHICS_BACKEND、MACMEOW_HUD：與 play.sh 相同（未設定時沿用 App 的設定，見 common.sh 的 load_settings）；
+#   MACMEOW_GRAPHICS_BACKEND 另可為 dxvk|wined3d；d3dmetal 沒有 GPTK 時改用 dxmt（以環境變數指定時則失敗）
 #     d3dmetal 需要 GPTK（CrossOver 內附或 Cyder 設定安裝），且 Cyder 已把它連結到 engine 的 lib64/apple_gptk
 #   WZCACHE=0|1（預設 0：與從 認證器.exe 啟動時相同；1 = Cyder 的 WZ read-ahead 快取）
-#   HUD=1（Metal 效能 HUD，顯示 FPS）  WINEDEBUG=...（覆寫頻道）  EXTRA_DEBUG=...（附加頻道）
+#   WINEDEBUG=...（覆寫頻道）  EXTRA_DEBUG=...（附加頻道）
 #   EXTRA_ENV="K=V K2=V2"（額外環境變數）
 # 紀錄：debug/run-<時間>/
 set -euo pipefail
+backend_from_env="${MACMEOW_GRAPHICS_BACKEND:-}" # load_settings 之前：是否以環境變數指定
 # shellcheck source=lib.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
@@ -33,16 +35,14 @@ LOG="$OUT/wine.log"
 export WINEPREFIX="$CYDER_PREFIX"
 export LANG=zh_TW.UTF-8 LC_ALL=zh_TW.UTF-8 LC_CTYPE=zh_TW.UTF-8
 unset WINEMSYNC WINEESYNC
-case "${SYNC:-msync}" in
+case "$MACMEOW_SYNC" in
   msync) export WINEMSYNC=1 ;;
   esync) export WINEESYNC=1 ;;
   none) ;;
-  *) die "SYNC 只能是 msync|esync|none" ;;
+  *) die "MACMEOW_SYNC 只能是 msync|esync|none" ;;
 esac
-# 沒有指定 GRAPHICS_BACKEND 時預設 d3dmetal，找不到 GPTK 就改用 dxmt；明確指定 GRAPHICS_BACKEND=d3dmetal 時找不到 GPTK 則失敗。
-graphics_backend_defaulted=0
-[[ -z "${GRAPHICS_BACKEND:-}" ]] && GRAPHICS_BACKEND=d3dmetal graphics_backend_defaulted=1
-case "$GRAPHICS_BACKEND" in dxmt | d3dmetal | dxvk | wined3d) ;; *) die "GRAPHICS_BACKEND 只能是 dxmt|d3dmetal|dxvk|wined3d" ;; esac
+GRAPHICS_BACKEND="$MACMEOW_GRAPHICS_BACKEND"
+case "$GRAPHICS_BACKEND" in dxmt | d3dmetal | dxvk | wined3d) ;; *) die "MACMEOW_GRAPHICS_BACKEND 只能是 dxmt|d3dmetal|dxvk|wined3d" ;; esac
 # 與 Cyder 的 cyder_apply_gptk_launch_environment 相同：有 GPTK 時任何後端都帶上這些變數（ntdll 會載入
 # libd3dshared.dylib）。只用 Cyder 已建立的 engine 連結，不自行修改 engine。
 # 不設 DYLD_FRAMEWORK_PATH：/usr/bin/arch 受 SIP 保護會清掉 DYLD_*，而 libd3dshared 以 @rpath
@@ -52,7 +52,7 @@ gptk="$CYDER_ENGINE/lib64/apple_gptk"
 if gptk_complete "$gptk"; then
   gptk="$(cd "$gptk" && pwd -P)"
   export CYDER_GPTK_ROOT="$gptk" CX_APPLEGPTK_LIBD3DSHARED_PATH="$gptk/external/libd3dshared.dylib"
-elif [[ "$GRAPHICS_BACKEND" == d3dmetal && "$graphics_backend_defaulted" == 1 ]]; then
+elif [[ "$GRAPHICS_BACKEND" == d3dmetal && -z "$backend_from_env" ]]; then
   echo "找不到 GPTK（${gptk}），改用 dxmt。" >&2
   GRAPHICS_BACKEND=dxmt
 elif [[ "$GRAPHICS_BACKEND" == d3dmetal ]]; then
@@ -61,7 +61,7 @@ fi
 export CX_GRAPHICS_BACKEND="$GRAPHICS_BACKEND" CYDER_GRAPHICS_BACKEND="$GRAPHICS_BACKEND" CYDER_GRAPHICS_BACKENDS_ROOT="$CYDER_ENGINE"
 export CYDER_MAPLESTORY_FILE_CACHE="${WZCACHE:-0}"
 export PATH="$CYDER_ENGINE/bin:$PATH"
-[[ "${HUD:-0}" == 1 ]] && export MTL_HUD_ENABLED=1
+[[ "$MACMEOW_HUD" == 1 ]] && export MTL_HUD_ENABLED=1
 # shellcheck disable=SC2163  # kv 是 K=V 字串
 for kv in ${EXTRA_ENV:-}; do export "$kv"; done
 
@@ -77,7 +77,7 @@ esac
 export WINEDEBUG="${WINEDEBUG:-$default_debug}${EXTRA_DEBUG:+,$EXTRA_DEBUG}"
 
 {
-  echo "mode=$mode SYNC=${SYNC:-msync} GRAPHICS_BACKEND=$GRAPHICS_BACKEND GPTK=${CYDER_GPTK_ROOT:-none} WZCACHE=$CYDER_MAPLESTORY_FILE_CACHE HUD=${HUD:-0}"
+  echo "mode=$mode SYNC=$MACMEOW_SYNC GRAPHICS_BACKEND=$GRAPHICS_BACKEND GPTK=${CYDER_GPTK_ROOT:-none} WZCACHE=$CYDER_MAPLESTORY_FILE_CACHE HUD=$MACMEOW_HUD"
   echo "EXTRA_ENV=${EXTRA_ENV:-}"
   echo "WINEDEBUG=$WINEDEBUG"
 } | tee "$OUT/env.txt"

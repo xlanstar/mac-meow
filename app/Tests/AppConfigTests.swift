@@ -1,12 +1,20 @@
 func testAppConfig() {
-    // values → environment → fileContents 來回轉換
+    // values ↔ fileContents 來回轉換
     let settings = GameSettings(sync: .esync, graphicsBackend: .dxmt, metalHUD: true, fpsCap: .fps144, autoClose: false)
     let config = AppConfig(gameDir: "/Games/貓貓谷", settings: settings)
     expectEqual(
         config.fileContents,
         "GAME_DIR=/Games/貓貓谷\nSYNC=esync\nGRAPHICS_BACKEND=dxmt\nHUD=1\nMAX_FPS=144\nAUTO_CLOSE=0\n")
-    expectEqual(AppConfig(values: config.environment), config)
+    expectEqual(AppConfig(values: config.values), config)
     expectEqual(AppConfig(values: parseKeyValues(config.fileContents.split(separator: "\n"))), config)
+
+    // 環境變數：MACMEOW_ + KEY，GAME_DIR 不加前綴
+    expectEqual(
+        config.environment,
+        [
+            "GAME_DIR": "/Games/貓貓谷", "MACMEOW_SYNC": "esync", "MACMEOW_GRAPHICS_BACKEND": "dxmt",
+            "MACMEOW_HUD": "1", "MACMEOW_MAX_FPS": "144", "MACMEOW_AUTO_CLOSE": "0",
+        ])
 
     // 0.3.0 以前的 MAPLE_SYNC；SYNC 優先
     expectEqual(AppConfig(values: ["MAPLE_SYNC": "none"]).settings.sync, SyncMode.none)
@@ -20,6 +28,7 @@ func testAppConfig() {
 
     // 空的 GAME_DIR 視為沒選過，不寫入環境變數與設定檔
     expectEqual(AppConfig(values: ["GAME_DIR": ""]).gameDir, nil)
+    expectEqual(AppConfig().values["GAME_DIR"], nil)
     expectEqual(AppConfig().environment["GAME_DIR"], nil)
     expect(!AppConfig().fileContents.contains("GAME_DIR"))
 

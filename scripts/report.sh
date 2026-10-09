@@ -6,7 +6,7 @@
 #   bash scripts/report.sh                         # 環境摘要（Markdown）
 #   bash scripts/report.sh log <記錄檔> [行數]      # 記錄檔最後幾行（預設 40）
 #   bash scripts/report.sh bundle <輸出.zip> [記錄檔]   # 診斷檔：摘要、狀態、記錄、MacMeow 當機報告
-# 環境變數：MACMEOW_VERSION（App 版本；未設定時讀 repo 的 VERSION），以及 GAME_DIR、CYDER_ENGINE
+# 環境變數：MACMEOW_VERSION（App 版本；未設定時讀 repo 的 VERSION），以及 common.sh 的設定與路徑
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -30,6 +30,16 @@ app_version() {
   else echo "未知"; fi
 }
 
+# settings_summary：目前生效的設定（common.sh 的 load_settings），「名稱=值」以空白分隔。
+settings_summary() {
+  local name _rest var out=""
+  while read -r name _rest; do
+    var="MACMEOW_$name"
+    out+="$name=${!var} "
+  done <<<"$MACMEOW_SETTINGS"
+  echo "${out% }"
+}
+
 plist_value() { /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null || echo "?"; }
 
 summary() {
@@ -50,7 +60,7 @@ summary() {
     echo "- Engine：未下載"
   fi
   echo "- Cyder 設定：wineLocale=$(cyder_setting wineLocale) graphicsBackend=$(cyder_setting graphicsBackend) graphicsHud=$(cyder_setting graphicsHud) dxvkFrameRate=$(cyder_setting dxvkFrameRate) msync=$(cyder_setting msync) esync=$(cyder_setting esync)"
-  echo "- SYNC：${SYNC:-msync}，GRAPHICS_BACKEND：${GRAPHICS_BACKEND:-d3dmetal}，HUD：${HUD:-0}，MAX_FPS：${MAX_FPS:-unlimited}，AUTO_CLOSE：${AUTO_CLOSE:-1}，HIDE_LAUNCHER_DOCK：${HIDE_LAUNCHER_DOCK:-0}"
+  echo "- MacMeow 設定：$(settings_summary)"
   if missing="$(missing_game_file "$GAME_DIR")"; then
     echo "- 遊戲資料夾：缺少 ${missing}"
   else

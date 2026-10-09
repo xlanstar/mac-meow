@@ -11,44 +11,15 @@
 # 第一次修改前把原檔備份為 settings.json.macmeow-orig（已有備份就保留，備份即最初的原值）。
 #
 # 用法：bash scripts/cyder-settings.sh check|apply|restore
-#   check    設定都符合則回傳 0（依 SYNC、GRAPHICS_BACKEND、HUD、MAX_FPS）
+#   check    設定都符合則回傳 0（依 MACMEOW_SYNC、MACMEOW_GRAPHICS_BACKEND、MACMEOW_HUD、MACMEOW_MAX_FPS）
 #   apply    寫入不符合的設定
 #   restore  把上述設定還原成備份中的原值並刪除備份；目前值已不是本專案會寫入的值（使用者事後改過）就保留
-# 環境變數：SYNC=msync|esync|none（預設 msync）、GRAPHICS_BACKEND=d3dmetal|dxmt（預設 d3dmetal）、
-#           HUD=0|1（預設 0；1 為 Metal 效能 HUD）、MAX_FPS=60|120|144|unlimited（預設 unlimited）
+# 設定值見 common.sh 的 MACMEOW_SETTINGS（HUD=1 為 Metal 效能 HUD）；restore 不讀取設定。
 set -euo pipefail
 # shellcheck source=lib/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
 
 BACKUP="$CYDER_SETTINGS.macmeow-orig"
-
-# ---------- 要寫入的值（want_<設定>） ----------
-case "${SYNC:-msync}" in
-  msync) want_msync=true want_esync=false ;;
-  esync) want_msync=false want_esync=true ;;
-  none) want_msync=false want_esync=false ;;
-  *) die "SYNC 只能是 msync|esync|none" ;;
-esac
-
-case "${GRAPHICS_BACKEND:-d3dmetal}" in
-  d3dmetal | dxmt) want_backend="${GRAPHICS_BACKEND:-d3dmetal}" ;;
-  *) die "GRAPHICS_BACKEND 只能是 d3dmetal|dxmt" ;;
-esac
-
-case "${HUD:-0}" in
-  0) want_hud=off ;;
-  1) want_hud=metal ;;
-  *) die "HUD 只能是 0|1" ;;
-esac
-
-# want_dxvk_fps：dxvkFrameRate 的值，與 Cyder App 寫入的相同（sixty|120|144|unlimited）。
-# want_d3dm_fps：D3DM_MAX_FPS 的值；空字串表示不設（移除）。
-case "${MAX_FPS:-unlimited}" in
-  60) want_dxvk_fps=sixty want_d3dm_fps=60 ;;
-  120 | 144) want_dxvk_fps="$MAX_FPS" want_d3dm_fps="$MAX_FPS" ;;
-  unlimited) want_dxvk_fps=unlimited want_d3dm_fps="" ;;
-  *) die "MAX_FPS 只能是 60|120|144|unlimited" ;;
-esac
 
 # 認證器.exe 的 D3DM_MAX_FPS（plutil keypath：perProfile.<id>.environment.D3DM_MAX_FPS）；遊戲資料夾沒有 認證器.exe 時不處理。
 D3DM_FPS_ENV_PATH="environment.D3DM_MAX_FPS"
@@ -73,13 +44,28 @@ $d3dm_fps_key string $D3DM_FPS_VALUES"
 # spec_field <key> <欄位>：SPEC 中該 key 的第 2 欄（型別）或第 3 欄（可能寫入的值）。
 spec_field() { echo "$SPEC" | /usr/bin/awk -v k="$1" -v f="$2" '$1 == k { print $f }'; }
 
-# 選了 D3DMetal 但無法使用時改用 DXMT（只在 check／apply 檢查；restore 不需要）。
+# resolve_wanted：依設定算出要寫入的值（want_<設定>；只在 check／apply 使用，restore 不讀取設定）。
+# 選了 D3DMetal 但無法使用時改用 DXMT（backend_fallback=1）。
+# want_dxvk_fps：dxvkFrameRate 的值，與 Cyder App 寫入的相同（sixty|120|144|unlimited）。
+# want_d3dm_fps：D3DM_MAX_FPS 的值；空字串表示不設（移除）。
 backend_fallback=0
-resolve_backend() {
+resolve_wanted() {
+  validate_settings
+  case "$MACMEOW_SYNC" in
+    msync) want_msync=true want_esync=false ;;
+    esync) want_msync=false want_esync=true ;;
+    none) want_msync=false want_esync=false ;;
+  esac
+  want_backend="$MACMEOW_GRAPHICS_BACKEND"
   if [[ "$want_backend" == d3dmetal ]] && ! d3dmetal_available; then
     want_backend=dxmt backend_fallback=1
   fi
-  return 0
+  if [[ "$MACMEOW_HUD" == 1 ]]; then want_hud=metal; else want_hud=off; fi
+  case "$MACMEOW_MAX_FPS" in
+    60) want_dxvk_fps=sixty want_d3dm_fps=60 ;;
+    unlimited) want_dxvk_fps=unlimited want_d3dm_fps="" ;;
+    *) want_dxvk_fps="$MACMEOW_MAX_FPS" want_d3dm_fps="$MACMEOW_MAX_FPS" ;;
+  esac
 }
 
 # wanted_value <key>：本次要寫入的值（空字串表示要移除）。
@@ -169,11 +155,11 @@ d3dm_fps_keys() {
 
 case "${1:-}" in
   check)
-    resolve_backend
+    resolve_wanted
     [[ -z "$(mismatched_keys)" ]]
     ;;
   apply)
-    resolve_backend
+    resolve_wanted
     ((backend_fallback)) && echo "注意：D3DMetal 無法使用（需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK），改用 DXMT"
     keys="$(mismatched_keys)"
     [[ -n "$keys" ]] || exit 0
