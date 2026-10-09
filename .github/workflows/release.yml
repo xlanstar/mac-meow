@@ -18,7 +18,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # ci 需要確認 tag 在 origin/main 上
           persist-credentials: false   # repo 為公開，git fetch 不需憑證；Release 由 gh 以 GH_TOKEN 建立
