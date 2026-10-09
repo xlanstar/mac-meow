@@ -6,8 +6,12 @@ body:
   - type: markdown
     attributes:
       value: |
+        回報前請先看[已知問題與解法](https://github.com/xlanstar/mac-meow/blob/main/docs/known-issues.md)，也可以先搜尋[已回報的問題](https://github.com/xlanstar/mac-meow/issues?q=is%3Aissue%20is%3Aopen)。
+  - type: markdown
+    attributes:
+      value: |
         建議從 MacMeow.app 的「說明 → 回報問題…」開啟，環境資訊會自動填好。
-        回報前請先搜尋[已知問題](https://github.com/xlanstar/mac-meow/issues?q=is%3Aissue)。請勿貼上帳號、密碼或 `login.txt` 的內容。
+        請勿貼上帳號、密碼或 `login.txt` 的內容。
   - type: textarea
     id: what
     attributes:
