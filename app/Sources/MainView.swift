@@ -596,7 +596,7 @@ private struct GraphicsRow: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .help(
-                            "DXMT 是預設值。D3DMetal 是 Apple GPTK 的轉譯層，需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時改用 DXMT。寫入 Cyder 的全域設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。"
+                            "D3DMetal 是預設值，為 Apple GPTK 的轉譯層，需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時自動改用 DXMT。寫入 Cyder 的全域設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。"
                         )
                 }
                 Spacer(minLength: 8)
@@ -616,11 +616,11 @@ private struct GraphicsRow: View {
             if d3dmetalUnavailable {
                 Text(
                     launcher.config.graphics == .d3dmetal
-                        ? "D3DMetal 無法使用，會改用 DXMT：需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
+                        ? "D3DMetal 無法使用，目前改用 DXMT：需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
                         : "D3DMetal 需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
                 )
                 .font(.caption)
-                .foregroundStyle(launcher.config.graphics == .d3dmetal ? Color.orange : Color.secondary)
+                .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 34)
             }

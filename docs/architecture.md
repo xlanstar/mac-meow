@@ -25,7 +25,7 @@ MapleStory.exe → 202.80.104.28:37629（lo0 alias）
 - `scripts/patch-cyder-loopback.sh check|apply|restore`：wineserver 1 byte 修補；指令序列找不到或不唯一就不修改。
 - `scripts/patch-cyder-dlls.sh check|apply|restore`：以 `patches/bin` 的 DLL 取代 engine 內建版；先比對 `SHA256SUMS`，只套用到 CrossOver 基底 26.3.0。
 - `scripts/patch-cyder-winemac.sh check|apply|restore`（實驗性，只在 `HIDE_LAUNCHER_DOCK=1` 時由 `play.sh` 套用；未設定且 Wine 沒在執行時 `play.sh` 會還原）：改 engine `winemac.so` 兩段指令，讓設了 `CaptureDisplaysForFullscreen=y` 的程式成為沒有 Dock 圖示的輔助程式（[technical-notes.md](technical-notes.md) #10）。只套用到 SHA-256 已知的 `winemac.so`；其他版本 `apply` 回傳 2、不修改。
-- `scripts/cyder-settings.sh check|apply|restore`：Cyder 全域設定 `wineLocale=zh_TW`、`graphicsBackend`（依 `MAPLE_GFX`）、`graphicsHud`（依 `MAPLE_HUD`：`off`／`metal`）、`msync`／`esync`（依 `MAPLE_SYNC`）。`MAPLE_GFX=d3dmetal` 但 `d3dmetal_available` 不成立時改寫 `dxmt` 並在 `apply` 印出提示（Cyder 遇到無法使用的 `d3dmetal` 會退回 Wine 內建的 wined3d，[technical-notes.md](technical-notes.md) #13）。第一次修改前把 `settings.json` 備份為 `settings.json.macmeow-orig`（之後保留，即最初的原值）；`restore` 只把這 5 個 key 寫回原值（原本沒有的 key 刪除），目前值已不是本專案會寫入的值（`SPEC` 中以 `|` 分隔的任一值，例如 `graphicsBackend` 的 `dxmt|d3dmetal`；使用者事後改成其他值）就保留，最後刪除備份。
+- `scripts/cyder-settings.sh check|apply|restore`：Cyder 全域設定 `wineLocale=zh_TW`、`graphicsBackend`（依 `MAPLE_GFX`，預設 `d3dmetal`）、`graphicsHud`（依 `MAPLE_HUD`：`off`／`metal`）、`msync`／`esync`（依 `MAPLE_SYNC`）。`d3dmetal_available` 不成立時改寫 `dxmt` 並在 `apply` 印出提示（Cyder 遇到無法使用的 `d3dmetal` 會退回 Wine 內建的 wined3d，[technical-notes.md](technical-notes.md) #13）。第一次修改前把 `settings.json` 備份為 `settings.json.macmeow-orig`（之後保留，即最初的原值）；`restore` 只把這 5 個 key 寫回原值（原本沒有的 key 刪除），目前值已不是本專案會寫入的值（`SPEC` 中以 `|` 分隔的任一值，例如 `graphicsBackend` 的 `dxmt|d3dmetal`；使用者事後改成其他值）就保留，最後刪除備份。
 - `scripts/quarantine.sh check|clear|restore`：遊戲資料夾的 `com.apple.quarantine`。`clear` 先以 `xattr -r -p` 把每個項目的標記值與絕對路徑（`標記值<TAB>路徑`）附加到 `~/Library/Application Support/MacMeow/quarantine.macmeow-orig`，記錄成功才 `xattr -dr`；`restore` 把標記寫回仍存在的項目並刪除記錄。
 - `scripts/launcher-dock.sh status|hide|show`：在 shared bottle 登錄寫入或刪除 `AppDefaults\貓貓TMS登入器.exe\Mac Driver\CaptureDisplaysForFullscreen=y`（以 Wine 的 `reg.exe`；`status` 直接讀 `user.reg`）。
 - `scripts/session.sh start|watch|close|status|cleanup`：遊戲階段監看（[technical-notes.md](technical-notes.md) #11）。`start` 以 `nohup` 在背景執行 `watch`，PID 記在 `session-watch.pid`，記錄寫到 `session.log`；同時只有一個，wineserver PID 改變（Wine 結束）就退出；`close` 先停止執行中的 `watch` 再收尾。本專案程式的判斷在 `common.sh` 的 `session_procs`。
@@ -77,7 +77,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
 - `GAME_DIR`（預設 `~/Games/MapleStory`）：遊戲資料夾，需含 `MapleStory.exe`、`認證器.exe`、`貓貓TMS登入器.exe`、`HostShield.exe`、`XCGUI.dll`。
 - `CYDER_ENGINE`（預設 `~/.cyder/runtime/Engines/wine-x86_64`）：Cyder engine 路徑。
 - `MAPLE_SYNC`（預設 `msync`，可為 `none|msync|esync`）：寫入 Cyder 設定的同步模式。
-- `MAPLE_GFX`（預設 `dxmt`，可為 `dxmt|d3dmetal`）：寫入 Cyder 設定的圖形後端；`d3dmetal` 無法使用時改寫 `dxmt`。
+- `MAPLE_GFX`（預設 `d3dmetal`，可為 `d3dmetal|dxmt`）：寫入 Cyder 設定的圖形後端；`d3dmetal` 無法使用時改寫 `dxmt`。
 - `MAPLE_HUD`（預設 `0`）：`1` 時寫入 Cyder 設定 `graphicsHud=metal`（Metal 效能 HUD，顯示 FPS），否則 `off`。
 - `AUTO_CLOSE`（預設 `1`）：`0` 時 `play.sh` 不啟動 `session.sh`，遊戲關閉後不自動收尾。
 - `HIDE_LAUNCHER_DOCK`（預設 `0`，實驗性）：`1` 時 `play.sh` 套用 winemac 修補並執行 `launcher-dock.sh hide`，否則執行 `show` 並還原 winemac 修補。開啟後遊戲會與登入伺服器斷線（[technical-notes.md](technical-notes.md) #10），App 不提供這個選項。

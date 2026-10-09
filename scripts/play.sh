@@ -7,7 +7,7 @@
 #   bash scripts/play.sh status     # 查看迴路位址、通道與 Wine 程序狀態
 #   bash scripts/play.sh status --porcelain   # 機器可讀的 key=value 狀態（MacMeow.app 使用）
 #   bash scripts/play.sh stop       # 關閉 Cyder shared bottle 內所有 Windows 程式（含其他 Cyder 遊戲）
-# 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none、MAPLE_GFX=dxmt|d3dmetal、MAPLE_HUD=0|1、
+# 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none、MAPLE_GFX=d3dmetal|dxmt、MAPLE_HUD=0|1、
 #           AUTO_CLOSE=1|0、HIDE_LAUNCHER_DOCK=0|1
 # （見 docs/architecture.md）
 set -euo pipefail

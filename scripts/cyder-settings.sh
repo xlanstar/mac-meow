@@ -2,7 +2,7 @@
 # Cyder 全域設定（settings.json）：wineLocale、graphicsBackend、graphicsHud、msync、esync。
 # Cyder 只在「直接啟動 MapleStory.exe」時套用楓之谷設定；經由登入器啟動時要改成全域設定，子程序才會繼承。
 # 同步機制預設 MSync（Cyder 預設關閉，此時每次同步都經 wineserver，楓之谷會明顯卡頓）。
-# 圖形後端預設 DXMT；選 D3DMetal 但無法使用時（macOS 14 以下或沒有 GPTK）改寫 DXMT，
+# 圖形後端預設 D3DMetal；無法使用時（macOS 14 以下或沒有 GPTK）改寫 DXMT，
 # 否則 Cyder 會退回 Wine 內建的 wined3d（docs/technical-notes.md #13）。
 #
 # 第一次修改前把原檔備份為 settings.json.macmeow-orig（已有備份就保留，備份即最初的原值）。
@@ -11,7 +11,7 @@
 #   check    設定都符合則回傳 0（依 MAPLE_SYNC、MAPLE_GFX、MAPLE_HUD）
 #   apply    寫入不符合的設定
 #   restore  把上述設定還原成備份中的原值並刪除備份；目前值已不是本專案會寫入的值（使用者事後改過）就保留
-# 環境變數：MAPLE_SYNC=msync|esync|none（預設 msync）、MAPLE_GFX=dxmt|d3dmetal（預設 dxmt）、
+# 環境變數：MAPLE_SYNC=msync|esync|none（預設 msync）、MAPLE_GFX=d3dmetal|dxmt（預設 d3dmetal）、
 #           MAPLE_HUD=0|1（預設 0；1 為 Metal 效能 HUD）
 set -euo pipefail
 # shellcheck source=lib/common.sh
@@ -26,9 +26,9 @@ case "${MAPLE_SYNC:-msync}" in
   *) die "MAPLE_SYNC 只能是 msync|esync|none" ;;
 esac
 
-case "${MAPLE_GFX:-dxmt}" in
-  dxmt | d3dmetal) want_gfx="${MAPLE_GFX:-dxmt}" ;;
-  *) die "MAPLE_GFX 只能是 dxmt|d3dmetal" ;;
+case "${MAPLE_GFX:-d3dmetal}" in
+  d3dmetal | dxmt) want_gfx="${MAPLE_GFX:-d3dmetal}" ;;
+  *) die "MAPLE_GFX 只能是 d3dmetal|dxmt" ;;
 esac
 
 case "${MAPLE_HUD:-0}" in
