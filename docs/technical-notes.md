@@ -86,7 +86,7 @@
   - 登入器在 Windows 上本來就不會隨遊戲關閉。
   - `認證器.exe` 啟動的 4 個 `HostShield.exe`（各有一個 `conhost.exe`）不會自行結束。Wine 的 wineserver 要等所有非系統程式結束後，才會通知 `services.exe`、`explorer.exe` 等系統程式關閉（`server/process.c` 的 `user_processes`），所以整個 Wine 一直留著。
   - Cyder 0.13.2 每次啟動會留下一組 `CyderSwift --sentinel-connect` 與其 `bash`。Wine 結束後 Cyder 會刪除它的 `--fifo` 暫存資料夾，但程序不會退出。
-- 修補：`session.sh` 在背景監看本專案的程式（以命令列開頭是遊戲資料夾的 Windows 路徑，或 `HostShield.exe`／`認證器.exe` 來判斷）。遊戲關閉，或登入器關閉且遊戲沒在執行，連續 3 次檢查（約 6 秒）都成立就結束這些程式。Patcher 這類其他程式執行中時不收尾。只結束本專案的程式，Wine 會自行關閉，其他 Cyder 遊戲不受影響；Wine 沒有自行結束、也沒有其他 Windows 程式時，才執行 `wineserver -k`。Wine 結束後再結束 fifo 已刪除或監督程序已結束（PPID 1）的 sentinel。
+- 修補：`session.sh` 在背景監看本專案的程式（以命令列開頭是遊戲資料夾的 Windows 路徑，或 `HostShield.exe`／`認證器.exe` 來判斷）。遊戲關閉，或登入器關閉且遊戲沒在執行，連續 3 次檢查（約 6 秒）都成立就結束這些程式。Patcher 這類其他程式執行中時不收尾。只結束本專案的程式，Wine 會自行關閉，其他 Cyder 遊戲不受影響；有其他 Windows 程式時不等待 Wine 結束；Wine 沒有自行結束、也沒有其他 Windows 程式時，才執行 `wineserver -k`。`play.sh` 啟動時若只剩 `認證器.exe`／`HostShield.exe` 殘留，也以同樣方式收尾（`session.sh close`，會先停止舊的監看程序，以免它沿用上一次的狀態），不再對整個 shared bottle 執行 `wineserver -k`。Wine 結束後再結束 fifo 已刪除或監督程序已結束（PPID 1）的 sentinel。
 - 結果：關閉登入器後，4 秒內 HostShield、`conhost` 與所有 Wine 系統程式都結束；當時殘留的 11 組 sentinel 也一併清除。
 
 ## 其他觀察

@@ -112,7 +112,8 @@ start_watcher() {
   bash "$SCRIPT_DIR/session.sh" start || echo "注意：無法啟動遊戲階段監看，遊戲關閉後請按「全部關閉」" >&2
 }
 
-# 2. 前一次留下的程序：登入器或遊戲還在就不重複啟動；只剩 認證器／HostShield 殘留時，關閉整個 bottle。
+# 2. 前一次留下的程序：登入器或遊戲還在就不重複啟動；只剩 認證器／HostShield 殘留時，只結束本專案的程式
+#    （session.sh close）。shared bottle 內其他 Cyder 遊戲不受影響。
 if proc_running "$LAUNCHER_RE"; then
   echo "貓貓谷已在執行中（登入器或遊戲視窗仍開著）"
   start_watcher
@@ -120,7 +121,7 @@ if proc_running "$LAUNCHER_RE"; then
 fi
 if proc_running "$HELPER_RE"; then
   progress cleanup "關閉前一次殘留的 認證器／HostShield ..."
-  wineserver_kill
+  bash "$SCRIPT_DIR/session.sh" close
 fi
 
 # 3. Cyder engine 修補（Wine 執行中會拒絕套用）

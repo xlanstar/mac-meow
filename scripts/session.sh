@@ -6,7 +6,7 @@
 # 用法：bash scripts/session.sh start|watch|close|status|cleanup
 #   start    在背景啟動 watch（已在執行就不重複啟動），由 play.sh 呼叫
 #   watch    監看直到收尾或 Wine 結束（前景執行；同時只會有一個）
-#   close    立即收尾
+#   close    立即收尾（先停止執行中的 watch，避免它沿用這次之前的狀態）
 #   status   watch 在執行則回傳 0
 #   cleanup  結束 Cyder 遺留的 sentinel 程序（其啟動流程已結束、但程序沒有退出）
 set -euo pipefail
@@ -32,6 +32,17 @@ watcher_pid() {
 
 session_pids() { session_procs | /usr/bin/awk '{print $1}'; }
 no_session_procs() { [[ -z "$(session_procs)" ]]; }
+wine_stopped_or_foreign() { wine_stopped || [[ -n "$(foreign_wine_procs)" ]]; }
+
+# 停止執行中的 watch（不是自己時）並等它退出，最多 10 秒。
+stop_watcher() {
+  local pid
+  pid="$(watcher_pid)" || return 0
+  [[ "$pid" != "$$" ]] || return 0
+  kill "$pid" 2>/dev/null || return 0
+  wait_until 10 watcher_gone || log "監看程序（PID ${pid}）沒有結束"
+}
+watcher_gone() { ! watcher_pid >/dev/null; }
 
 # 已結束的 Cyder sentinel（Cyder 0.13 每次啟動遺留一組 CyderSwift --sentinel-connect 與其 bash）：
 # Cyder 在 Wine 結束後才刪除 --fifo 所在的暫存資料夾；資料夾已不存在，或監督它的 bash 已結束
@@ -61,9 +72,10 @@ close_session() {
       [[ -z "$pids" ]] || kill -KILL $pids 2>/dev/null || true
     fi
   fi
-  # 只剩 Wine 系統程式時，wineserver 會在數秒內自行結束。
-  if wait_until 20 wine_stopped; then
-    log "Wine 已結束"
+  # 只剩 Wine 系統程式時，wineserver 會在數秒內自行結束；有其他 Windows 程式（例如其他 Cyder 遊戲）
+  # 就不必等，保留 Wine。
+  if wait_until 20 wine_stopped_or_foreign; then
+    if wine_stopped; then log "Wine 已結束"; else log "其他 Windows 程式仍在執行，保留 Wine"; fi
   elif [[ -z "$(foreign_wine_procs)" ]]; then
     log "Wine 沒有自行結束，且沒有其他 Windows 程式在執行，關閉 wineserver"
     wineserver_kill
@@ -140,7 +152,10 @@ case "${1:-}" in
     echo "已啟動遊戲階段監看：遊戲關閉後會自動關閉登入器與背景程式（記錄：${LOG_FILE}）"
     ;;
   watch) watch ;;
-  close) close_session ;;
+  close)
+    stop_watcher
+    close_session
+    ;;
   status)
     if pid="$(watcher_pid)"; then echo "遊戲階段監看：執行中（PID ${pid}）"; else
       echo "遊戲階段監看：未執行"
