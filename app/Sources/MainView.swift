@@ -13,7 +13,7 @@ struct MainView: View {
     var body: some View {
         VStack(spacing: 14) {
             HeaderView(launcher: launcher)
-            HeroCard(launcher: launcher)
+            StatusSummaryCard(launcher: launcher)
             ChecklistCard(launcher: launcher)
             SyncCard(launcher: launcher)
             LogSection(launcher: launcher)
@@ -94,13 +94,8 @@ private struct HeaderView: View {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .frame(width: 54, height: 54)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("貓貓谷 for Mac")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                Text("版本 \(appVersion) · 透過 Cyder 執行原版登入器")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            Text("貓貓谷 for Mac")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
             Spacer()
             Button {
                 launcher.reportBug()
@@ -127,70 +122,59 @@ private struct HeaderIcon: View {
 
 // MARK: - 主要狀態與動作
 
-private struct Hero {
+/// 主卡片顯示的整體狀態摘要（圖示、標題、色調），由 `Launcher` 目前狀態推導。
+private struct StatusSummary {
     var title: String
-    var detail: String
     var symbol = "pawprint.fill"
     var tint = Theme.orange
     var busy = false
 }
 
 extension Launcher {
-    fileprivate var hero: Hero {
-        if case .working(let message) = phase {
-            return Hero(title: "處理中", detail: message, busy: true)
+    fileprivate var statusSummary: StatusSummary {
+        if case .working = phase {
+            return StatusSummary(title: "處理中", busy: true)
         }
         if !status.loaded {
-            return Hero(title: "檢查環境中", detail: "正在讀取 Cyder 與遊戲狀態…", busy: true)
+            return StatusSummary(title: "檢查環境中", busy: true)
         }
         if status.game {
-            return Hero(
-                title: "遊戲執行中", detail: "祝你玩得愉快！關閉遊戲後可以從這裡再次啟動。",
-                symbol: "gamecontroller.fill", tint: Theme.ok)
+            return StatusSummary(title: "遊戲執行中", symbol: "gamecontroller.fill", tint: Theme.ok)
         }
         if status.launcher {
-            return Hero(
-                title: "登入器已開啟", detail: "在貓貓谷登入器按「開始遊戲」即可進入遊戲。",
-                symbol: "checkmark.seal.fill", tint: Theme.ok)
+            return StatusSummary(title: "登入器已開啟", symbol: "checkmark.seal.fill", tint: Theme.ok)
         }
-        if case .failed(let message) = phase {
-            return Hero(title: "啟動沒有完成", detail: message, symbol: "exclamationmark.triangle.fill", tint: .red)
+        if case .failed = phase {
+            return StatusSummary(title: "啟動沒有完成", symbol: "exclamationmark.triangle.fill", tint: .red)
         }
         if Step.checklist.contains(where: { row($0).state == .action }) {
-            return Hero(
-                title: "需要設定", detail: "完成下方標示的項目，或直接按「開始遊戲」由程式一步步引導。",
-                symbol: "wrench.and.screwdriver.fill")
+            return StatusSummary(title: "需要設定", symbol: "wrench.and.screwdriver.fill")
         }
-        return Hero(title: "準備就緒", detail: "按「開始遊戲」開啟貓貓谷登入器。")
+        return StatusSummary(title: "準備就緒")
     }
 }
 
-private struct HeroCard: View {
+private struct StatusSummaryCard: View {
     @ObservedObject var launcher: Launcher
 
     var body: some View {
-        let hero = launcher.hero
+        let summary = launcher.statusSummary
         let status = launcher.status
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .center, spacing: 14) {
                 ZStack {
-                    Circle().fill(hero.tint.opacity(0.16))
-                    if hero.busy {
+                    Circle().fill(summary.tint.opacity(0.16))
+                    if summary.busy {
                         ProgressView().controlSize(.small)
                     } else {
-                        Image(systemName: hero.symbol)
+                        Image(systemName: summary.symbol)
                             .font(.system(size: 21, weight: .semibold))
-                            .foregroundStyle(hero.tint)
+                            .foregroundStyle(summary.tint)
                     }
                 }
                 .frame(width: 46, height: 46)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(hero.title).font(.system(size: 17, weight: .semibold, design: .rounded))
-                    Text(hero.detail)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
+                    Text(summary.title).font(.system(size: 17, weight: .semibold, design: .rounded))
                     if case .failed = launcher.phase {
                         HStack(spacing: 12) {
                             Button("查看詳細記錄") { launcher.showLog = true }
@@ -212,7 +196,7 @@ private struct HeroCard: View {
             actions
         }
         .modifier(Card(padding: 18))
-        .animation(.easeInOut(duration: 0.2), value: hero.title)
+        .animation(.easeInOut(duration: 0.2), value: summary.title)
     }
 
     @ViewBuilder private var actions: some View {
@@ -266,14 +250,16 @@ private struct TunnelMeter: View {
                 ForEach(0..<max(total, 1), id: \.self) { i in
                     Capsule()
                         .fill(i < count ? Theme.ok : Color.primary.opacity(0.12))
-                        .frame(width: 26, height: 6)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 6)
                 }
             }
+            .frame(maxWidth: .infinity)
             Text("\(count)/\(total)")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(count >= total ? Theme.ok : .secondary)
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
         .animation(.easeInOut, value: count)
     }
 }

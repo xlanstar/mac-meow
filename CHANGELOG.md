@@ -12,6 +12,7 @@ List each change under `## Unreleased` as it lands
 - 修正 `MacMeow.app` 展開「詳細記錄」時，記錄面板在淡入過程中與上方卡片重疊
 - `MacMeow.app` 視窗背景與主要按鈕改為單色，展開或收合「詳細記錄」時背景不再閃爍
 - `MacMeow.app` 移除設定視窗：同步機制改在首頁獨立的「Wine 設定」區塊切換
+- `MacMeow.app` 精簡首頁：移除標題下的版本說明與狀態卡片的說明文字，連線通道進度條改為填滿整個寬度
 
 ## 0.1.0 — 2026-10-09
 
