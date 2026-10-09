@@ -135,10 +135,12 @@ run_wine_tool() {
 # session_procs：本專案啟動的 Windows 程式，每行「PID exe 名稱」。
 # 以命令列開頭比對：遊戲資料夾的 Windows 路徑（Z:\…，含 BlackCipher、NxOverlay 等子資料夾），
 # 或以相對路徑啟動的 HostShield.exe／認證器.exe。不讀取其餘命令列參數。
+# ps 在非 UTF-8 locale（例如 MacMeow.app 啟動的腳本）會把中文跳脫成 M-… 字元，所以固定以 UTF-8 執行；
+# awk 以 C locale 逐位元組比對。
 session_procs() {
   local dir="${GAME_DIR%/}" phys
   phys="$(cd "$dir" 2>/dev/null && pwd -P || echo "$dir")"
-  /bin/ps -axo pid=,args= | GAME_WIN="Z:${dir//\//\\}\\" GAME_WIN_PHYS="Z:${phys//\//\\}\\" /usr/bin/awk '
+  LC_ALL=en_US.UTF-8 /bin/ps -axo pid=,args= | LC_ALL=C GAME_WIN="Z:${dir//\//\\}\\" GAME_WIN_PHYS="Z:${phys//\//\\}\\" /usr/bin/awk '
     {
       pid = $1; cmd = $0; sub(/^ *[0-9]+ /, "", cmd); rest = ""
       if (index(cmd, ENVIRON["GAME_WIN"]) == 1) rest = substr(cmd, length(ENVIRON["GAME_WIN"]) + 1)
@@ -155,7 +157,7 @@ session_procs() {
 foreign_wine_procs() {
   local ours
   ours=" $(session_procs | /usr/bin/awk '{printf "%s ", $1}')"
-  /bin/ps -axo pid=,args= | OURS="$ours" /usr/bin/awk '
+  LC_ALL=en_US.UTF-8 /bin/ps -axo pid=,args= | LC_ALL=C OURS="$ours" /usr/bin/awk '
     {
       pid = $1; cmd = $0; sub(/^ *[0-9]+ /, "", cmd)
       if (index(ENVIRON["OURS"], " " pid " ")) next
