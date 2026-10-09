@@ -1,11 +1,11 @@
 #!/bin/bash
 # 移除本專案對系統與 Cyder 所做的所有變更（不刪除遊戲、Cyder 或其設定）：
 #   1. 還原 Cyder engine：wineserver（loopback 修補）、wsock32.dll／advapi32.dll、winemac.so（Dock 圖示）、
-#      開發用除錯簽章（只在 repo 內執行時；App 不打包 tools/）；刪除 shared bottle 登錄中登入器的 Dock 圖示設定
+#      開發用除錯簽章（tools/sign-debug.sh）；刪除 shared bottle 登錄中登入器的 Dock 圖示設定
 #   2. 還原 Cyder 全域設定的原值，加回遊戲資料夾的下載隔離標記
 #   3. 移除 lo0 位址與 LaunchDaemon（需要管理員密碼；只有這一步以 root 執行 setup-loopback.sh）
 #   4. 刪除 MacMeow.app 的設定與記錄
-# 只用 macOS 內建指令；還原只用到 scripts/ 內的檔案（tools/sign-debug.sh 只在 repo 內）。打包進 MacMeow.app：
+# 只用 macOS 內建指令；還原只用到 scripts/ 內的檔案。打包進 MacMeow.app：
 # App 的「解除安裝⋯」執行 App 內這一份，Homebrew cask 執行安裝時複製到 Caskroom 的 scripts/（App 被刪除後仍可移除）。
 #
 # 用法：
@@ -70,10 +70,7 @@ cmd_system() {
   run_script patch-cyder-loopback.sh restore || rc=1
   run_script patch-cyder-dlls.sh restore || rc=1
   run_script patch-cyder-winemac.sh restore || rc=1
-  # 除錯簽章是開發工具，只會由 repo 內的 tools/sign-debug.sh 套用；App 內沒有這個檔案
-  if [[ -f "$MACMEOW_ROOT/tools/sign-debug.sh" ]]; then
-    bash "$MACMEOW_ROOT/tools/sign-debug.sh" restore || rc=1
-  fi
+  (debug_sign_restore) || rc=1 # 子 shell：失敗時 die 只結束這一步
   run_script cyder-settings.sh restore || rc=1
   # 記錄在 MACMEOW_SUPPORT，必須在 purge 刪除它之前還原
   run_script quarantine.sh restore || rc=1

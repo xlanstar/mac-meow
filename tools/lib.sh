@@ -3,7 +3,6 @@
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
 #   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、ok、usage_doc、need_cmd、out_dir、maple_pids、need_tool、in_terminal、
 #   run_wine、llvm_paths（LLVM 路徑）、APP_SWIFT_TARGET / app_sources（App 原始碼）
-# 載入時只用 macOS 內建指令（tools/sign-debug.sh 由 uninstall.sh 呼叫）。
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
 MACMEOW_TOOLS_LOADED=1
 

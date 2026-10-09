@@ -9,7 +9,7 @@ MACMEOW_COMMON_LOADED=1
 
 # ---------- 路徑（可用環境變數覆寫；GAME_DIR 見下方「設定」） ----------
 CYDER_ENGINE="${CYDER_ENGINE:-$HOME/.cyder/runtime/Engines/wine-x86_64}"
-CYDER_ENGINE="${CYDER_ENGINE%/}" # 去掉結尾斜線，供路徑前綴比對（sign-debug.sh 等）
+CYDER_ENGINE="${CYDER_ENGINE%/}" # 去掉結尾斜線，供路徑前綴比對（debug_sign_status 等）
 # Cyder 的資料夾與 shared bottle。不用 Cyder 腳本會讀取的 CYDER_SUPPORT、CYDER_PREFIX，避免影響 Cyder 的腳本。
 CYDER_SUPPORT_DIR="$HOME/Library/Application Support/Cyder"
 CYDER_SETTINGS="$CYDER_SUPPORT_DIR/settings.json"
@@ -315,6 +315,43 @@ wine_stopped() { ! wine_running; }
 require_wine_stopped() {
   engine_running && die "請先關閉所有 Cyder 遊戲（包含貓貓谷）再${1}。"
   return 0
+}
+
+# ---------- 開發用除錯簽章 ----------
+# tools/sign-debug.sh apply 替 engine 的 wine 換上除錯簽章（ad-hoc + get-task-allow，移除 hardened runtime），
+# 原檔備份為 *.macmeow-orig。偵測與還原放在這裡，uninstall.sh 在 App 與 Caskroom 內也能還原。
+DEBUG_SIGN_FILES=("$WINE_BIN" "$CYDER_ENGINE/lib/wine/x86_64-unix/wine")
+
+# wine_entitlements <檔案>：簽章的 entitlements（plist；沒有時為空）。
+wine_entitlements() { /usr/bin/codesign -d --entitlements :- "$1" 2>/dev/null; }
+# debug_signed <檔案>：是除錯簽章（entitlements 含 get-task-allow）。
+debug_signed() { [[ "$(wine_entitlements "$1")" == *com.apple.security.get-task-allow* ]]; }
+
+# debug_sign_status：各檔案是除錯或原廠簽章，以及簽章 flags。
+debug_sign_status() {
+  local f
+  for f in "${DEBUG_SIGN_FILES[@]}"; do
+    printf '%s：' "${f#"$CYDER_ENGINE"/}"
+    if debug_signed "$f"; then printf '除錯簽章 '; else printf '原廠簽章 '; fi
+    /usr/bin/codesign -dv "$f" 2>&1 | /usr/bin/grep -o 'flags=[^ ]*' || echo
+  done
+}
+
+# debug_sign_restore：寫回備份並刪除；目前不是除錯簽章（engine 已更新）時只刪除過期備份。
+debug_sign_restore() {
+  local f restored=0
+  for f in "${DEBUG_SIGN_FILES[@]}"; do
+    [[ -f "$f.macmeow-orig" ]] || continue
+    require_wine_stopped "還原 wine 簽章"
+    if debug_signed "$f"; then
+      cp -p "$f.macmeow-orig" "$f"
+    else
+      echo "${f#"$CYDER_ENGINE"/}：目前不是除錯簽章版（engine 已更新？），只刪除過期備份"
+    fi
+    rm -f "$f.macmeow-orig"
+    restored=1
+  done
+  if ((restored)); then echo "已還原原廠簽章"; else echo "除錯簽章：無備份"; fi
 }
 
 # 匯出 Wine client 需要的環境。client 必須與執行中的 wineserver 使用相同同步機制（依 Cyder 設定）。
