@@ -19,6 +19,8 @@ final class Launcher: ObservableObject {
     @Published private(set) var failedStep: Step?
     @Published private(set) var log: [String] = []
     @Published var showLog = false
+    /// 「回報問題」視窗；非 nil 時在主視窗以 sheet 顯示。
+    @Published var bugReport: BugReportContext?
     @Published var config = AppConfig.load() {
         didSet {
             guard config != oldValue else { return }
@@ -272,6 +274,19 @@ final class Launcher: ObservableObject {
     func copyLog() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(log.joined(separator: "\n"), forType: .string)
+    }
+
+    // MARK: - 回報問題
+
+    func reportBug() {
+        bugReport = BugReportContext()
+    }
+
+    /// 從啟動失敗畫面回報：帶入失敗的步驟與錯誤訊息。
+    func reportFailure() {
+        guard case let .failed(message) = phase else { return reportBug() }
+        let step = failedStep.map { "在「\($0.title)」步驟" } ?? ""
+        bugReport = BugReportContext(category: .launch, details: "啟動\(step)失敗，App 顯示：\n\(message)\n\n")
     }
 
     func dismissFailure() {

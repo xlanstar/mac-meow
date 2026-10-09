@@ -7,9 +7,13 @@ enum AppPaths {
     static let configFile = supportDir.appendingPathComponent("config")
     static let logDir = home.appendingPathComponent("Library/Logs/MacMeow")
     static let logFile = logDir.appendingPathComponent("launcher.log")
+    /// 回報問題時產生的診斷檔（scripts/report.sh bundle）。
+    static let reportsDir = logDir.appendingPathComponent("reports")
     /// app/build-app.sh 打包進 Contents/Resources/scripts 的使用者腳本。
     static let scripts = Bundle.main.resourceURL!.appendingPathComponent("scripts")
     static let cyderDownload = URL(string: "https://github.com/dspp779/CyderBits/releases")!
+    static let repo = URL(string: "https://github.com/xlanstar/mac-meow")!
+    static let knownIssues = URL(string: "https://github.com/xlanstar/mac-meow/issues?q=is%3Aissue")!
 
     static func script(_ name: String) -> String { scripts.appendingPathComponent(name).path }
 }

@@ -1,0 +1,48 @@
+# 欄位 id 對應 MacMeow.app「回報問題」預先填入的網址參數（app/Sources/BugReport.swift 的 issueURL()）；改 id 時兩邊一起改。
+name: 問題回報
+description: 回報 MacMeow.app 或啟動流程的問題
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        建議從 MacMeow.app 的「說明 → 回報問題…」開啟，環境資訊會自動填好。
+        回報前請先搜尋[已知問題](https://github.com/xlanstar/mac-meow/issues?q=is%3Aissue)。請勿貼上帳號、密碼或 `login.txt` 的內容。
+  - type: textarea
+    id: what
+    attributes:
+      label: 發生了什麼
+      description: 看到什麼畫面或錯誤訊息？預期應該發生什麼？
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重現步驟
+      placeholder: |
+        1. 開啟 App
+        2. 按「開始遊戲」
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: MacMeow 版本
+      description: App 視窗標題下方，或「MacMeow → 關於」
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境
+      description: App 會自動填入；手動回報請貼上 `bash scripts/report.sh` 的輸出
+  - type: textarea
+    id: log
+    attributes:
+      label: 最近的記錄
+      description: "`~/Library/Logs/MacMeow/launcher.log` 的最後幾行"
+      render: text
+  - type: textarea
+    id: attachments
+    attributes:
+      label: 診斷檔與截圖
+      description: 把 App 產生的 `MacMeow-report-*.zip` 或截圖拖到這裡

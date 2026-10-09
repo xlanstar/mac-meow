@@ -12,7 +12,7 @@ struct MainView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            HeaderView()
+            HeaderView(launcher: launcher)
             HeroCard(launcher: launcher)
             ChecklistCard(launcher: launcher)
             LogSection(launcher: launcher)
@@ -23,6 +23,9 @@ struct MainView: View {
         .frame(width: 500)
         .background(Backdrop())
         .task { launcher.startPolling() }
+        .sheet(item: $launcher.bugReport) { context in
+            BugReportView(context: context, env: launcher.config.environment)
+        }
     }
 }
 
@@ -39,7 +42,7 @@ private struct Backdrop: View {
     }
 }
 
-private struct Card: ViewModifier {
+struct Card: ViewModifier {
     var padding: CGFloat = 16
     func body(content: Content) -> some View {
         content
@@ -51,7 +54,7 @@ private struct Card: ViewModifier {
     }
 }
 
-private struct PrimaryButtonStyle: ButtonStyle {
+struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -69,7 +72,7 @@ private struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-private struct SecondaryButtonStyle: ButtonStyle {
+struct SecondaryButtonStyle: ButtonStyle {
     var tint: Color = .primary
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -87,6 +90,8 @@ private struct SecondaryButtonStyle: ButtonStyle {
 // MARK: - 標題
 
 private struct HeaderView: View {
+    @ObservedObject var launcher: Launcher
+
     var body: some View {
         HStack(spacing: 12) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -100,8 +105,23 @@ private struct HeaderView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button { launcher.reportBug() } label: { HeaderIcon(symbol: "ladybug.fill") }
+                .buttonStyle(.plain)
+                .help("回報問題")
             SettingsButton()
         }
+    }
+}
+
+private struct HeaderIcon: View {
+    let symbol: String
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 15))
+            .foregroundStyle(.secondary)
+            .frame(width: 30, height: 30)
+            .background(Circle().fill(Color.primary.opacity(0.06)))
+            .contentShape(Circle())
     }
 }
 
@@ -114,13 +134,7 @@ private struct SettingsButton: View {
                 .buttonStyle(.plain).help("設定")
         }
     }
-    private var icon: some View {
-        Image(systemName: "gearshape.fill")
-            .font(.system(size: 15))
-            .foregroundStyle(.secondary)
-            .frame(width: 30, height: 30)
-            .background(Circle().fill(Color.primary.opacity(0.06)))
-    }
+    private var icon: some View { HeaderIcon(symbol: "gearshape.fill") }
 }
 
 // MARK: - 主要狀態與動作
@@ -189,6 +203,7 @@ private struct HeroCard: View {
                     if case .failed = launcher.phase {
                         HStack(spacing: 12) {
                             Button("查看詳細記錄") { withAnimation { launcher.showLog = true } }
+                            Button("回報此問題") { launcher.reportFailure() }
                             Button("知道了") { launcher.dismissFailure() }
                         }
                         .buttonStyle(.link)

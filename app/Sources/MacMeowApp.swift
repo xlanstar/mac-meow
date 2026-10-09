@@ -25,6 +25,12 @@ struct MacMeowApp: App {
                 Divider()
                 Button("開啟記錄檔") { launcher.openLog() }
             }
+            CommandGroup(replacing: .help) {
+                Button("回報問題…") { launcher.reportBug() }
+                Button("已知問題") { NSWorkspace.shared.open(AppPaths.knownIssues) }
+                Divider()
+                Button("專案網頁") { NSWorkspace.shared.open(AppPaths.repo) }
+            }
         }
 
         Settings {

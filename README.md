@@ -57,6 +57,14 @@ bash scripts/uninstall.sh
 - **「不正確的版本」**：若官方 `Patcher.exe` 被觸發，`MapleStory.exe` 會被更新成官方最新版，伺服器就會拒絕。請把私服要求版本的 `MapleStory.exe` 放回遊戲資料夾。
 - **Cyder 更新後無法啟動**：App 每次啟動都會重新套用修補；若新版 Cyder 的 Wine 版本差太多，修補會拒絕套用並顯示訊息，請回報 issue 或等待本專案更新。
 
+## 回報問題
+
+在 App 按右上角的瓢蟲圖示，或選單「說明 → 回報問題⋯」（啟動失敗時也可以直接按「回報此問題」）。選擇問題類型、寫下發生了什麼，按「前往 GitHub 送出」後，瀏覽器會開啟已經填好內容的 GitHub issue 頁面（需要 GitHub 帳號），Finder 會同時選取診斷檔 `MacMeow-report-*.zip`，把它拖進「診斷檔與截圖」欄位再送出即可。
+
+- 診斷資料包含 macOS／Cyder 版本、環境檢查結果與最近的記錄；家目錄、使用者名稱與連線 token 都已隱藏，也不會讀取帳號密碼或 `login.txt`。送出前可以在「檢視將送出的資訊」確認內容。
+- 沒有 GitHub 帳號時，按「複製報告」把內容貼給協助你的人。
+- 不用 App 時：`bash scripts/report.sh` 會印出可以貼到 issue 的環境資訊。
+
 ## 開發
 
 本專案以 AI agent 開發。開發規範見 [AGENTS.md](AGENTS.md)，技術文件在 [docs/](docs/)。
