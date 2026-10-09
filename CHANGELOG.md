@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+## 0.4.0 — 2026-10-10
+
 - `MacMeow.app` 的「已知問題」改為開啟已知問題與解法文件，並可另外查看已回報的問題
 - 從終端機執行 `scripts/play.sh` 等腳本時沿用 `MacMeow.app` 的遊戲資料夾與遊戲設定；覆寫設定的環境變數改名為 `MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`、`MACMEOW_HUD`、`MACMEOW_MAX_FPS`、`MACMEOW_AUTO_CLOSE`、`MACMEOW_HIDE_LAUNCHER_DOCK`
 - `MacMeow.app` 首頁的「Wine 設定」改名為「遊戲設定」
