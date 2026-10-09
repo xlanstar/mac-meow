@@ -145,6 +145,8 @@ gh run watch                          # 等 CI 完成
 
 `.github/workflows/release.yml` 在 push `vX.Y.Z` tag 時於 `macos-15`（arm64）執行：`tools/ci-keychain.sh setup` 建立暫時鑰匙圈，匯入 Developer ID 憑證與 Developer ID G2 中繼憑證、存入 notarytool profile，並把 `MACMEOW_SIGN_ID`／`MACMEOW_NOTARY_PROFILE`／`MACMEOW_NOTARY_KEYCHAIN` 寫入 `$GITHUB_ENV`；接著 `release.sh ci`（建置、公證並正式發佈）；最後無論成敗都 `ci-keychain.sh cleanup` 刪除鑰匙圈。Swift 工具鏈以 runner 映像的 Xcode 為準，版本印在「工具版本」步驟。dmg 視窗版面由 `build-app.sh` 以 AppleScript 請 Finder 排版（需 Aqua 工作階段與「自動化」權限，GitHub 的 macOS runner 已具備）；Finder 90 秒內未完成時只警告並產生預設版面的 dmg，`release.sh` 的 dmg 驗證會因缺少 `.DS_Store` 而失敗。
 
+`.github/dependabot.yml` 每週一檢查 workflow 引用的 action，新版發佈滿 7 天後合併成一個 `build(deps): …` PR，更新釘選的 commit SHA 與版本註解。prek hook 版本不在其範圍，以 `prek update` 手動更新。
+
 Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `gh auth login` 的終端機執行 `bash tools/setup-ci-secrets.sh` 即可一次設定：
 
 | Secret | 內容 |
