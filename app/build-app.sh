@@ -111,8 +111,8 @@ notarize() {
 if [[ -n "$NOTARY_PROFILE" ]]; then
   ditto -c -k --sequesterRsrc --keepParent "$APP" "$WORK/MacMeow-notarize.zip"
   notarize "$WORK/MacMeow-notarize.zip"
-  xcrun stapler staple "$APP"
-  xcrun stapler validate "$APP"
+  # staple 釘完會自行驗證（失敗回傳非 0），不必再跑 stapler validate
+  xcrun stapler staple -q "$APP"
 fi
 
 # retry <次數> <指令...>：hdiutil 偶爾回報 Resource busy（CI 常見），失敗時稍候重試
@@ -157,7 +157,7 @@ on run argv
       set position of item "MacMeow.app" of cw to {170, 205}
       set position of item linkName of cw to {470, 205}
       -- 有開「顯示隱藏檔」的使用者也看得到點檔；移到視窗外，免得擠亂版面
-      repeat with f in {".background", ".fseventsd", ".Trashes", ".DS_Store"}
+      repeat with f in {".background", ".VolumeIcon.icns", ".fseventsd", ".Trashes", ".DS_Store"}
         try
           set position of item f of cw to {900, 600}
         end try
@@ -216,13 +216,19 @@ MNT="$(retry 3 hdiutil attach "$RW" -readwrite -noverify -noautoopen | awk -F'\t
   echo "dmg 掛載位置不符：${MNT:-（無）}" >&2
   exit 1
 }
+# 磁碟圖示：-srcfolder 不會複製 .VolumeIcon.icns，所以掛載後才放；根目錄 FinderInfo 設 kHasCustomIcon（0x0400）。
+# 排版前先放，Finder 才能把它移到視窗外（開了「顯示隱藏檔」也不會出現在安裝畫面）
+set_volume_icon() {
+  [[ -f "$MNT/.VolumeIcon.icns" ]] || cp "$RES/AppIcon.icns" "$MNT/.VolumeIcon.icns"
+  chflags hidden "$MNT/.VolumeIcon.icns"
+  xattr -wx com.apple.FinderInfo "0000000000000000040000000000000000000000000000000000000000000000" "$MNT"
+}
+set_volume_icon
 if ! layout_dmg "$MNT"; then
   echo "警告：Finder 無法設定 dmg 視窗版面（需允許終端機控制 Finder：系統設定 → 隱私權與安全性 → 自動化），改用預設版面" >&2
 fi
-# 磁碟圖示：-srcfolder 不會複製 .VolumeIcon.icns，Finder 排版時也會刪掉，所以排版後才放；
-# 根目錄 FinderInfo 設 kHasCustomIcon（0x0400）
-cp "$RES/AppIcon.icns" "$MNT/.VolumeIcon.icns"
-xattr -wx com.apple.FinderInfo "0000000000000000040000000000000000000000000000000000000000000000" "$MNT"
+# Finder 的 update 會刪掉圖示並清掉 FinderInfo，但 .DS_Store 裡的位置會保留；排版後補回
+set_volume_icon
 rm -rf "$MNT/.fseventsd" "$MNT/.Trashes"
 sync
 retry 3 hdiutil detach "$MNT" -quiet
@@ -234,8 +240,7 @@ if [[ -n "$SIGN_ID" ]]; then
 fi
 if [[ -n "$NOTARY_PROFILE" ]]; then
   notarize "$DMG"
-  xcrun stapler staple "$DMG"
-  xcrun stapler validate "$DMG"
+  xcrun stapler staple -q "$DMG"
 fi
 
 if [[ -n "$NOTARY_PROFILE" ]]; then
