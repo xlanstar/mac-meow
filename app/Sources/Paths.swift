@@ -53,6 +53,16 @@ enum GraphicsBackend: String, CaseIterable, Identifiable {
     }
 }
 
+/// FPS 上限（傳給 play.sh 的 MAPLE_FPS）。選項與 Cyder 的 dxvkFrameRate 相同。
+enum FrameRateCap: String, CaseIterable, Identifiable {
+    case fps60 = "60"
+    case fps120 = "120"
+    case fps144 = "144"
+    case unlimited
+    var id: String { rawValue }
+    var title: String { self == .unlimited ? "不限制" : rawValue }
+}
+
 /// ~/Library/Application Support/MacMeow/config（KEY=VALUE；uninstall.sh 會刪除）。
 struct AppConfig: Equatable {
     var gameDir: String?
@@ -60,6 +70,7 @@ struct AppConfig: Equatable {
     var graphics: GraphicsBackend = .d3dmetal
     /// Metal 效能 HUD，顯示 FPS（play.sh 的 MAPLE_HUD）。
     var hud = false
+    var frameRate: FrameRateCap = .unlimited
     /// 遊戲關閉時自動關閉登入器與背景程式（play.sh 的 AUTO_CLOSE）。
     var autoClose = true
 
@@ -74,6 +85,7 @@ struct AppConfig: Equatable {
             case "MAPLE_SYNC": config.sync = SyncMode(rawValue: value) ?? .msync
             case "MAPLE_GFX": config.graphics = GraphicsBackend(rawValue: value) ?? .d3dmetal
             case "MAPLE_HUD": config.hud = value == "1"
+            case "MAPLE_FPS": config.frameRate = FrameRateCap(rawValue: value) ?? .unlimited
             case "AUTO_CLOSE": config.autoClose = value != "0"
             default: break
             }
@@ -87,6 +99,7 @@ struct AppConfig: Equatable {
         text += "MAPLE_SYNC=\(sync.rawValue)\n"
         text += "MAPLE_GFX=\(graphics.rawValue)\n"
         text += "MAPLE_HUD=\(hud ? 1 : 0)\n"
+        text += "MAPLE_FPS=\(frameRate.rawValue)\n"
         text += "AUTO_CLOSE=\(autoClose ? 1 : 0)\n"
         try? FileManager.default.createDirectory(at: AppPaths.supportDir, withIntermediateDirectories: true)
         try? text.write(to: AppPaths.configFile, atomically: true, encoding: .utf8)
@@ -98,6 +111,7 @@ struct AppConfig: Equatable {
             "MAPLE_SYNC": sync.rawValue,
             "MAPLE_GFX": graphics.rawValue,
             "MAPLE_HUD": hud ? "1" : "0",
+            "MAPLE_FPS": frameRate.rawValue,
             "AUTO_CLOSE": autoClose ? "1" : "0",
         ]
         if let gameDir { env["GAME_DIR"] = gameDir }

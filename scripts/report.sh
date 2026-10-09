@@ -49,8 +49,8 @@ summary() {
   else
     echo "- Engine：未下載"
   fi
-  echo "- Cyder 設定：wineLocale=$(cyder_setting wineLocale) graphicsBackend=$(cyder_setting graphicsBackend) graphicsHud=$(cyder_setting graphicsHud) msync=$(cyder_setting msync) esync=$(cyder_setting esync)"
-  echo "- MAPLE_SYNC：${MAPLE_SYNC:-msync}，MAPLE_GFX：${MAPLE_GFX:-d3dmetal}，MAPLE_HUD：${MAPLE_HUD:-0}，AUTO_CLOSE：${AUTO_CLOSE:-1}，HIDE_LAUNCHER_DOCK：${HIDE_LAUNCHER_DOCK:-0}"
+  echo "- Cyder 設定：wineLocale=$(cyder_setting wineLocale) graphicsBackend=$(cyder_setting graphicsBackend) graphicsHud=$(cyder_setting graphicsHud) dxvkFrameRate=$(cyder_setting dxvkFrameRate) msync=$(cyder_setting msync) esync=$(cyder_setting esync)"
+  echo "- MAPLE_SYNC：${MAPLE_SYNC:-msync}，MAPLE_GFX：${MAPLE_GFX:-d3dmetal}，MAPLE_HUD：${MAPLE_HUD:-0}，MAPLE_FPS：${MAPLE_FPS:-unlimited}，AUTO_CLOSE：${AUTO_CLOSE:-1}，HIDE_LAUNCHER_DOCK：${HIDE_LAUNCHER_DOCK:-0}"
   if missing="$(missing_game_file "$GAME_DIR")"; then
     echo "- 遊戲資料夾：缺少 ${missing}"
   else

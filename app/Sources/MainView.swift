@@ -561,6 +561,31 @@ private struct SettingsCard: View {
             Divider()
             GraphicsRow(launcher: launcher)
             Divider()
+            HStack(spacing: 12) {
+                Image(systemName: "film.stack")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.orange)
+                    .frame(width: 22)
+                HStack(spacing: 4) {
+                    Text("FPS 上限").font(.system(size: 13, weight: .medium))
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .help(
+                            "選項與 Cyder 相同，DXMT 與 D3DMetal 都適用；「不限制」時最高為螢幕更新率。寫入 Cyder 的設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。"
+                        )
+                }
+                Spacer(minLength: 8)
+                Picker("FPS 上限", selection: $launcher.config.frameRate) {
+                    ForEach(FrameRateCap.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+            }
+            .padding(.vertical, 7)
+            Divider()
             ToggleRow(
                 symbol: "speedometer", title: "顯示效能 HUD",
                 help:
@@ -582,8 +607,6 @@ private struct GraphicsRow: View {
 
     /// 狀態已讀取且 D3DMetal 無法使用（狀態尚未讀取時不提示）。
     private var d3dmetalUnavailable: Bool { launcher.status.loaded && !launcher.status.d3dmetal }
-    /// 實際會用 DXMT（選了 DXMT，或 D3DMetal 無法使用）。
-    private var usesDXMT: Bool { launcher.config.graphics == .dxmt || d3dmetalUnavailable }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -625,13 +648,6 @@ private struct GraphicsRow: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 34)
-            }
-            if usesDXMT {
-                Label("使用 DXMT 時，遊戲 FPS 可能會被限制在最高 60", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 34)
             }
         }
         .padding(.vertical, 7)

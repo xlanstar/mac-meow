@@ -121,6 +121,16 @@ d3dmetal_available() {
   return 1
 }
 
+# cyder_profile_id <exe>：Cyder 的 perProfile 設定 key，與 cyder-profile.sh 的 cyder_profile_id_for_path 相同：
+# 「profile-」加上 exe 實際路徑（解析符號連結）SHA-256 的前 24 個十六進位字元。exe 不存在時回傳 1。
+cyder_profile_id() {
+  local canonical digest
+  [[ -e "$1" ]] || return 1
+  canonical="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")" || return 1
+  digest="$(printf '%s' "$canonical" | /usr/bin/shasum -a 256 | /usr/bin/awk '{ print $1 }')"
+  printf 'profile-%s\n' "${digest:0:24}"
+}
+
 # Cyder 已建立 Windows 環境（shared bottle）且 engine 已下載。
 cyder_ready() { [[ -f "$CYDER_PREFIX/system.reg" && -x "$WINE_BIN" ]]; }
 

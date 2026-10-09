@@ -8,7 +8,7 @@
 #   bash scripts/play.sh status --porcelain   # 機器可讀的 key=value 狀態（MacMeow.app 使用）
 #   bash scripts/play.sh stop       # 關閉 Cyder shared bottle 內所有 Windows 程式（含其他 Cyder 遊戲）
 # 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none、MAPLE_GFX=d3dmetal|dxmt、MAPLE_HUD=0|1、
-#           AUTO_CLOSE=1|0、HIDE_LAUNCHER_DOCK=0|1
+#           MAPLE_FPS=60|120|144|unlimited、AUTO_CLOSE=1|0、HIDE_LAUNCHER_DOCK=0|1
 # （見 docs/architecture.md）
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -166,7 +166,7 @@ else
   }
 fi
 
-# 5. Cyder 全域設定（wineLocale、圖形後端、效能 HUD、同步機制；原值備份，uninstall.sh 還原）
+# 5. Cyder 設定（wineLocale、圖形後端、效能 HUD、FPS 上限、同步機制；原值備份，uninstall.sh 還原）
 progress settings "檢查 Cyder 設定 ..."
 bash "$SCRIPT_DIR/cyder-settings.sh" apply # 已符合時不修改
 

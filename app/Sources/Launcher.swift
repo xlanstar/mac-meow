@@ -32,6 +32,7 @@ final class Launcher: ObservableObject {
     @Published private(set) var applied = AppConfig.load()
     var settingsDirty: Bool {
         config.sync != applied.sync || config.graphics != applied.graphics || config.hud != applied.hud
+            || config.frameRate != applied.frameRate
             || config.autoClose != applied.autoClose
     }
 
