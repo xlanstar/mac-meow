@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+## 0.3.0 — 2026-10-10
+
 - `MacMeow.app` 新增「解除安裝⋯」（App 選單）：還原所有修補與設定、移除本機網路位址與 App 的設定記錄，並把 App 移到垃圾桶，不必再執行 `uninstall.sh`
 - 用 Homebrew 安裝的，`brew uninstall --cask macmeow` 會一併還原所有修補與設定（`brew upgrade` 不受影響）
 - 用 Homebrew 安裝的 `MacMeow.app` 有新版本時，改為提示在終端機執行 `brew upgrade --cask macmeow`（可一鍵複製）
