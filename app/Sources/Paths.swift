@@ -28,7 +28,7 @@ var appVersion: String {
     Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 }
 
-/// Cyder 的同步機制（傳給 play.sh 的 MAPLE_SYNC）。
+/// Cyder 的同步機制（傳給 play.sh 的 SYNC）。
 enum SyncMode: String, CaseIterable, Identifiable {
     case msync, esync, none
     var id: String { rawValue }
@@ -41,7 +41,7 @@ enum SyncMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// Cyder 的圖形後端（傳給 play.sh 的 MAPLE_GFX）。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷。
+/// Cyder 的圖形後端（傳給 play.sh 的 GRAPHICS_BACKEND）。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷。
 enum GraphicsBackend: String, CaseIterable, Identifiable {
     case d3dmetal, dxmt
     var id: String { rawValue }
@@ -53,8 +53,8 @@ enum GraphicsBackend: String, CaseIterable, Identifiable {
     }
 }
 
-/// FPS 上限（傳給 play.sh 的 MAPLE_FPS）。選項與 Cyder 的 dxvkFrameRate 相同。
-enum FrameRateCap: String, CaseIterable, Identifiable {
+/// FPS 上限（傳給 play.sh 的 MAX_FPS）。選項與 Cyder 的 dxvkFrameRate 相同。
+enum FPSCap: String, CaseIterable, Identifiable {
     case fps60 = "60"
     case fps120 = "120"
     case fps144 = "144"
@@ -67,10 +67,10 @@ enum FrameRateCap: String, CaseIterable, Identifiable {
 struct AppConfig: Equatable {
     var gameDir: String?
     var sync: SyncMode = .msync
-    var graphics: GraphicsBackend = .d3dmetal
-    /// Metal 效能 HUD，顯示 FPS（play.sh 的 MAPLE_HUD）。
-    var hud = false
-    var frameRate: FrameRateCap = .unlimited
+    var graphicsBackend: GraphicsBackend = .d3dmetal
+    /// Metal 效能 HUD，顯示 FPS（play.sh 的 HUD）。
+    var metalHUD = false
+    var fpsCap: FPSCap = .unlimited
     /// 遊戲關閉時自動關閉登入器與背景程式（play.sh 的 AUTO_CLOSE）。
     var autoClose = true
 
@@ -82,10 +82,11 @@ struct AppConfig: Equatable {
             let value = String(line[line.index(after: eq)...])
             switch line[..<eq] {
             case "GAME_DIR": config.gameDir = value.isEmpty ? nil : value
-            case "MAPLE_SYNC": config.sync = SyncMode(rawValue: value) ?? .msync
-            case "MAPLE_GFX": config.graphics = GraphicsBackend(rawValue: value) ?? .d3dmetal
-            case "MAPLE_HUD": config.hud = value == "1"
-            case "MAPLE_FPS": config.frameRate = FrameRateCap(rawValue: value) ?? .unlimited
+            // MAPLE_SYNC 是 0.3.0 以前的 key，下次 save() 時改寫成 SYNC。
+            case "SYNC", "MAPLE_SYNC": config.sync = SyncMode(rawValue: value) ?? .msync
+            case "GRAPHICS_BACKEND": config.graphicsBackend = GraphicsBackend(rawValue: value) ?? .d3dmetal
+            case "HUD": config.metalHUD = value == "1"
+            case "MAX_FPS": config.fpsCap = FPSCap(rawValue: value) ?? .unlimited
             case "AUTO_CLOSE": config.autoClose = value != "0"
             default: break
             }
@@ -96,10 +97,10 @@ struct AppConfig: Equatable {
     func save() {
         var text = ""
         if let gameDir { text += "GAME_DIR=\(gameDir)\n" }
-        text += "MAPLE_SYNC=\(sync.rawValue)\n"
-        text += "MAPLE_GFX=\(graphics.rawValue)\n"
-        text += "MAPLE_HUD=\(hud ? 1 : 0)\n"
-        text += "MAPLE_FPS=\(frameRate.rawValue)\n"
+        text += "SYNC=\(sync.rawValue)\n"
+        text += "GRAPHICS_BACKEND=\(graphicsBackend.rawValue)\n"
+        text += "HUD=\(metalHUD ? 1 : 0)\n"
+        text += "MAX_FPS=\(fpsCap.rawValue)\n"
         text += "AUTO_CLOSE=\(autoClose ? 1 : 0)\n"
         try? FileManager.default.createDirectory(at: AppPaths.supportDir, withIntermediateDirectories: true)
         try? text.write(to: AppPaths.configFile, atomically: true, encoding: .utf8)
@@ -108,10 +109,10 @@ struct AppConfig: Equatable {
     /// 傳給 scripts/ 的環境變數；沒選過資料夾時讓 common.sh 用預設值。
     var environment: [String: String] {
         var env = [
-            "MAPLE_SYNC": sync.rawValue,
-            "MAPLE_GFX": graphics.rawValue,
-            "MAPLE_HUD": hud ? "1" : "0",
-            "MAPLE_FPS": frameRate.rawValue,
+            "SYNC": sync.rawValue,
+            "GRAPHICS_BACKEND": graphicsBackend.rawValue,
+            "HUD": metalHUD ? "1" : "0",
+            "MAX_FPS": fpsCap.rawValue,
             "AUTO_CLOSE": autoClose ? "1" : "0",
         ]
         if let gameDir { env["GAME_DIR"] = gameDir }

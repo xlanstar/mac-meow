@@ -106,9 +106,12 @@ cyder_setting() {
   /usr/bin/plutil -extract "$1" raw -o - "$CYDER_SETTINGS" 2>/dev/null || true
 }
 
+# gptk_complete <GPTK 目錄>：external/libd3dshared.dylib 可讀、external/D3DMetal.framework 存在
+# （與 Cyder 的 cyder_d3dmetal_launch_allowed 檢查的檔案相同；tools/run-game.sh 也使用）。
+gptk_complete() { [[ -r "$1/external/libd3dshared.dylib" && -d "$1/external/D3DMetal.framework" ]]; }
+
 # d3dmetal_available：Cyder 可以使用 D3DMetal（Apple GPTK）圖形後端。與 Cyder 的 cyder_d3dmetal_launch_allowed 相同：
-# macOS 14 以上，且 Cyder 設定安裝的 GPTK（runtime/apple_gptk）或 CrossOver 內建的 GPTK 完整
-# （external/libd3dshared.dylib 可讀、external/D3DMetal.framework 存在）。
+# macOS 14 以上，且 Cyder 設定安裝的 GPTK（runtime/apple_gptk）或 CrossOver 內建的 GPTK 完整（gptk_complete）。
 # 不符合時 Cyder 會把 graphicsBackend=d3dmetal 當成 default 且停用自動選擇，結果是 Wine 內建的 wined3d。
 d3dmetal_available() {
   local version major root
@@ -116,7 +119,7 @@ d3dmetal_available() {
   major="${version%%.*}"
   [[ "$major" =~ ^[0-9]+$ ]] && ((major >= 14)) || return 1
   for root in "$CYDER_SUPPORT/runtime/apple_gptk" /Applications/CrossOver.app/Contents/SharedSupport/CrossOver/lib64/apple_gptk; do
-    [[ -r "$root/external/libd3dshared.dylib" && -d "$root/external/D3DMetal.framework" ]] && return 0
+    gptk_complete "$root" && return 0
   done
   return 1
 }

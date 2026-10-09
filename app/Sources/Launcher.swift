@@ -30,10 +30,11 @@ final class Launcher: ObservableObject {
     }
     /// 上次成功「開始遊戲」時套用的設定；與 config 不同表示有尚未套用的變更。
     @Published private(set) var applied = AppConfig.load()
+    /// 遊戲資料夾以外的設定與上次「開始遊戲」時不同（比較整個 AppConfig，新增的設定欄位自動納入）。
     var settingsDirty: Bool {
-        config.sync != applied.sync || config.graphics != applied.graphics || config.hud != applied.hud
-            || config.frameRate != applied.frameRate
-            || config.autoClose != applied.autoClose
+        var current = config
+        current.gameDir = applied.gameDir
+        return current != applied
     }
 
     private let logFile = LogFile()

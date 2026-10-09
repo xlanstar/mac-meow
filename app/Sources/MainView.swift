@@ -44,7 +44,7 @@ struct MainView: View {
             }
             StatusSummaryCard(launcher: launcher)
             ChecklistCard(launcher: launcher)
-            SettingsCard(launcher: launcher)
+            GameSettingsCard(launcher: launcher)
             LogSection(launcher: launcher)
         }
         .padding(.horizontal, 22)
@@ -518,7 +518,7 @@ private struct StateBadge: View {
 
 // MARK: - 遊戲設定
 
-private struct SettingsCard: View {
+private struct GameSettingsCard: View {
     @ObservedObject var launcher: Launcher
 
     var body: some View {
@@ -559,7 +559,7 @@ private struct SettingsCard: View {
             }
             .padding(.vertical, 7)
             Divider()
-            GraphicsRow(launcher: launcher)
+            GraphicsBackendRow(launcher: launcher)
             Divider()
             HStack(spacing: 12) {
                 Image(systemName: "film.stack")
@@ -576,8 +576,8 @@ private struct SettingsCard: View {
                         )
                 }
                 Spacer(minLength: 8)
-                Picker("FPS 上限", selection: $launcher.config.frameRate) {
-                    ForEach(FrameRateCap.allCases) { Text($0.title).tag($0) }
+                Picker("FPS 上限", selection: $launcher.config.fpsCap) {
+                    ForEach(FPSCap.allCases) { Text($0.title).tag($0) }
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
@@ -590,7 +590,7 @@ private struct SettingsCard: View {
                 symbol: "speedometer", title: "顯示效能 HUD",
                 help:
                     "在遊戲畫面顯示 Metal 效能 HUD（FPS 等），DXMT 與 D3DMetal 都適用。寫入 Cyder 的全域設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。",
-                isOn: $launcher.config.hud)
+                isOn: $launcher.config.metalHUD)
             Divider()
             ToggleRow(
                 symbol: "xmark.app", title: "遊戲關閉時自動收尾",
@@ -602,11 +602,11 @@ private struct SettingsCard: View {
 }
 
 /// 圖形後端。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷；無法使用時 cyder-settings.sh 改寫 DXMT。
-private struct GraphicsRow: View {
+private struct GraphicsBackendRow: View {
     @ObservedObject var launcher: Launcher
 
     /// 狀態已讀取且 D3DMetal 無法使用（狀態尚未讀取時不提示）。
-    private var d3dmetalUnavailable: Bool { launcher.status.loaded && !launcher.status.d3dmetal }
+    private var d3dmetalUnavailable: Bool { launcher.status.loaded && !launcher.status.d3dmetalAvailable }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -625,7 +625,7 @@ private struct GraphicsRow: View {
                         )
                 }
                 Spacer(minLength: 8)
-                Picker("圖形後端", selection: $launcher.config.graphics) {
+                Picker("圖形後端", selection: $launcher.config.graphicsBackend) {
                     ForEach(GraphicsBackend.allCases) { backend in
                         let unavailable = backend == .d3dmetal && d3dmetalUnavailable
                         Text(unavailable ? "\(backend.title)（無法使用）" : backend.title)
@@ -640,7 +640,7 @@ private struct GraphicsRow: View {
             }
             if d3dmetalUnavailable {
                 Text(
-                    launcher.config.graphics == .d3dmetal
+                    launcher.config.graphicsBackend == .d3dmetal
                         ? "D3DMetal 無法使用，目前改用 DXMT：需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
                         : "D3DMetal 需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
                 )

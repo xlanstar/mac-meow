@@ -11,8 +11,8 @@ struct EnvStatus: Equatable {
     var loopback = false
     var patched = false
     var vb6 = false
-    /// Cyder 可使用 D3DMetal 圖形後端（macOS 14 以上且有 GPTK）。
-    var d3dmetal = false
+    /// Cyder 可使用 D3DMetal 圖形後端（porcelain 的 d3dmetal：macOS 14 以上且有 GPTK）。
+    var d3dmetalAvailable = false
     var wine = false
     var helpers = false
     var launcher = false
@@ -37,7 +37,7 @@ struct EnvStatus: Equatable {
         loopback = flag("loopback")
         patched = flag("patched")
         vb6 = flag("vb6")
-        d3dmetal = flag("d3dmetal")
+        d3dmetalAvailable = flag("d3dmetal")
         wine = flag("wine")
         helpers = flag("helpers")
         launcher = flag("launcher")
