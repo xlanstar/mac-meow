@@ -134,7 +134,7 @@ bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check >/dev/null 2>&1 || bash "$SCRIPT_DI
 if [[ "${HIDE_LAUNCHER_DOCK:-0}" == 1 ]]; then
   bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check >/dev/null 2>&1 \
     || bash "$SCRIPT_DIR/patch-cyder-winemac.sh" apply || echo "注意：無法套用 winemac 修補，登入器會照常顯示在 Dock"
-elif bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check >/dev/null 2>&1 && engine_stopped; then
+elif bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check >/dev/null 2>&1 && ! engine_running; then
   bash "$SCRIPT_DIR/patch-cyder-winemac.sh" restore
 fi
 

@@ -10,7 +10,7 @@ MACMEOW_COMMON_LOADED=1
 # ---------- 路徑（可用環境變數覆寫） ----------
 GAME_DIR="${GAME_DIR:-$HOME/Games/MapleStory}"
 CYDER_ENGINE="${CYDER_ENGINE:-$HOME/.cyder/runtime/Engines/wine-x86_64}"
-CYDER_ENGINE="${CYDER_ENGINE%/}" # engine_wineserver_pids 以「路徑/」比對命令列開頭，不能有結尾斜線
+CYDER_ENGINE="${CYDER_ENGINE%/}" # 去掉結尾斜線，供路徑前綴比對（sign-debug.sh 等）
 CYDER_SUPPORT="$HOME/Library/Application Support/Cyder"
 CYDER_SETTINGS="$CYDER_SUPPORT/settings.json"
 CYDER_PREFIX="$CYDER_SUPPORT/bottles/shared"
@@ -96,38 +96,32 @@ progress() {
   if [[ -n "${MACMEOW_PROGRESS:-}" ]]; then echo "@@STEP $id $*"; else echo "$*"; fi
 }
 
-# engine_wineserver_pids：這個 Cyder engine 執行中的 wineserver PID（每行一個，含所有 bottle）。
-# 先以程序名稱找 wineserver（pgrep -x），再核對命令列以 engine 路徑開頭（實際為 …/lib/wine/../../bin/wineserver）。
-# 不用 pgrep -f 比對整行命令列：參數含 wineserver 路徑的程序（xxd、codesign 等）也會被誤判。
-engine_wineserver_pids() {
-  local phys pid args
-  phys="$(cd "$CYDER_ENGINE" 2>/dev/null && pwd -P || echo "$CYDER_ENGINE")"
-  for pid in $(/usr/bin/pgrep -x wineserver 2>/dev/null); do
-    args="$(LC_ALL=en_US.UTF-8 /bin/ps -ww -o args= -p "$pid" 2>/dev/null)" || continue
-    [[ "$args" == "$CYDER_ENGINE/"* || "$args" == "$phys/"* ]] && echo "$pid"
-  done
-  return 0
+# wineservers：這個 engine 執行中的 wineserver，每行「PID shared|other」（是否為 shared bottle 的 server）。
+# 以 lsof 一次讀出程序名稱為 wineserver 者的執行檔（txt）與工作目錄（cwd）：
+# - 執行檔必須是本 engine 的 bin/wineserver（實體路徑），排除其他 Wine；不比對命令列，
+#   所以參數含 wineserver 路徑的程序（xxd、codesign 等）不會被誤判。
+# - 每個 prefix 一個 wineserver，工作目錄為 <tmp>/.wine-<uid>/server-<prefix dev>-<inode>（十六進位），以此辨識 shared bottle。
+wineservers() {
+  local exe dev ino server=""
+  exe="$(cd "$CYDER_ENGINE/bin" 2>/dev/null && pwd -P)/wineserver" || return 0
+  read -r dev ino < <(/usr/bin/stat -f '%d %i' "$CYDER_PREFIX" 2>/dev/null) && server="$(printf '/server-%x-%x' "$dev" "$ino")"
+  /usr/sbin/lsof -a -c '/^wineserver$/' -d cwd,txt -Fpfn 2>/dev/null | EXE="$exe" SERVER="$server" /usr/bin/awk '
+    function flush() { if (ours) print pid, (shared ? "shared" : "other") }
+    /^p/ { flush(); pid = substr($0, 2); ours = shared = 0 }
+    /^f/ { fd = substr($0, 2) }
+    /^n/ {
+      n = substr($0, 2); s = ENVIRON["SERVER"]
+      if (fd == "txt" && n == ENVIRON["EXE"]) ours = 1
+      if (fd == "cwd" && s != "" && substr(n, length(n) - length(s) + 1) == s) shared = 1
+    }
+    END { flush() }'
+  return 0 # 沒有 wineserver 時 lsof 回傳 1；呼叫端多在 set -o pipefail 下執行
 }
 
-# 這個 engine 有任何 wineserver 在執行（= 有 Cyder 遊戲開著，不論哪個 bottle）。修改 engine 前以此檢查。
-engine_running() { [[ -n "$(engine_wineserver_pids)" ]]; }
-engine_stopped() { ! engine_running; }
-
-# wineserver_pid：shared bottle（CYDER_PREFIX）的 wineserver PID（沒有則輸出空字串）。
-# 每個 prefix 一個 wineserver，其工作目錄為 <tmp>/.wine-<uid>/server-<prefix 的 dev>-<inode>（十六進位），
-# 以此區分同一個 engine 的其他 bottle。
-wineserver_pid() {
-  local pids dev ino want
-  pids="$(engine_wineserver_pids)"
-  [[ -n "$pids" ]] || return 0
-  read -r dev ino < <(/usr/bin/stat -f '%d %i' "$CYDER_PREFIX" 2>/dev/null) || return 0
-  want="/.wine-$(/usr/bin/id -u)/$(printf 'server-%x-%x' "$dev" "$ino")"
-  /usr/sbin/lsof -a -p "${pids//$'\n'/,}" -d cwd -Fpn 2>/dev/null | WANT="$want" /usr/bin/awk '
-    /^p/ { pid = substr($0, 2) }
-    /^n/ { n = substr($0, 2); if (substr(n, length(n) - length(ENVIRON["WANT"]) + 1) == ENVIRON["WANT"]) { print pid; exit } }'
-  return 0
-}
-# shared bottle 的 wineserver 是否在執行（= 貓貓谷或 shared bottle 內的程式開著）。
+# 這個 engine 有任何 wineserver 在執行（不論哪個 bottle）。所有 bottle 共用 engine，修改 engine 前以此檢查。
+engine_running() { [[ -n "$(wineservers)" ]]; }
+# shared bottle 的 wineserver PID（沒有則輸出空字串）與是否在執行（= 貓貓谷或 shared bottle 內的程式開著）。
+wineserver_pid() { wineservers | /usr/bin/awk '$2 == "shared" && !n++ { print $1 }'; }
 wine_running() { [[ -n "$(wineserver_pid)" ]]; }
 wine_stopped() { ! wine_running; }
 
