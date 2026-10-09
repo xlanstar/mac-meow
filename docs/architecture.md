@@ -37,6 +37,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
   - 啟動：依序檢查 Cyder、遊戲資料夾（`NSOpenPanel`，以 porcelain 驗證）、Cyder 初始化（開啟 Cyder 等待 prefix）、迴路位址（`osascript … with administrator privileges` 執行 `setup-loopback.sh install`），再以 `MACMEOW_PROGRESS=1` 執行 `play.sh`，解析 `@@STEP <id> <訊息>`（`common.sh` 的 `progress`）顯示進度。
   - 全部關閉：確認後執行 `play.sh stop`。
   - 顯示登入器：以 porcelain 的 `launcher_pid` 啟用登入器程序（`NSRunningApplication.activate`）；Wine 會還原縮到最小的視窗。
+  - 視窗與選單列（`MacMeowApp.swift`）：主視窗的關閉鈕改為隱藏（`MainWindow` 把關閉鈕的 action 換成自己的 `hide:`：`orderOut` 並把 activation policy 改為 `.accessory`，Dock 不顯示圖示；⌘W 的 `performClose:` 也經過關閉鈕），叫回時改回 `.regular`；最後一個視窗關閉時不結束 App，隱藏中從 Finder 再開啟也會叫回主視窗；`MenuBarExtra` 貓掌圖示提供狀態、顯示主視窗、開始遊戲／全部關閉與結束。
   - 「Wine 設定」卡：同步機制、遊戲關閉時自動收尾，存在 config 並以環境變數傳給 `play.sh`。
   - 回報問題（`BugReport.swift`）：sheet 表單，以 `report.sh` 與 `report.sh log` 取得預覽內容；送出時以 `report.sh bundle` 在 `~/Library/Logs/MacMeow/reports/` 產生診斷檔並在 Finder 選取，再開啟 `issues/new?template=bug_report.yml&<欄位 id>=…` 預先填好 `.github/ISSUE_TEMPLATE/bug_report.yml` 的欄位（網址超過 7000 字元時先刪減記錄再截短文字）。沒有後端；改欄位 id 時兩邊一起改。
 - `app/make-icon.swift`：以 Core Graphics 繪製 App 圖示，建置時轉成 `AppIcon.icns`。

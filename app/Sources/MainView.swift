@@ -23,6 +23,7 @@ struct MainView: View {
         .padding(.bottom, 20)
         .frame(width: 500)
         .background(Backdrop())
+        .background(MainWindowAccessor())
         .task { launcher.startPolling() }
         .sheet(item: $launcher.bugReport) { context in
             BugReportView(context: context, env: launcher.config.environment)
@@ -123,7 +124,7 @@ private struct HeaderIcon: View {
 // MARK: - 主要狀態與動作
 
 /// 主卡片顯示的整體狀態摘要（圖示、標題、色調），由 `Launcher` 目前狀態推導。
-private struct StatusSummary {
+struct StatusSummary {
     var title: String
     var symbol = "pawprint.fill"
     var tint = Theme.orange
@@ -131,7 +132,7 @@ private struct StatusSummary {
 }
 
 extension Launcher {
-    fileprivate var statusSummary: StatusSummary {
+    var statusSummary: StatusSummary {
         if case .working = phase {
             return StatusSummary(title: "處理中", busy: true)
         }

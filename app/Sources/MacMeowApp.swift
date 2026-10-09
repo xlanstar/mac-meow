@@ -33,6 +33,93 @@ struct MacMeowApp: App {
                 Button("專案網頁") { NSWorkspace.shared.open(AppPaths.repo) }
             }
         }
+
+        // 關閉視窗只會縮到 Dock，選單列圖示讓 App 隨時可以叫回主視窗。
+        MenuBarExtra("貓貓谷 for Mac", systemImage: "pawprint.fill") {
+            MenuBarContent(launcher: launcher)
+        }
+    }
+}
+
+/// 主視窗：左上角關閉鈕（與 ⌘W）改為隱藏視窗並從 Dock 移除 App 圖示，
+/// App 與選單列圖示保持執行；從選單列叫回時再顯示於 Dock。
+@MainActor
+final class MainWindow: NSObject {
+    private static let shared = MainWindow()
+    private weak var window: NSWindow?
+    /// 視窗被 `hide` 收起（仍存在，只是不在畫面上）。
+    private var hidden = false
+
+    fileprivate static func attach(_ window: NSWindow) {
+        shared.window = window
+        // performClose（⌘W）也會經過關閉鈕，所以只改按鈕動作即可。按鈕的 target 是 weak，由 shared 持有。
+        if let close = window.standardWindowButton(.closeButton) {
+            close.target = shared
+            close.action = #selector(hide(_:))
+        }
+    }
+
+    @objc private func hide(_ sender: Any?) {
+        guard let window else { return }
+        hidden = true
+        window.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
+    }
+
+    /// 叫回主視窗：恢復 Dock 圖示並帶到最前面；視窗不存在時以 `openWindow` 重新開啟。
+    /// 回傳是否已顯示（沒有 `openWindow` 且視窗已不存在時回傳 false）。
+    @discardableResult
+    static func show(_ openWindow: OpenWindowAction? = nil) -> Bool {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = shared.window, shared.hidden || window.isVisible || window.isMiniaturized {
+            shared.hidden = false
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            window.makeKeyAndOrderFront(nil)
+            return true
+        }
+        guard let openWindow else { return false }
+        openWindow(id: "main")
+        return true
+    }
+}
+
+/// 放在主視窗內容的背景，取得所在的 NSWindow 交給 `MainWindow`。
+struct MainWindowAccessor: NSViewRepresentable {
+    final class AccessorView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let window { MainWindow.attach(window) }
+        }
+    }
+
+    func makeNSView(context: Context) -> AccessorView { AccessorView() }
+    func updateNSView(_ nsView: AccessorView, context: Context) {}
+}
+
+/// 選單列圖示的選單。
+private struct MenuBarContent: View {
+    @ObservedObject var launcher: Launcher
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Text(launcher.statusSummary.title)
+        Divider()
+        Button("顯示主視窗") { MainWindow.show(openWindow) }
+        if launcher.status.running && !launcher.isWorking {
+            Button("全部關閉…") {
+                MainWindow.show(openWindow)
+                Task { await launcher.stopAll() }
+            }
+        } else {
+            Button("開始遊戲") {
+                MainWindow.show(openWindow)
+                Task { await launcher.start() }
+            }
+            .disabled(launcher.isWorking || !launcher.status.loaded)
+        }
+        Divider()
+        Button("結束貓貓谷 for Mac") { NSApp.terminate(nil) }
     }
 }
 
@@ -48,7 +135,13 @@ private struct ShowLauncherButton: View {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// 主視窗關閉鈕只會隱藏視窗；選單列圖示仍在，所以沒有視窗時也不結束。
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    /// 隱藏時再次從 Finder／Launchpad 開啟 App：叫回原本的主視窗；視窗已不存在時交給 SwiftUI 重新開啟。
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        flag || !MainWindow.show()
+    }
 
     /// 啟動流程進行中（例如安裝 VB6）就結束 App，play.sh 會因輸出中斷而停在一半，先確認。
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
