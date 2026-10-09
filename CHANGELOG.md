@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+## 0.2.0 — 2026-10-09
+
 - `MacMeow.app` 按左上角關閉鈕改為隱藏視窗並從 Dock 移除圖示，不再結束 App；新增選單列貓掌圖示，可叫回主視窗、開始遊戲或全部關閉
 - 改以 `.dmg` 發佈：開啟後的視窗有圖解說明，把 `MacMeow.app` 拖到「應用程式」即可安裝，不必再解壓縮 zip
 - `MacMeow.app` 新增「回報問題」：在 App 內填寫後開啟已填好內容的 GitHub issue，並自動產生隱藏個人資訊的診斷檔；啟動失敗時可直接「回報此問題」
