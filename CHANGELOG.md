@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+## 0.1.0 — 2026-10-09
+
 首次釋出：可在 Apple Silicon Mac 以 Cyder 執行貓貓谷原版登入流程並進入遊戲，不修改任何遊戲或登入器檔案。
 
 - `MacMeow.app`：原生 SwiftUI 視窗，含環境檢查清單、啟動進度、連線通道狀態、詳細記錄，以及「開始遊戲」「全部關閉」「重新啟動」；需要 macOS 13 以上
