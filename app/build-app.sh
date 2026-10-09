@@ -107,18 +107,101 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   xcrun stapler validate "$APP"
 fi
 
-# dmg：App 加上「應用程式」捷徑，使用者開啟後直接拖曳安裝
+# retry <次數> <指令...>：hdiutil 偶爾回報 Resource busy（CI 常見），失敗時稍候重試
+retry() {
+  local n="$1" i; shift
+  for (( i = 1; ; i++ )); do
+    "$@" && return
+    (( i < n )) || { echo "失敗（已試 ${n} 次）：$*" >&2; return 1; }
+    sleep 3
+  done
+}
+
+# layout_dmg <掛載點>：請 Finder 設定 dmg 視窗（背景、圖示位置、隱藏工具列），結果存在 .DS_Store。
+# 版面座標與 app/make-dmg-background.swift 一致。Finder 沒回應（例如等待「自動化」權限）時 90 秒後放棄。
+layout_dmg() {
+  local mnt="$1" pid watchdog rc=0
+  /usr/bin/osascript - "$VOLNAME" "$LINK" <<'OSA' &
+on run argv
+  set volName to item 1 of argv
+  set linkName to item 2 of argv
+  tell application "Finder"
+    tell disk volName
+      open
+      set cw to container window
+      set current view of cw to icon view
+      set toolbar visible of cw to false
+      set statusbar visible of cw to false
+      set pathbar visible of cw to false
+      set bounds of cw to {200, 120, 840, 552}
+      set opts to icon view options of cw
+      set arrangement of opts to not arranged
+      set icon size of opts to 128
+      set text size of opts to 13
+      set label position of opts to bottom
+      set shows item info of opts to false
+      set shows icon preview of opts to false
+      set background picture of opts to file ".background:background.tiff"
+      set position of item "MacMeow.app" of cw to {170, 205}
+      set position of item linkName of cw to {470, 205}
+      -- 有開「顯示隱藏檔」的使用者也看得到點檔；移到視窗外，免得擠亂版面
+      repeat with f in {".background", ".fseventsd", ".Trashes", ".DS_Store"}
+        try
+          set position of item f of cw to {900, 600}
+        end try
+      end repeat
+      close
+      open
+      update without registering applications
+      delay 1
+      close
+    end tell
+  end tell
+end run
+OSA
+  pid=$!
+  ( sleep 90; kill "$pid" 2>/dev/null ) & watchdog=$!
+  wait "$pid" || rc=$?
+  kill "$watchdog" 2>/dev/null || true
+  (( rc == 0 )) || return 1
+  # Finder 非同步寫入 .DS_Store
+  for _ in $(seq 20); do [[ -f "$mnt/.DS_Store" ]] && return; sleep 0.5; done
+  return 1
+}
+
+# dmg：App、「應用程式」捷徑、背景圖與磁碟圖示；先做可寫入映像讓 Finder 排版，再壓縮成唯讀 dmg
 DMG="$DIST/MacMeow-$VERSION.dmg"
+VOLNAME="貓貓谷 for Mac"
+LINK="應用程式"
 STAGE="$WORK/dmg"
-rm -rf "$STAGE" "$DMG"; mkdir -p "$STAGE"
+# 同名磁碟已掛載時 Finder 無法分辨要排版哪一個
+[[ ! -e "/Volumes/$VOLNAME" ]] || { echo "請先退出已掛載的「${VOLNAME}」磁碟" >&2; exit 1; }
+rm -rf "$STAGE" "$DMG"; mkdir -p "$STAGE/.background"
 ditto "$APP" "$STAGE/MacMeow.app"
-ln -s /Applications "$STAGE/Applications"
-# hdiutil 偶爾回報 Resource busy（CI 常見），重試幾次
-for i in 1 2 3; do
-  hdiutil create -volname "MacMeow" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov -quiet "$DMG" && break
-  (( i < 3 )) || { echo "hdiutil create 失敗" >&2; exit 1; }
-  sleep 3
-done
+ln -s /Applications "$STAGE/$LINK"
+swiftc -O -sdk "$SDK" -o "$WORK/make-dmg-background" "$ROOT/app/make-dmg-background.swift"
+"$WORK/make-dmg-background" "$WORK/dmg-bg"
+tiffutil -cathidpicheck "$WORK/dmg-bg/background.png" "$WORK/dmg-bg/background@2x.png" \
+  -out "$STAGE/.background/background.tiff" 2>/dev/null
+
+RW="$WORK/MacMeow-rw.dmg"
+retry 3 hdiutil create -volname "$VOLNAME" -srcfolder "$STAGE" -fs HFS+ -format UDRW \
+  -size "$(( $(du -sm "$STAGE" | cut -f1) + 20 ))m" -ov -quiet "$RW"
+# 不指定 -mountpoint（/Volumes 只有 root 可寫），由系統掛載後讀回路徑
+MNT="$(retry 3 hdiutil attach "$RW" -readwrite -noverify -noautoopen | awk -F'\t' '$NF ~ /^\/Volumes\// {print $NF}')"
+[[ "$MNT" == "/Volumes/$VOLNAME" ]] || { echo "dmg 掛載位置不符：${MNT:-（無）}" >&2; exit 1; }
+if ! layout_dmg "$MNT"; then
+  echo "警告：Finder 無法設定 dmg 視窗版面（需允許終端機控制 Finder：系統設定 → 隱私權與安全性 → 自動化），改用預設版面" >&2
+fi
+# 磁碟圖示：-srcfolder 不會複製 .VolumeIcon.icns，Finder 排版時也會刪掉，所以排版後才放；
+# 根目錄 FinderInfo 設 kHasCustomIcon（0x0400）
+cp "$RES/AppIcon.icns" "$MNT/.VolumeIcon.icns"
+xattr -wx com.apple.FinderInfo "0000000000000000040000000000000000000000000000000000000000000000" "$MNT"
+rm -rf "$MNT/.fseventsd" "$MNT/.Trashes"
+sync
+retry 3 hdiutil detach "$MNT" -quiet
+retry 3 hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -quiet -o "$DMG"
+rm -f "$RW"
 if [[ -n "$SIGN_ID" ]]; then
   codesign --force --timestamp --sign "$SIGN_ID" "$DMG"
   codesign --verify "$DMG"

@@ -5,7 +5,7 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
-- 改以 `.dmg` 發佈：開啟後把 `MacMeow.app` 拖到「應用程式」即可安裝，不必再解壓縮 zip
+- 改以 `.dmg` 發佈：開啟後的視窗有圖解說明，把 `MacMeow.app` 拖到「應用程式」即可安裝，不必再解壓縮 zip
 
 ## 0.1.0 — 2026-10-09
 

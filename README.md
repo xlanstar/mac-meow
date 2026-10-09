@@ -29,9 +29,9 @@
 2. 取得 `MacMeow.app`：
    - 從 [最新版 Release](https://github.com/xlanstar/mac-meow/releases/latest) 下載 `MacMeow-<版本>.dmg`；或
    - 自行建置（需要 Xcode 或 `xcode-select --install`）：`bash app/build-app.sh` → `dist/MacMeow-<版本>.dmg`
-3. 雙擊開啟 `.dmg`，在出現的視窗中把 `MacMeow.app` 拖到旁邊的「Applications」（應用程式）資料夾，再從「應用程式」開啟 `MacMeow.app`。
+3. 雙擊開啟 `.dmg`，在出現的視窗中把 `MacMeow.app` 拖到右邊的「應用程式」資料夾，再從「應用程式」開啟 `MacMeow.app`。
    - Releases 的 App 經過 Apple 公證，第一次開啟時按「打開」即可。
-   - 安裝完成後可以在 Finder 側邊欄退出「MacMeow」磁碟，並刪除 `.dmg`。
+   - 安裝完成後可以在 Finder 側邊欄退出「貓貓谷 for Mac」磁碟，並刪除 `.dmg`。
 
 之後每次只要開啟 `MacMeow.app` 按「開始遊戲」即可。App 視窗會顯示環境檢查清單與連線通道狀態；遊戲執行中可以按「全部關閉」或「重新啟動」（會一併關閉其他 Cyder 遊戲）。同步機制等選項在選單「MacMeow → 設定⋯」。記錄檔在 `~/Library/Logs/MacMeow/launcher.log`，也可以在 App 內展開「詳細記錄」查看。
 

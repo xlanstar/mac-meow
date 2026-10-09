@@ -129,7 +129,8 @@ verify_dmg() {
   chk="$(mktemp -d)"; mnt="$chk/mnt"
   hdiutil attach -nobrowse -readonly -noautoopen -quiet -mountpoint "$mnt" "$dmg" || die "無法掛載 ${dmg}"
   ditto "$mnt/MacMeow.app" "$chk/MacMeow.app"
-  [[ -L "$mnt/Applications" ]] || { hdiutil detach -quiet "$mnt"; die "dmg 內缺少「應用程式」捷徑"; }
+  [[ -L "$mnt/應用程式" && -f "$mnt/.DS_Store" && -f "$mnt/.background/background.tiff" ]] \
+    || { hdiutil detach -quiet "$mnt"; die "dmg 內缺少「應用程式」捷徑或視窗版面（.DS_Store、背景圖）"; }
   hdiutil detach -quiet "$mnt" || die "無法卸載 ${mnt}"
   codesign --verify --deep --strict "$chk/MacMeow.app" || die "dmg 內 App 簽章驗證失敗"
   ok "codesign"
@@ -174,9 +175,9 @@ cmd_build() {
     echo "## 安裝"
     echo
     if adhoc_release; then
-      echo "下載 \`$dmg\`，開啟後把 \`MacMeow.app\` 拖到視窗中的 Applications（應用程式）。本版未經 Apple 公證：第一次開啟被擋時，到「系統設定 → 隱私權與安全性」按「仍要打開」。詳見 README。"
+      echo "下載 \`$dmg\`，開啟後把 \`MacMeow.app\` 拖到視窗右邊的「應用程式」資料夾。本版未經 Apple 公證：第一次開啟被擋時，到「系統設定 → 隱私權與安全性」按「仍要打開」。詳見 README。"
     else
-      echo "下載 \`$dmg\`，開啟後把 \`MacMeow.app\` 拖到視窗中的 Applications（應用程式），再從「應用程式」開啟。詳見 README。"
+      echo "下載 \`$dmg\`，開啟後把 \`MacMeow.app\` 拖到視窗右邊的「應用程式」資料夾，再從「應用程式」開啟。詳見 README。"
     fi
     echo
     echo "SHA-256：\`$(cut -d' ' -f1 "$out/$dmg.sha256")\`"
