@@ -1,5 +1,5 @@
 #!/bin/bash
-# 遊戲結束時自動收尾（docs/architecture.md「遊戲階段監看」）。
+# 遊戲結束時自動收尾（docs/technical-notes.md #11）。
 # 監看本專案啟動的 Windows 程式（session_procs）：遊戲關閉，或登入器關閉且遊戲沒在執行，就結束登入器、
 # 認證器、HostShield 等本專案的程式。其他 Wine 程式都不碰，最後一個使用者程式結束後 Wine 會自己關閉。
 #
