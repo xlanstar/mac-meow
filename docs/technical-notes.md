@@ -103,6 +103,14 @@
 - 下一步（若要繼續）：以 `tools/run-game.sh` 搭配 `EXTRA_DEBUG=MapleStory.exe:+font` 記錄遊戲要求的字型名稱與實際選到的字型。若是不存在的名稱，可用 Replacements 指定；若是遊戲自帶的字型資料，不改遊戲檔就無法更換。
 - 附帶發現：Wine 依 locale 決定字碼頁，與 bottle 的 `Fonts\Codepages` 不同時，任何 Wine 程式啟動都會改寫語系相依的字型設定（`Codepages`、FontSubstitutes 的 `MS Shell Dlg`／`Tms Rmn`、FontLink）。從 `LANG=C` 的 shell 執行 `reg` 曾把 shared bottle 從 950 改成 1252，所以 `export_wine_env` 固定使用 `zh_TW.UTF-8`（與 Cyder 的 `wineLocale=zh_TW` 相同）。
 
+## 13. 圖形後端（D3D11 經 DXMT 轉 Metal）
+
+- 結論：遊戲以 D3D11 繪圖，`graphicsBackend=dxmt`（#5）讓它直接走 DXMT（D3D11 → Metal）。
+- 證據：遊戲執行中以 `lsof -p <MapleStory.exe>` 檢查。遊戲是 64 位元，繪圖模組為 `Gr2D_DX11.dll`；`d3d11.dll`、`dxgi.dll`、`winemetal.dll` 來自 Cyder 的 `~/.cyder/runtime/graphics/dxmt/<版本>/`，而非 Wine 內建；DXMT 的 shader 快取（`$TMPDIR/../C/dxmt/MapleStory.exe/`）在遊戲啟動後隨即被寫入。
+- 同程序也映射 Wine 內建的 `d3d9.dll`、`wined3d.dll`、`opengl32` 與 MoltenVK，推測是 `NxOverlay_x64.dll` 偵測或 hook 時載入，不是主要繪圖路徑（未以 `+loaddll` 確認載入者）。
+- 其他後端：Cyder 也支援 `d3dmetal`（Apple GPTK 的 D3DMetal，支援 D3D11／12；需要 macOS 14 以上與使用者自行安裝的 GPTK 或 CrossOver，不能隨本專案散布）、`dxvk`（D3D11 → Vulkan → MoltenVK → Metal）與 `wined3d`（OpenGL）。Cyder 對楓之谷的自動選擇是 macOS 15 以上用 DXMT，否則 DXVK，不會自動選 D3DMetal。
+- 未比較 DXMT 與 D3DMetal 的效能。遊戲是 2D，已知的效能問題都在 CPU 端（#7–#9），預期更換圖形後端的效果有限。要實測時以 `GFX=dxmt|d3dmetal HUD=1 bash tools/run-game.sh` 在同一張地圖比較 FPS 與 CPU。
+
 ## 其他觀察
 
 - 官方 `Patcher.exe` 曾被觸發一次，把 `MapleStory.exe` 換成官方 6.282.5.0，伺服器回報「不正確的版本」。觸發者未查明，之後未再發生。
