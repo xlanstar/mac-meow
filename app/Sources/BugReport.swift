@@ -162,6 +162,7 @@ final class BugReporter: ObservableObject {
 
     private func makeBundle() async -> URL? {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let out = AppPaths.reportsDir.appendingPathComponent("MacMeow-report-\(formatter.string(from: Date())).zip")
         let result = await Shell.collect(

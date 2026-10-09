@@ -135,10 +135,18 @@ final class LogFile {
         if !fm.fileExists(atPath: path) { fm.createFile(atPath: path, contents: nil) }
         handle = FileHandle(forWritingAtPath: path)
         handle?.seekToEndOfFile()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
     }
 
+    /// 寫入失敗（例如磁碟已滿）時略過；舊的 `write(_:)` 會丟出 Objective-C 例外讓 App 閃退。
     func write(_ line: String) {
-        handle?.write(Data("\(formatter.string(from: Date())) \(line)\n".utf8))
+        try? handle?.write(contentsOf: Data("\(formatter.string(from: Date())) \(line)\n".utf8))
     }
+}
+
+/// 畫面上的一行記錄；id 遞增，舊記錄被捨棄後也不會與新記錄重複。
+struct LogLine: Identifiable, Equatable {
+    let id: Int
+    let text: String
 }

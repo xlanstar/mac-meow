@@ -17,7 +17,7 @@ final class Launcher: ObservableObject {
     /// 目前正在處理的清單項目（顯示轉圈）。
     @Published private(set) var activeStep: Step?
     @Published private(set) var failedStep: Step?
-    @Published private(set) var log: [String] = []
+    @Published private(set) var log: [LogLine] = []
     @Published var showLog = false
     /// 「回報問題」視窗；非 nil 時在主視窗以 sheet 顯示。
     @Published var bugReport: BugReportContext?
@@ -39,7 +39,9 @@ final class Launcher: ObservableObject {
 
     private let logFile = LogFile()
     private var pollTask: Task<Void, Never>?
-    private var refreshTask: Task<EnvStatus, Never>?
+    /// 進行中的狀態查詢與其環境變數；只有環境相同時才共用結果。
+    private var refreshTask: (env: [String: String], task: Task<EnvStatus, Never>)?
+    private var nextLogID = 0
 
     var isWorking: Bool {
         if case .working = phase { return true }
@@ -63,16 +65,23 @@ final class Launcher: ObservableObject {
         }
     }
 
+    /// 查詢目前設定下的狀態。查詢期間設定改變（例如換了遊戲資料夾）時捨棄舊結果重新查詢；
+    /// 查詢失敗時保留並回傳上一次的狀態。
     @discardableResult
     func refresh() async -> EnvStatus {
-        if let refreshTask { return await refreshTask.value }
         let env = config.environment
-        let task = Task.detached { await Launcher.queryStatus(env: env) }
-        refreshTask = task
+        let task: Task<EnvStatus, Never>
+        if let pending = refreshTask, pending.env == env {
+            task = pending.task
+        } else {
+            task = Task.detached { await Launcher.queryStatus(env: env) }
+            refreshTask = (env, task)
+        }
         let result = await task.value
-        refreshTask = nil
+        if refreshTask?.task == task { refreshTask = nil }
+        guard env == config.environment else { return await refresh() }
         if result.loaded { status = result }
-        return result.loaded ? result : status
+        return status
     }
 
     nonisolated static func queryStatus(env: [String: String]) async -> EnvStatus {
@@ -88,6 +97,9 @@ final class Launcher: ObservableObject {
         phase = .working("檢查環境…")
         record("===== 啟動 =====")
         var s = await refresh()
+        guard s.loaded else {
+            return fail(nil, "無法讀取目前的環境狀態，請稍後再試。")
+        }
 
         // 1. Cyder
         guard s.cyderUsable, let cyder = s.cyderPath else {
@@ -185,6 +197,7 @@ final class Launcher: ObservableObject {
     @discardableResult
     func stopAll(confirm: Bool = true) async -> Bool {
         if confirm {
+            guard !busy else { return false }
             let choice = await Dialog.ask(
                 "要關閉貓貓谷嗎？",
                 "會關閉 Cyder 內所有正在執行的 Windows 程式，包含遊戲、登入器，以及其他 Cyder 遊戲。",
@@ -208,7 +221,8 @@ final class Launcher: ObservableObject {
     /// 以管理員權限執行 setup-loopback.sh install。
     @discardableResult
     func setupLoopback() async -> Bool {
-        guard !uninstalling else { return false }
+        // 啟動流程內呼叫時 isWorking 為 true；其他流程進行中則不可執行
+        guard !uninstalling, isWorking || !busy else { return false }
         let choice = await Dialog.ask(
             "設定本機網路位址",
             "貓貓谷的連線元件會使用 127.x.x.1 這類本機位址，macOS 預設沒有開啟。\n\n接下來會要求輸入電腦密碼，以加入這些本機位址並設定開機自動套用（只需一次）。",
@@ -245,6 +259,7 @@ final class Launcher: ObservableObject {
     /// 請使用者選擇遊戲資料夾；以 play.sh 檢查檔案是否齊全後才儲存。
     @discardableResult
     func chooseGameDir() async -> Bool {
+        guard !busy else { return false }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -384,7 +399,7 @@ final class Launcher: ObservableObject {
     func revealLog() { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.logFile]) }
     func copyLog() {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(log.joined(separator: "\n"), forType: .string)
+        NSPasteboard.general.setString(log.map(\.text).joined(separator: "\n"), forType: .string)
     }
 
     // MARK: - 回報問題
@@ -407,7 +422,8 @@ final class Launcher: ObservableObject {
 
     private func record(_ line: String) {
         logFile.write(line)
-        log.append(line)
+        nextLogID += 1
+        log.append(LogLine(id: nextLogID, text: line))
         if log.count > 1000 { log.removeFirst(log.count - 1000) }
     }
 

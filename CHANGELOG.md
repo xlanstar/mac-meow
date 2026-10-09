@@ -9,6 +9,10 @@ List each change under `## Unreleased` as it lands
 - `MacMeow.app` 的「遊戲設定」新增「圖形後端」：預設改用 D3DMetal（需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時自動改用 DXMT），也可改選 DXMT
 - `MacMeow.app` 的「遊戲設定」新增「FPS 上限」：60、120、144 或不限制（預設），DXMT 與 D3DMetal 都適用
 - `MacMeow.app` 的「遊戲設定」新增「顯示效能 HUD」：在遊戲畫面顯示 FPS
+- 修正 `MacMeow.app` 選擇遊戲資料夾後立刻按「開始遊戲」，偶爾會改回原本的資料夾
+- 修正 `MacMeow.app` 暫時讀不到環境狀態時，按「開始遊戲」會誤報「需要先安裝 Cyder」
+- 修正 `MacMeow.app` 啟動途中仍可從選單執行「全部關閉」、選擇遊戲資料夾或設定本機網路位址
+- 修正 `MacMeow.app` 詳細記錄超過 1000 行後不再自動捲到最新一行，以及磁碟已滿時寫入記錄會讓 App 閃退
 
 ## 0.3.0 — 2026-10-10
 

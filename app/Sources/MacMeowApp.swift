@@ -21,16 +21,7 @@ struct MacMeowApp: App {
                 UninstallButton(launcher: launcher, updater: updater)
             }
             CommandMenu("遊戲") {
-                Button("開始遊戲") { Task { await launcher.start() } }
-                    .keyboardShortcut("r")
-                Button("全部關閉…") { Task { await launcher.stopAll() } }
-                    .keyboardShortcut(".")
-                ShowLauncherButton(launcher: launcher)
-                Divider()
-                Button("選擇遊戲資料夾…") { Task { await launcher.chooseGameDir() } }
-                Button("設定本機網路位址…") { Task { await launcher.setupLoopback() } }
-                Divider()
-                Button("開啟記錄檔") { launcher.openLog() }
+                GameCommands(launcher: launcher)
             }
             CommandGroup(replacing: .help) {
                 Button("回報問題…") { launcher.reportBug() }
@@ -201,14 +192,27 @@ private struct UninstallButton: View {
     }
 }
 
-/// 選單「顯示登入器」：登入器執行中才可用（需要觀察狀態，所以獨立成 View）。
-private struct ShowLauncherButton: View {
+/// 「遊戲」選單：有流程進行中時停用會改變狀態的項目（需要觀察狀態，所以獨立成 View）。
+private struct GameCommands: View {
     @ObservedObject var launcher: Launcher
 
     var body: some View {
+        Button("開始遊戲") { Task { await launcher.start() } }
+            .keyboardShortcut("r")
+            .disabled(launcher.busy || !launcher.status.loaded)
+        Button("全部關閉…") { Task { await launcher.stopAll() } }
+            .keyboardShortcut(".")
+            .disabled(launcher.busy)
         Button("顯示登入器") { launcher.showLauncher() }
             .keyboardShortcut("l")
             .disabled(launcher.status.launcherPid == nil)
+        Divider()
+        Button("選擇遊戲資料夾…") { Task { await launcher.chooseGameDir() } }
+            .disabled(launcher.busy)
+        Button("設定本機網路位址…") { Task { await launcher.setupLoopback() } }
+            .disabled(launcher.busy)
+        Divider()
+        Button("開啟記錄檔") { launcher.openLog() }
     }
 }
 

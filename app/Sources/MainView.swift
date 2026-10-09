@@ -743,9 +743,11 @@ private struct LogPanel: View {
                         Text("這次開啟還沒有記錄。完整記錄：~/Library/Logs/MacMeow/launcher.log")
                             .foregroundStyle(.secondary)
                     }
-                    ForEach(Array(launcher.log.enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .foregroundStyle(line.hasPrefix("!") || line.hasPrefix("錯誤") ? Color.red : .primary)
+                    ForEach(launcher.log) { line in
+                        Text(line.text)
+                            .foregroundStyle(
+                                line.text.hasPrefix("!") || line.text.hasPrefix("錯誤") ? Color.red : .primary
+                            )
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -755,11 +757,12 @@ private struct LogPanel: View {
             }
             .frame(height: 170)
             .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .onChange(of: launcher.log.count) { count in
-                if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
+            // 以最後一行的 id 判斷：記錄達到上限後行數不再變動
+            .onChange(of: launcher.log.last?.id) { id in
+                if let id { proxy.scrollTo(id, anchor: .bottom) }
             }
             .onAppear {
-                if !launcher.log.isEmpty { proxy.scrollTo(launcher.log.count - 1, anchor: .bottom) }
+                if let id = launcher.log.last?.id { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
         .opacity(appeared ? 1 : 0)
