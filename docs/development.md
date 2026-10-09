@@ -9,16 +9,27 @@
 ## 目錄分工
 
 - `scripts/`：使用者流程，會打包進 `MacMeow.app`，只能用 macOS 內建指令。共用路徑、常數與函式在 `scripts/lib/common.sh`（遊戲檔案清單、迴路位址、Cyder 路徑、`wine_running`、`wineserver_kill` 等），新增腳本請 source 它，不要重複定義。
-- `app/`：SwiftUI App（`app/Sources/`，Swift 5 語言模式、最低 macOS 13），由 `app/build-app.sh` 以 `swiftc` 編譯，不需要 Xcode 專案。App 只負責 UI：需要新狀態就加到 `play.sh` 的 `porcelain()` 並同步 `app/Sources/Status.swift`；需要新進度就在腳本呼叫 `progress <id> <訊息>`，並在 `Step.fromProgress` 對應清單項目。
+- `app/`：SwiftUI App（`app/Sources/`，Swift 5 語言模式、最低 macOS 13），由 `app/build-app.sh` 以 `swiftc` 編譯，不需要 Xcode 專案。App 只負責 UI：需要新狀態就加到 `play.sh` 的 `porcelain()` 並同步 `app/Sources/Core/EnvStatus.swift`；需要新進度就在腳本呼叫 `progress <id> <訊息>`，並在同一檔案的 `Step(progressID:)` 對應清單項目（`@@STEP`／`@@PROGRESS`／`@@WAIT` 標記只在 `Core/ScriptEvent.swift` 解析）；新的腳本呼叫加在 `Services/Scripts.swift`。
 - `tools/`：開發與診斷，可用 Xcode、Homebrew、`python3`。入口腳本放在 `tools/*.sh`，共用函式在 `tools/lib.sh`（建立在 `common.sh` 之上），原始碼在 `tools/src/<工具>/`，建置產物一律輸出到 `build/tools/`，診斷紀錄一律寫到 `debug/`。
 - 例外：`tools/sign-debug.sh` 會被 `scripts/uninstall.sh` 呼叫（只在 repo 內執行時；App 不打包 `tools/`），因此只用 macOS 內建指令。
 - `packaging/homebrew/macmeow.rb`：Homebrew cask 範本（`@VERSION@`、`@SHA256@` 由 `release.sh tap` 填入），發佈到第三方 tap [`xlanstar/homebrew-tap`](https://github.com/xlanstar/homebrew-tap)（`common.sh` 的 `MACMEOW_TAP_REPO`）。tap 的 `Casks/` 只由 `release.sh tap` 產生，不直接修改。
+
+### App 原始碼分層
+
+`app/Sources/` 依層分資料夾，只能由上往下依賴（UI → Features → Services → Core）；`build-app.sh` 與 `release.sh` 以 `tools/lib.sh` 的 `app_sources` 遞迴編譯整個資料夾。
+
+- `Core/`：純資料與規則（設定、porcelain 狀態、進度標記、首頁清單與摘要、Release、Issue 網址），只用 Foundation，不可 import AppKit／SwiftUI；由 `tools/test-app.sh` 單元測試。
+- `Services/`：副作用（路徑、執行程序、記錄、設定檔、狀態輪詢、GitHub API、對話框與剪貼簿）。所有 `scripts/` 呼叫都經過 `Services/Scripts.swift`。
+- `Features/`：流程（啟動／關閉／迴路位址／遊戲資料夾、解除安裝、更新、回報問題、首頁狀態）；View 從這裡取得狀態並呼叫動作。
+- `App/`：App 進入點、唯一的組合根 `AppModel`、選單與選單列。
+- `UI/`：SwiftUI View 與共用元件；不執行腳本或程序。
 
 ## 建置與測試
 
 ```sh
 bash app/build-app.sh                              # dist/MacMeow.app 與 dmg（預設 ad-hoc 簽章；需允許終端機控制 Finder）
 open dist/MacMeow.app                              # 開啟 App；記錄在 ~/Library/Logs/MacMeow/launcher.log
+bash tools/test-app.sh                             # App Core 單元測試（只需 Command Line Tools；產物在 build/tests/）
 bash scripts/play.sh status --porcelain            # App 讀取的狀態（key=value）
 GAME_DIR=~/Games/MapleStory bash scripts/play.sh   # 直接跑使用者流程
 bash scripts/play.sh status                        # 通道／程序狀態
@@ -141,7 +152,7 @@ bash tools/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章�
 gh run watch                          # 等 CI 完成
 ```
 
-- `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck`、`patches/bin/SHA256SUMS` 與 DLL 相符、Homebrew cask 範本填入後通過 `brew style`（有安裝 Homebrew 時）、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
+- `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck` 與 Core 單元測試（`tools/test-app.sh`）、`patches/bin/SHA256SUMS` 與 DLL 相符、Homebrew cask 範本填入後通過 `brew style`（有安裝 Homebrew 時）、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
   - 例外：`MACMEOW_ALLOW_ADHOC=1` 跳過簽章檢查，`build` 產生 ad-hoc 版本，release notes 改為教使用者到「系統設定 → 隱私權與安全性」按「仍要打開」。只在無法公證時使用（CI 不使用）；舊版 App 的一鍵更新會拒絕 ad-hoc 版本，使用者需手動下載。
 - `prepare`：把 `## Unreleased` 下的項目移到 `## X.Y.Z — YYYY-MM-DD`，上方留一個空的 `## Unreleased`。
 - `build`：以 `git archive vX.Y.Z` 取出原始碼到 `build/release/X.Y.Z/` 再執行 `app/build-app.sh`，所以未提交的檔案不會進入產物。驗證 dmg 的簽章、公證票證與 Gatekeeper 評估（`spctl --type open --context context:primary-signature`），再掛載 dmg 驗證內含「應用程式」捷徑與視窗版面（`.DS_Store`、背景圖），以及 App 的 `codesign`、`CFBundleShortVersionString`、公證票證（`stapler validate`）與 Gatekeeper 評估（`spctl` 須為 `Notarized Developer ID`）、符合一鍵更新的簽章需求（`common.sh` 的 `MACMEOW_REQUIREMENT`，即官方 Team ID），並產生：
