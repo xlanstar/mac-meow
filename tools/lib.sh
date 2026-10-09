@@ -59,8 +59,10 @@ need_tool() {
 # dmg_attach [--readonly] [--nobrowse] [--mountpoint <路徑>] <映像>：掛載磁碟映像，輸出格式同 hdiutil attach
 # （裝置<TAB>內容<TAB>掛載點）。macOS 26 起 hdiutil attach 已棄用（會印警告），改用 diskutil image attach；
 # 舊系統（例如 CI 的 macOS 15）沒有 diskutil image，退回 hdiutil。
+# diskutil image attach 的文字輸出會把非 ASCII 掛載點以 MacRoman 重複編碼（與 locale 無關），
+# 所以改讀 --plist 輸出再轉成 hdiutil 的格式。
 dmg_attach() {
-  local d=() h=(-noverify -noautoopen)
+  local d=() h=(-noverify -noautoopen) plist i dev hint mp
   while (($# > 1)); do
     case "$1" in
       --readonly) d+=(--readOnly) h+=(-readonly) ;;
@@ -77,7 +79,14 @@ dmg_attach() {
     shift
   done
   if diskutil image attach --help >/dev/null 2>&1; then
-    diskutil image attach ${d[@]+"${d[@]}"} "$1"
+    plist="$(diskutil image attach --plist ${d[@]+"${d[@]}"} "$1")" || return
+    i=0
+    while dev="$(plutil -extract "system-entities.$i.dev-entry" raw -o - - <<<"$plist" 2>/dev/null)"; do
+      hint="$(plutil -extract "system-entities.$i.content-hint" raw -o - - <<<"$plist" 2>/dev/null)" || hint=
+      mp="$(plutil -extract "system-entities.$i.mount-point" raw -o - - <<<"$plist" 2>/dev/null)" || mp=
+      printf '/dev/%s\t%s\t%s\n' "$dev" "$hint" "$mp"
+      i=$((i + 1))
+    done
   else
     hdiutil attach "${h[@]}" "$1"
   fi
