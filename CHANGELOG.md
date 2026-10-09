@@ -5,8 +5,9 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
-- `MacMeow.app` 的「Wine 設定」新增「圖形後端」：預設改用 D3DMetal（需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時自動改用 DXMT），也可改選 DXMT
-- `MacMeow.app` 的「Wine 設定」新增「效能 HUD」：在遊戲畫面顯示 FPS
+- `MacMeow.app` 首頁的「Wine 設定」改名為「遊戲設定」
+- `MacMeow.app` 的「遊戲設定」新增「圖形後端」：預設改用 D3DMetal（需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時自動改用 DXMT），也可改選 DXMT
+- `MacMeow.app` 的「遊戲設定」新增「顯示效能 HUD」：在遊戲畫面顯示 FPS
 
 ## 0.3.0 — 2026-10-10
 

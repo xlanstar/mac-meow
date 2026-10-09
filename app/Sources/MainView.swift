@@ -44,7 +44,7 @@ struct MainView: View {
             }
             StatusSummaryCard(launcher: launcher)
             ChecklistCard(launcher: launcher)
-            SyncCard(launcher: launcher)
+            SettingsCard(launcher: launcher)
             LogSection(launcher: launcher)
         }
         .padding(.horizontal, 22)
@@ -516,15 +516,15 @@ private struct StateBadge: View {
     }
 }
 
-// MARK: - Wine 設定
+// MARK: - 遊戲設定
 
-private struct SyncCard: View {
+private struct SettingsCard: View {
     @ObservedObject var launcher: Launcher
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text("Wine 設定")
+                Text("遊戲設定")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
                 if launcher.settingsDirty {
@@ -562,7 +562,7 @@ private struct SyncCard: View {
             GraphicsRow(launcher: launcher)
             Divider()
             ToggleRow(
-                symbol: "speedometer", title: "效能 HUD（顯示 FPS）",
+                symbol: "speedometer", title: "顯示效能 HUD",
                 help:
                     "在遊戲畫面顯示 Metal 效能 HUD（FPS 等），DXMT 與 D3DMetal 都適用。寫入 Cyder 的全域設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。",
                 isOn: $launcher.config.hud)
