@@ -59,6 +59,33 @@
 - 已試無效：Rosetta 隱藏環境變數（`ROSETTA_*`、`CAMBRIA_*`）、MAP_JIT、一般 RWX、共享或檔案映射、不可執行頁。
 - 結論：根治需改動遊戲記憶體，會碰到 Themida/NGS 防外掛，不採用。使用者只能避開人多的頻道與地圖。
 
+## 10. Dock 上有兩個楓之谷圖示（登入器不能隱藏）
+
+- 症狀：開始遊戲後，Dock 上同時有登入器與遊戲兩個 `wine` 圖示。登入器會一直把自己縮到最小，手動打開又會立刻縮小。
+- 根因：每個 Wine 程式都是獨立的 macOS 程序。`winemac.drv` 在程式第一次顯示視窗時（`-[WineApplicationController transformProcessToForeground:]`）把它設成一般 App（`NSApplicationActivationPolicyRegular`），之後不會改回。登入器在遊戲執行期間要轉發遊戲連線（見 [architecture.md](architecture.md) 的連線路徑），不能關閉。
+- 不可行的做法：
+  - Wine 的 `Mac Driver` 登錄選項沒有 Dock 相關設定。
+  - CrossOver 的不顯示 Dock 清單（`CW HACK 24141`）比對的是 macOS 執行檔名稱，在 Cyder 中所有程式都叫 `wine`；而且那個清單會讓程式維持 Prohibited，視窗無法輸入。
+  - 從其他程序修改：`lsappinfo setinfo <ASN> -uielement` 回傳成功，但 LaunchServices 不會套用。
+  - 以 CrossOver 原始碼重建 `winemac.so`：Cyder 的 `winemac.so` 另含 Cyder 自己的楓之谷修補（`engine-manifest.json` 列出的 `maplestory-cx26-*`、`a6-final-same-view-backing-sync` 等，字串如 `MapleStoryPort: not bringing BlackXchg.aes to the foreground`），部分修補的原始碼沒有公開，重建會把這些修補拿掉。
+- 驗證：以 Swift 測試程式確認輔助程式（`NSApplicationActivationPolicyAccessory`）沒有 Dock 圖示，縮到最小的視窗也不會留在 Dock，而且仍可用 `deminiaturize` 還原。
+- 修補：`patch-cyder-winemac.sh` 只改 Cyder engine 的 `winemac.so` 內上述方法的兩段指令（只套用到 SHA-256 已知的檔案，改完重新 ad-hoc 簽章；`wine` 有 `disable-library-validation`）：
+  - `setActivationPolicy:` 的參數從固定的 `0`（Regular）改成讀取 `capture_displays_for_fullscreen`（依程式讀取的 `CaptureDisplaysForFullscreen` 登錄值，`0` 或 `1`），值為 `1` 時成為 Accessory。原本經由 GOT 呼叫的 `objc_msgSend` 改為 `callq *%r12`（同一函式），空出的位元組放得下新指令。
+  - 「已轉成前景程式就返回」的檢查從 `policy == Regular` 改成 `policy != Prohibited`，避免 Accessory 程式每次顯示視窗都重建選單並搶走焦點。
+  - `launcher-dock.sh` 只對 `貓貓TMS登入器.exe` 寫入 `AppDefaults\貓貓TMS登入器.exe\Mac Driver\CaptureDisplaysForFullscreen=y`。其他程式（包含 `MapleStory.exe`）的值是預設的 `n`，行為不變。這個值原本只影響全螢幕時是否鎖定螢幕，登入器不會全螢幕。
+  - 登入器沒有 Dock 圖示時，Wine 會在程式被啟用時還原縮到最小的視窗（`applicationDidBecomeActive:` → `unminimizeWindowIfNoneVisible`），MacMeow 的「顯示登入器」就是啟用該程序。
+- 結果：`lsappinfo` 顯示登入器為 `UIElement`，Dock 的項目清單中沒有登入器；登入器視窗照常顯示並完成載入。
+
+## 11. 關閉遊戲後登入器與 Wine 程式殘留
+
+- 症狀：關閉遊戲後登入器還開著；兩個都關閉後，背景仍有十多個 `wine` 程序，只有「全部關閉」能清乾淨。
+- 根因：
+  - 登入器在 Windows 上本來就不會隨遊戲關閉。
+  - `認證器.exe` 啟動的 4 個 `HostShield.exe`（各有一個 `conhost.exe`）不會自行結束。Wine 的 wineserver 要等所有非系統程式結束後，才會通知 `services.exe`、`explorer.exe` 等系統程式關閉（`server/process.c` 的 `user_processes`），所以整個 Wine 一直留著。
+  - Cyder 0.13.2 每次啟動會留下一組 `CyderSwift --sentinel-connect` 與其 `bash`。Wine 結束後 Cyder 會刪除它的 `--fifo` 暫存資料夾，但程序不會退出。
+- 修補：`session.sh` 在背景監看本專案的程式（以命令列開頭是遊戲資料夾的 Windows 路徑，或 `HostShield.exe`／`認證器.exe` 來判斷）。遊戲關閉，或登入器關閉且遊戲沒在執行，連續 3 次檢查（約 6 秒）都成立就結束這些程式。Patcher 這類其他程式執行中時不收尾。只結束本專案的程式，Wine 會自行關閉，其他 Cyder 遊戲不受影響；Wine 沒有自行結束、也沒有其他 Windows 程式時，才執行 `wineserver -k`。Wine 結束後再結束 fifo 已刪除或監督程序已結束（PPID 1）的 sentinel。
+- 結果：關閉登入器後，4 秒內 HostShield、`conhost` 與所有 Wine 系統程式都結束；當時殘留的 11 組 sentinel 也一併清除。
+
 ## 其他觀察
 
 - 官方 `Patcher.exe` 曾被觸發一次，把 `MapleStory.exe` 換成官方 6.282.5.0，伺服器回報「不正確的版本」。觸發者未查明，之後未再發生。

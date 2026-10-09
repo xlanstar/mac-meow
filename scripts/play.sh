@@ -7,14 +7,17 @@
 #   bash scripts/play.sh status     # 查看迴路位址、通道與 Wine 程序狀態
 #   bash scripts/play.sh status --porcelain   # 機器可讀的 key=value 狀態（MacMeow.app 使用）
 #   bash scripts/play.sh stop       # 關閉 Cyder shared bottle 內所有 Windows 程式（含其他 Cyder 遊戲）
-# 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none（見 docs/architecture.md）
+# 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none、AUTO_CLOSE=1|0、HIDE_LAUNCHER_DOCK=1|0
+# （見 docs/architecture.md）
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
-LAUNCHER_RE='貓貓TMS登入器\.exe|MapleStory\.exe'
-HELPER_RE='認證器\.exe|HostShield\.exe'
+# Wine 程序的命令列以 exe 路徑開頭（Z:\…\x.exe 或相對路徑 x.exe）；錨定開頭，避免比對到
+# Cyder 啟動腳本的參數（--launch-exe /…/認證器.exe）。
+LAUNCHER_RE='(^|\\)(貓貓TMS登入器|MapleStory)\.exe( |$)'
+HELPER_RE='(^|\\)(認證器|HostShield)\.exe( |$)'
 SHIELD_RE="^($(
   IFS='|'
   echo "${HOSTSHIELD_IPS[*]}" | /usr/bin/sed 's/\./\\./g'
@@ -35,8 +38,12 @@ status() {
   echo "== HostShield 通道監聽（位址：port 數，預期 ${#HOSTSHIELD_IPS[@]} 個位址、各 ${HOSTSHIELD_PORTS}）"
   listeners | /usr/bin/awk '{printf "%-16s %s\n", $2, $1}'
   echo "== Wine 程序"
-  /bin/ps -axo pid=,command= | /usr/bin/grep -E "${HELPER_RE}|${LAUNCHER_RE}|BlackCipher|BlackXchg" \
+  /bin/ps -axo pid=,command= | /usr/bin/grep -E '(認證器|HostShield|貓貓TMS登入器|MapleStory)\.exe|BlackCipher|BlackXchg' \
     | /usr/bin/grep -vE 'grep|cyder_launcher|CyderSwift' | /usr/bin/cut -c1-160 || true
+  echo "== 自動收尾與 Dock"
+  bash "$SCRIPT_DIR/session.sh" status || true
+  bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check || true
+  bash "$SCRIPT_DIR/launcher-dock.sh" status 2>/dev/null || true
 }
 
 flag() { if "$@" >/dev/null 2>&1; then echo 1; else echo 0; fi; }
@@ -58,8 +65,11 @@ porcelain() {
   echo "vb6=$(flag vb6_installed)"
   echo "wine=$(flag wine_running)"
   echo "helpers=$(flag proc_running "$HELPER_RE")"
-  echo "launcher=$(flag proc_running '貓貓TMS登入器\.exe')"
-  echo "game=$(flag proc_running 'MapleStory\.exe')"
+  echo "launcher=$(flag proc_running '(^|\\)貓貓TMS登入器\.exe( |$)')"
+  echo "game=$(flag proc_running '(^|\\)MapleStory\.exe( |$)')"
+  echo "launcher_pid=$(session_procs | LAUNCHER="$LAUNCHER_EXE" /usr/bin/awk '$2 == ENVIRON["LAUNCHER"] { print $1; exit }')"
+  echo "watching=$(flag bash "$SCRIPT_DIR/session.sh" status)"
+  echo "dock_patched=$(flag bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check)"
   echo "tunnels=$(listeners | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
   echo "tunnels_total=${#HOSTSHIELD_IPS[@]}"
 }
@@ -73,6 +83,7 @@ case "${1:-}" in
     echo "關閉 Cyder 內所有 Windows 程式 ..."
     wineserver_kill
     wine_stopped || die "Wine 仍在執行，請稍後再試或在 Cyder 中結束。"
+    bash "$SCRIPT_DIR/session.sh" cleanup >/dev/null 2>&1 || true
     echo "已全部關閉"
     exit 0
     ;;
@@ -95,9 +106,16 @@ bash "$SCRIPT_DIR/setup-loopback.sh" status >/dev/null \
   || die "lo0 尚未加上貓貓谷位址，請先執行：sudo bash ${SCRIPT_DIR}/setup-loopback.sh install"
 cyder_ready || die "Cyder prefix 尚未初始化，請先開啟一次 Cyder"
 
+# 遊戲結束時自動關閉登入器與背景程式（session.sh；AUTO_CLOSE=0 時不監看）。
+start_watcher() {
+  [[ "${AUTO_CLOSE:-1}" == 1 ]] || return 0
+  bash "$SCRIPT_DIR/session.sh" start || echo "注意：無法啟動遊戲階段監看，遊戲關閉後請按「全部關閉」" >&2
+}
+
 # 2. 前一次留下的程序：登入器或遊戲還在就不重複啟動；只剩 認證器／HostShield 殘留時，關閉整個 bottle。
 if proc_running "$LAUNCHER_RE"; then
   echo "貓貓谷已在執行中（登入器或遊戲視窗仍開著）"
+  start_watcher
   exit 0
 fi
 if proc_running "$HELPER_RE"; then
@@ -111,6 +129,9 @@ fi
 progress patch "檢查 Cyder engine 修補 ..."
 bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check >/dev/null 2>&1 || bash "$SCRIPT_DIR/patch-cyder-loopback.sh" apply
 bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check >/dev/null 2>&1 || bash "$SCRIPT_DIR/patch-cyder-dlls.sh" apply
+#    winemac：讓登入器可以不顯示在 Dock。只是外觀，engine 不是已知版本時照常啟動。
+bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check >/dev/null 2>&1 \
+  || bash "$SCRIPT_DIR/patch-cyder-winemac.sh" apply || echo "注意：無法套用 winemac 修補，登入器會照常顯示在 Dock"
 
 # 4. 認證器.exe 是 VB6 程式，需要 VB6 runtime
 if ! vb6_installed; then
@@ -119,6 +140,19 @@ if ! vb6_installed; then
     || die "找不到 Cyder 的 winetricks（${CYDER_SCRIPTS}/cyder-winetricks.sh），Cyder 版本可能不相容"
   progress vb6 "安裝 VB6 runtime（vb6run，約 1–2 分鐘）..."
   bash "$CYDER_SCRIPTS/cyder-winetricks.sh" install vb6run
+fi
+
+# 4b. 登入器的 Dock 圖示（Wine 登錄；需要 patch-cyder-winemac.sh 的修補才有作用）
+if [[ "${HIDE_LAUNCHER_DOCK:-1}" == 1 ]]; then
+  bash "$SCRIPT_DIR/launcher-dock.sh" status >/dev/null 2>&1 || {
+    progress settings "設定登入器不顯示在 Dock ..."
+    bash "$SCRIPT_DIR/launcher-dock.sh" hide || echo "注意：無法設定登入器的 Dock 圖示"
+  }
+else
+  bash "$SCRIPT_DIR/launcher-dock.sh" status >/dev/null 2>&1 && {
+    progress settings "恢復登入器的 Dock 圖示 ..."
+    bash "$SCRIPT_DIR/launcher-dock.sh" show || echo "注意：無法恢復登入器的 Dock 圖示"
+  }
 fi
 
 # 5. Cyder 全域設定。Cyder 只在「直接啟動 MapleStory.exe」時套用楓之谷設定；
@@ -154,8 +188,10 @@ progress tunnels "等待 HostShield 通道建立（最多 60 秒）..."
 if wait_until 60 tunnels_up; then
   echo "通道已建立："
   status
+  start_watcher
   exit 0
 fi
 echo "60 秒內沒看到全部通道監聽，請執行 bash scripts/play.sh status 檢查" >&2
 status
+start_watcher
 exit 1

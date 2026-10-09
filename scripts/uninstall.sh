@@ -1,6 +1,7 @@
 #!/bin/bash
 # 移除本專案對系統與 Cyder 所做的所有變更（不刪除遊戲、Cyder 或其設定）：
-#   1. 還原 Cyder engine：wineserver（loopback 修補）、wsock32.dll／advapi32.dll、開發用除錯簽章
+#   1. 還原 Cyder engine：wineserver（loopback 修補）、wsock32.dll／advapi32.dll、winemac.so（Dock 圖示）、
+#      開發用除錯簽章；刪除 shared bottle 登錄中登入器的 Dock 圖示設定
 #   2. 移除 lo0 位址與 LaunchDaemon（需要管理員密碼）
 #   3. 刪除 MacMeow.app 的設定與記錄
 # 用法：bash scripts/uninstall.sh
@@ -12,8 +13,10 @@ source "$ROOT/scripts/lib/common.sh"
 require_wine_stopped "執行移除"
 
 rc=0
+bash "$ROOT/scripts/launcher-dock.sh" show || rc=1
 bash "$ROOT/scripts/patch-cyder-loopback.sh" restore || rc=1
 bash "$ROOT/scripts/patch-cyder-dlls.sh" restore || rc=1
+bash "$ROOT/scripts/patch-cyder-winemac.sh" restore || rc=1
 bash "$ROOT/tools/sign-debug.sh" restore || rc=1
 
 echo "移除 lo0 位址與 LaunchDaemon（需要管理員密碼）："

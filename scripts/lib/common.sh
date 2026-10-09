@@ -16,6 +16,9 @@ CYDER_SETTINGS="$CYDER_SUPPORT/settings.json"
 CYDER_PREFIX="$CYDER_SUPPORT/bottles/shared"
 WINE_BIN="$CYDER_ENGINE/bin/wine"
 WINESERVER_BIN="$CYDER_ENGINE/bin/wineserver"
+# MacMeow 自己的設定與記錄（uninstall.sh 整個刪除；App 端路徑見 app/Sources/Paths.swift）。
+MACMEOW_SUPPORT="$HOME/Library/Application Support/MacMeow"
+MACMEOW_LOGS="$HOME/Library/Logs/MacMeow"
 
 # ---------- 貓貓谷 ----------
 GAME_FILES=(認證器.exe HostShield.exe 貓貓TMS登入器.exe XCGUI.dll MapleStory.exe)
@@ -25,6 +28,8 @@ HOSTSHIELD_PORTS="37601-37630"
 # 登入器在 Windows 上以 netsh 掛到 Loopback 的官方 IP（docs/technical-notes.md #3）。
 GAME_ALIAS_IP="202.80.104.28"
 LOOPBACK_IPS=("${HOSTSHIELD_IPS[@]}" "$GAME_ALIAS_IP")
+# 登入器的 exe 名稱（Dock 圖示設定以此為 Wine AppDefaults 的 key）。
+LAUNCHER_EXE="貓貓TMS登入器.exe"
 
 # ---------- 共用函式 ----------
 die() {
@@ -83,6 +88,10 @@ wine_running() {
   /usr/bin/pgrep -f "/${CYDER_ENGINE##*/}/.*bin/wineserver" >/dev/null 2>&1
 }
 wine_stopped() { ! wine_running; }
+# 執行中的 wineserver PID（沒有則輸出空字串）。
+wineserver_pid() {
+  /usr/bin/pgrep -f "/${CYDER_ENGINE##*/}/.*bin/wineserver" 2>/dev/null | /usr/bin/head -1 || true
+}
 
 # require_wine_stopped <動作說明>：Wine 執行中就拒絕修改 engine。
 require_wine_stopped() {
@@ -108,6 +117,50 @@ wineserver_kill() {
     /usr/bin/arch -x86_64 "$WINESERVER_BIN" -k
   ) >/dev/null 2>&1 || true
   wait_until 15 wine_stopped || true
+}
+
+# run_wine_tool <exe> [參數...]：在 shared bottle 執行 Wine 內建的主控台程式（reg 等），不輸出 Wine 訊息。
+# Wine 原本沒在執行時，等這次啟動的 wineserver 結束（登錄寫回 user.reg）再返回。
+run_wine_tool() {
+  local was_running=0 rc=0
+  wine_running && was_running=1
+  (
+    export_wine_env
+    WINEDEBUG=-all /usr/bin/arch -x86_64 "$WINE_BIN" "$@"
+  ) >/dev/null 2>&1 || rc=$?
+  ((was_running)) || wait_until 20 wine_stopped || true
+  return $rc
+}
+
+# session_procs：本專案啟動的 Windows 程式，每行「PID exe 名稱」。
+# 以命令列開頭比對：遊戲資料夾的 Windows 路徑（Z:\…，含 BlackCipher、NxOverlay 等子資料夾），
+# 或以相對路徑啟動的 HostShield.exe／認證器.exe。不讀取其餘命令列參數。
+session_procs() {
+  local dir="${GAME_DIR%/}" phys
+  phys="$(cd "$dir" 2>/dev/null && pwd -P || echo "$dir")"
+  /bin/ps -axo pid=,args= | GAME_WIN="Z:${dir//\//\\}\\" GAME_WIN_PHYS="Z:${phys//\//\\}\\" /usr/bin/awk '
+    {
+      pid = $1; cmd = $0; sub(/^ *[0-9]+ /, "", cmd); rest = ""
+      if (index(cmd, ENVIRON["GAME_WIN"]) == 1) rest = substr(cmd, length(ENVIRON["GAME_WIN"]) + 1)
+      else if (index(cmd, ENVIRON["GAME_WIN_PHYS"]) == 1) rest = substr(cmd, length(ENVIRON["GAME_WIN_PHYS"]) + 1)
+      else if (cmd ~ /^(HostShield|認證器)\.exe( |$)/) rest = cmd
+      else next
+      if (!match(rest, /\.([Ee][Xx][Ee]|aes)( |$)/)) next
+      name = substr(rest, 1, RSTART + 3); sub(/.*\\/, "", name)
+      print pid, name
+    }'
+}
+
+# foreign_wine_procs：shared bottle 以外或其他遊戲的 Windows 程式 PID（非本專案、非 Wine 系統程式）。
+foreign_wine_procs() {
+  local ours
+  ours=" $(session_procs | /usr/bin/awk '{printf "%s ", $1}')"
+  /bin/ps -axo pid=,args= | OURS="$ours" /usr/bin/awk '
+    {
+      pid = $1; cmd = $0; sub(/^ *[0-9]+ /, "", cmd)
+      if (index(ENVIRON["OURS"], " " pid " ")) next
+      if (cmd ~ /^[A-Za-z]:\\/ && tolower(cmd) !~ /^c:\\windows\\(system32|syswow64)\\/) print pid
+    }'
 }
 
 # wait_until <秒數> <指令...>：約每秒檢查一次，直到指令成功（回傳 0）或超過秒數（回傳 1）。

@@ -13,6 +13,9 @@ List each change under `## Unreleased` as it lands
 - `MacMeow.app` 視窗背景與主要按鈕改為單色，展開或收合「詳細記錄」時背景不再閃爍
 - `MacMeow.app` 移除設定視窗：同步機制改在首頁獨立的「Wine 設定」區塊切換
 - `MacMeow.app` 精簡首頁：移除標題下的版本說明與狀態卡片的說明文字，連線通道進度條改為填滿整個寬度
+- 關閉遊戲後自動關閉登入器、HostShield 等背景程式，Wine 也會完整結束，不必再按「全部關閉」；不影響其他 Cyder 遊戲（`AUTO_CLOSE=0` 可停用）
+- 登入器不再顯示在 Dock，Dock 只留遊戲的圖示（修補 Cyder 的 `winemac.so`，`uninstall.sh` 會還原；`HIDE_LAUNCHER_DOCK=0` 可停用）
+- 自動收尾與「全部關閉」會一併結束 Cyder 每次啟動後遺留的背景程序
 
 ## 0.1.0 — 2026-10-09
 

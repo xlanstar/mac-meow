@@ -50,7 +50,7 @@ summary() {
     echo "- Engine：未下載"
   fi
   echo "- Cyder 設定：wineLocale=$(cyder_setting wineLocale) graphicsBackend=$(cyder_setting graphicsBackend) msync=$(cyder_setting msync) esync=$(cyder_setting esync)"
-  echo "- MAPLE_SYNC：${MAPLE_SYNC:-msync}"
+  echo "- MAPLE_SYNC：${MAPLE_SYNC:-msync}，AUTO_CLOSE：${AUTO_CLOSE:-1}，HIDE_LAUNCHER_DOCK：${HIDE_LAUNCHER_DOCK:-1}"
   if missing="$(missing_game_file "$GAME_DIR")"; then
     echo "- 遊戲資料夾：缺少 ${missing}"
   else
@@ -60,6 +60,8 @@ summary() {
   echo "- 修補：$({
     bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check
     bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check
+    bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check
+    bash "$SCRIPT_DIR/launcher-dock.sh" status
   } 2>&1 \
     | /usr/bin/paste -sd '|' - | /usr/bin/sed 's/|/，/g')"
   echo "- 狀態：$(bash "$SCRIPT_DIR/play.sh" status --porcelain 2>/dev/null \
@@ -85,6 +87,7 @@ bundle() {
   summary | redact >"$dir/summary.md"
   bash "$SCRIPT_DIR/play.sh" status 2>&1 | redact >"$dir/status.txt" || true
   [[ -n "$log" && -f "$log" ]] && /usr/bin/tail -n 5000 "$log" | redact >"$dir/launcher.log"
+  [[ -f "$MACMEOW_LOGS/session.log" ]] && /usr/bin/tail -n 2000 "$MACMEOW_LOGS/session.log" | redact >"$dir/session.log"
   # 最近 7 天 MacMeow.app 自己的當機報告
   while IFS= read -r f; do
     redact <"$f" >"$dir/${f##*/}"
