@@ -157,6 +157,9 @@ require_wine_stopped() {
 # 匯出 Wine client 需要的環境。client 必須與執行中的 wineserver 使用相同同步機制（依 Cyder 設定）。
 export_wine_env() {
   export WINEPREFIX="$CYDER_PREFIX"
+  # 與 Cyder 的 wineLocale=zh_TW 相同。Wine 依 locale 決定字碼頁；與 bottle 記錄的不同時（Fonts\Codepages），
+  # 任何 Wine 程式啟動都會改寫語系相依的字型設定（FontSubstitutes 的 MS Shell Dlg 等），例如從 LANG=C 的 shell 執行 reg。
+  export LANG=zh_TW.UTF-8 LC_ALL=zh_TW.UTF-8
   unset WINEMSYNC WINEESYNC
   if [[ "$(cyder_setting msync)" == true ]]; then
     export WINEMSYNC=1
