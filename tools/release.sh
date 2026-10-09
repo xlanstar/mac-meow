@@ -176,6 +176,10 @@ verify_dmg() {
   hdiutil detach -quiet "$mnt" || die "無法卸載 ${mnt}"
   codesign --verify --deep --strict "$chk/MacMeow.app" || die "dmg 內 App 簽章驗證失敗"
   ok "codesign"
+  # Homebrew cask 的 uninstall script 寫死這個路徑；缺少時 brew uninstall／upgrade 都會失敗
+  [[ -x "$chk/MacMeow.app/Contents/Resources/scripts/uninstall.sh" ]] \
+    || die "dmg 內 App 缺少可執行的 Contents/Resources/scripts/uninstall.sh（cask 依賴）"
+  ok "App：scripts/uninstall.sh"
   if ! adhoc_release; then
     xcrun stapler validate -q "$chk/MacMeow.app" || die "dmg 內 App 沒有公證票證"
     spctl --assess --type exec -vv "$chk/MacMeow.app" 2>&1 | grep 'source=Notarized Developer ID' >/dev/null \

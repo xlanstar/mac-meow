@@ -50,3 +50,10 @@
 - 暫時解法：回報 issue，或等待本專案更新。
 - 原因：App 每次啟動都會重新套用修補。預先建置的 DLL 只能用在建置時的 CrossOver 版本上，如果新版 Cyder 的 Wine 版本差太多，`patch-cyder-dlls.sh` 會拒絕套用。要更新哪些地方見 [architecture.md](architecture.md) 的「外部變動時要更新的地方」。
 - 狀態：每次 Cyder 換新的 CrossOver 版本時都要重建 DLL。
+
+## 7. 手動刪除 App 後，`brew uninstall`／`brew upgrade` 失敗
+
+- 症狀：用 Homebrew 安裝後，自己把 `MacMeow.app` 拖到垃圾桶（或用了 App 的「解除安裝⋯」以外的方式刪除），之後 `brew uninstall --cask macmeow` 或 `brew upgrade` 回報 `uninstall script … does not exist`。
+- 暫時解法：先 `brew reinstall --cask macmeow` 裝回 App（重裝時 Homebrew 會略過不存在的腳本），再 `brew uninstall --cask macmeow`，這樣也會一併還原修補與設定。
+- 原因：cask 的 uninstall 區塊執行 App 內的 `Contents/Resources/scripts/uninstall.sh`（見 [architecture.md](architecture.md) 的 `uninstall.sh`）。Homebrew 找不到腳本時，除非是強制模式，否則停止移除；升級也會先執行舊版的 uninstall 區塊，所以一樣失敗。
+- 狀態：Homebrew 的行為，不修正；用 Homebrew 安裝的請以 `brew uninstall` 移除。

@@ -9,6 +9,7 @@
 #   sudo bash scripts/setup-loopback.sh install    # 立即生效並開機自動套用
 #   sudo bash scripts/setup-loopback.sh uninstall  # 移除
 #   bash scripts/setup-loopback.sh status          # 全部位址都在則回傳 0
+#   bash scripts/setup-loopback.sh installed       # 有任何位址或 LaunchDaemon 輸出 yes，否則 no（uninstall.sh 判斷是否需要密碼）
 set -euo pipefail
 # shellcheck source=lib/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
@@ -33,6 +34,19 @@ cmd_status() {
   done
   if [[ -f "$PLIST" ]]; then echo "LaunchDaemon：已安裝（${PLIST}）"; else echo "LaunchDaemon：未安裝"; fi
   return $missing
+}
+
+cmd_installed() {
+  local ip
+  [[ -f "$PLIST" ]] && {
+    echo yes
+    return 0
+  }
+  for ip in "${LOOPBACK_IPS[@]}"; do has_alias "$ip" && {
+    echo yes
+    return 0
+  }; done
+  echo no
 }
 
 cmd_install() {
@@ -73,9 +87,9 @@ cmd_uninstall() {
 }
 
 case "${1:-}" in
-  install | uninstall | status) "cmd_$1" ;;
+  install | uninstall | status | installed) "cmd_$1" ;;
   *)
-    echo "用法：$0 install|uninstall|status" >&2
+    echo "用法：$0 install|uninstall|status|installed" >&2
     exit 64
     ;;
 esac

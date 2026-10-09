@@ -17,6 +17,8 @@ struct MacMeowApp: App {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) {
                 UpdateCommands(updater: updater)
+                Divider()
+                UninstallButton(launcher: launcher, updater: updater)
             }
             CommandMenu("遊戲") {
                 Button("開始遊戲") { Task { await launcher.start() } }
@@ -160,7 +162,7 @@ private struct MenuBarContent: View {
             Divider()
         }
         Button("顯示主視窗") { MainWindow.show(openWindow) }
-        if launcher.status.running && !launcher.isWorking {
+        if launcher.status.running && !launcher.busy {
             Button("全部關閉…") {
                 MainWindow.show(openWindow)
                 Task { await launcher.stopAll() }
@@ -170,7 +172,7 @@ private struct MenuBarContent: View {
                 MainWindow.show(openWindow)
                 Task { await launcher.start() }
             }
-            .disabled(launcher.isWorking || !launcher.status.loaded)
+            .disabled(launcher.busy || !launcher.status.loaded)
         }
         Divider()
         Button("結束貓貓谷 for Mac") { NSApp.terminate(nil) }
@@ -185,6 +187,17 @@ private struct UpdateCommands: View {
         Button("檢查更新…") { Task { await updater.checkNow() } }
             .disabled(updater.checking || updater.installing)
         Toggle("自動檢查更新", isOn: $updater.automatic)
+    }
+}
+
+/// App 選單的「解除安裝⋯」：有流程進行中或正在更新時不可用。
+private struct UninstallButton: View {
+    @ObservedObject var launcher: Launcher
+    @ObservedObject var updater: Updater
+
+    var body: some View {
+        Button("解除安裝…") { Task { await launcher.uninstall() } }
+            .disabled(launcher.busy || updater.installing)
     }
 }
 
@@ -212,11 +225,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flag || !MainWindow.show()
     }
 
-    /// 啟動流程進行中（例如安裝 VB6）就結束 App，play.sh 會因輸出中斷而停在一半，先確認。
+    /// 啟動流程（例如安裝 VB6）或解除安裝進行中就結束 App，腳本會因輸出中斷而停在一半，先確認。
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard Launcher.shared.isWorking else { return .terminateNow }
         let alert = NSAlert()
-        alert.messageText = "正在啟動貓貓谷"
+        alert.messageText = Launcher.shared.uninstalling ? "正在解除安裝" : "正在啟動貓貓谷"
         alert.informativeText = "現在結束可能讓設定只做一半。確定要結束嗎？"
         alert.addButton(withTitle: "繼續等待")
         alert.addButton(withTitle: "結束")

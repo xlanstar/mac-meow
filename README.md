@@ -64,11 +64,10 @@ App 會自動檢查新版本，有新版時主視窗頂端會出現提示；也�
 
 ## 移除
 
-```sh
-bash scripts/uninstall.sh
-```
+- **手動下載安裝的**：在選單選「貓貓谷 for Mac → 解除安裝⋯」。
+- **用 Homebrew 安裝的**：在「終端機」執行 `brew uninstall --cask macmeow`。舊版請先執行 `brew upgrade --cask macmeow` 更新，否則不會還原修補與設定。
 
-用 Homebrew 安裝的，執行上面的指令後再以 `brew uninstall --cask macmeow` 移除 App（加 `--zap` 會一併刪除 App 的設定、記錄與 LaunchDaemon，但不會還原 Cyder engine 的修補）。
+兩種方式都會還原 Cyder engine 的修補與 Cyder 設定的原值、加回遊戲資料夾的下載隔離標記、移除本機網路位址與開機設定（需要密碼），並刪除 App 的設定與記錄。遊戲、Cyder 與其設定不會被刪除。
 
 ## 已知問題
 
@@ -80,6 +79,7 @@ bash scripts/uninstall.sh
 - **macOS 28 以後可能無法執行**：在本專案確認相容之前，先不要升級。
 - **出現「Intel 架構的 App 未來將無法執行」通知**：在 macOS 27 以前不影響遊戲，直接關閉即可。
 - **Cyder 更新後無法啟動**：請回報 issue，或等待本專案更新。
+- **手動刪除 App 後 `brew uninstall` 失敗**：先 `brew reinstall --cask macmeow`，再 `brew uninstall --cask macmeow`。
 
 ## 回報問題
 

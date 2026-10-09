@@ -42,6 +42,10 @@ final class Launcher: ObservableObject {
         if case .working = phase { return true }
         return false
     }
+    /// 「解除安裝⋯」進行中（含對話框）；這段期間不能開始遊戲、更新或設定網路位址。
+    @Published private(set) var uninstalling = false
+    /// 有流程在進行：啟動、關閉或解除安裝。
+    var busy: Bool { isWorking || uninstalling }
 
     // MARK: - 狀態
 
@@ -76,7 +80,7 @@ final class Launcher: ObservableObject {
     // MARK: - 啟動流程
 
     func start() async {
-        guard !isWorking else { return }
+        guard !busy else { return }
         failedStep = nil
         phase = .working("檢查環境…")
         record("===== 啟動 =====")
@@ -201,6 +205,7 @@ final class Launcher: ObservableObject {
     /// 以管理員權限執行 setup-loopback.sh install。
     @discardableResult
     func setupLoopback() async -> Bool {
+        guard !uninstalling else { return false }
         let choice = await Dialog.ask(
             "設定本機網路位址",
             "貓貓谷的連線元件會使用 127.x.x.1 這類本機位址，macOS 預設沒有開啟。\n\n接下來會要求輸入電腦密碼，以加入這些本機位址並設定開機自動套用（只需一次）。",
@@ -292,6 +297,82 @@ final class Launcher: ObservableObject {
             at: URL(fileURLWithPath: path),
             configuration: NSWorkspace.OpenConfiguration(),
             completionHandler: nil)
+    }
+
+    // MARK: - 解除安裝
+
+    /// 「解除安裝⋯」。Homebrew 安裝的 App 改為提示 brew 指令（cask 的 uninstall 區塊執行同一支 uninstall.sh）；
+    /// 其餘執行 uninstall.sh system（還原修補與設定、移除本機網路位址），成功後以 uninstall.sh stage 把
+    /// purge 複製到暫存資料夾（~/.Trash 受隱私權保護，App 無法從垃圾桶執行腳本），把 App 移到垃圾桶，
+    /// 再啟動 purge <PID> 並結束 App：設定與記錄等 App 結束後才刪除，App 結束時寫回的也會一併刪除。
+    func uninstall() async {
+        guard !busy else { return }
+        uninstalling = true
+        defer { uninstalling = false }
+        let app = Bundle.main.bundleURL
+        let brew = await Shell.collect(Shell.script("uninstall.sh", ["brew-command", app.path]))
+        if brew.ok, let command = brew.lines.last(where: { !$0.isEmpty }) {
+            let choice = await Dialog.ask(
+                "請用 Homebrew 解除安裝",
+                "這個 App 是用 Homebrew 安裝的，請在「終端機」執行以下指令（會自動結束 App）。會一併還原 Cyder 的修補與設定、移除本機網路位址（需要密碼），並刪除 App 的設定與記錄：\n\n\(command)",
+                buttons: ["複製指令", "取消"])
+            if choice == 0 {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(command, forType: .string)
+            }
+            return
+        }
+
+        let stopNote = status.running ? "會先關閉 Cyder 內所有正在執行的 Windows 程式（包含其他 Cyder 遊戲），再" : "會"
+        let choice = await Dialog.ask(
+            "要解除安裝貓貓谷 for Mac 嗎？",
+            "\(stopNote)還原 Cyder engine 的修補與 Cyder 設定的原值、加回遊戲資料夾的下載隔離標記、移除本機網路位址（需要密碼），並刪除 App 的設定與記錄，最後把 App 移到垃圾桶。\n\n遊戲、Cyder 與其設定不會被刪除。",
+            buttons: ["解除安裝", "取消"], destructive: true)
+        guard choice == 0 else { return }
+        if status.running {
+            guard await stopAll(confirm: false) else { return }
+        }
+
+        failedStep = nil
+        phase = .working("正在解除安裝…")
+        record("===== 解除安裝 =====")
+        let result = await run(Shell.script("uninstall.sh", ["system"], env: config.environment))
+        phase = .idle
+        guard result.ok else {
+            await refresh()
+            await Dialog.ask(
+                "解除安裝沒有完成",
+                "\(result.errors.last ?? "部分步驟失敗。")\n\n處理後可以再執行一次「解除安裝⋯」，已完成的步驟不會重複。",
+                style: .warning)
+            return
+        }
+
+        // 複製失敗時不移動 App，改從 App 內執行 purge
+        let staged = await Shell.collect(Shell.script("uninstall.sh", ["stage"]))
+        let purge = staged.ok ? staged.lines.last(where: { !$0.isEmpty }) : nil
+        var trashed = false
+        if purge != nil {
+            trashed = (try? await NSWorkspace.shared.recycle([app])) != nil
+        }
+        let message: String
+        if trashed {
+            message = "App 已移到垃圾桶。"
+        } else if app.path.contains("/AppTranslocation/") || app.path.hasPrefix("/Volumes/") {
+            message = "App 是從下載位置或磁碟映像直接開啟的，請在 App 結束後刪除你下載的 MacMeow.app。"
+        } else {
+            message = "無法把 App 移到垃圾桶，請在 App 結束後手動刪除「\(abbreviate(app.path))」。"
+        }
+        await Dialog.ask("已解除安裝", "\(message)按「好」後結束。")
+        // 在對話框之後才啟動：purge 等到 App 結束才刪除設定
+        do {
+            try Shell.spawn(
+                path: purge ?? AppPaths.script("uninstall.sh"),
+                ["purge", String(ProcessInfo.processInfo.processIdentifier)])
+        } catch {
+            record("錯誤：無法刪除 App 的設定與記錄：\(error.localizedDescription)")
+        }
+        uninstalling = false
+        NSApp.terminate(nil)
     }
 
     // MARK: - 記錄

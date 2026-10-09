@@ -306,7 +306,7 @@ private struct StatusSummaryCard: View {
     }
 
     @ViewBuilder private var actions: some View {
-        if launcher.status.running && !launcher.isWorking {
+        if launcher.status.running && !launcher.busy {
             HStack(spacing: 10) {
                 Button {
                     Task { await launcher.stopAll() }
@@ -328,7 +328,7 @@ private struct StatusSummaryCard: View {
                 HStack(spacing: 8) {
                     if launcher.isWorking {
                         ProgressView().controlSize(.small).colorScheme(.dark)
-                        Text("啟動中…")
+                        Text(launcher.uninstalling ? "解除安裝中…" : "啟動中…")
                     } else {
                         Image(systemName: "play.fill")
                         Text("開始遊戲")
@@ -336,7 +336,7 @@ private struct StatusSummaryCard: View {
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(launcher.isWorking || !launcher.status.loaded)
+            .disabled(launcher.busy || !launcher.status.loaded)
             .keyboardShortcut(.defaultAction)
         }
     }
@@ -455,7 +455,7 @@ private struct ChecklistCard: View {
                 .padding(.bottom, 6)
             ForEach(Array(Step.checklist.enumerated()), id: \.element) { index, step in
                 if index > 0 { Divider().padding(.leading, 34) }
-                StepRow(step: step, row: launcher.row(step), disabled: launcher.isWorking)
+                StepRow(step: step, row: launcher.row(step), disabled: launcher.busy)
             }
         }
         .modifier(Card(padding: 14))

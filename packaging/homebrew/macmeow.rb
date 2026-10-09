@@ -20,7 +20,13 @@ cask "macmeow" do
 
   app "MacMeow.app"
 
-  uninstall quit: "tw.macmeow.launcher"
+  # quit 先於 script：App 結束後才刪除它的設定。brew upgrade／reinstall 也會執行這個區塊，
+  # 這時 uninstall.sh cask 什麼都不做（見 scripts/uninstall.sh）。
+  uninstall quit:   "tw.macmeow.launcher",
+            script: {
+              executable: "#{appdir}/MacMeow.app/Contents/Resources/scripts/uninstall.sh",
+              args:       ["cask"],
+            }
 
   zap launchctl: "tw.macmeow.loopback",
       delete:    "/Library/LaunchDaemons/tw.macmeow.loopback.plist",
@@ -36,7 +42,7 @@ cask "macmeow" do
     MacMeow 需要 Cyder（x86_64 Wine，需要 Rosetta 2）：
       https://github.com/dspp779/CyderBits/releases
 
-    移除前請先依 README「移除」還原 Cyder engine 的修補：
-      https://github.com/xlanstar/mac-meow#移除
+    brew uninstall --cask macmeow 會還原 Cyder engine 的修補與 Cyder 設定、
+    移除本機網路位址（需要密碼），以及 App 的設定與記錄。
   EOS
 end

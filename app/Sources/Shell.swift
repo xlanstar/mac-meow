@@ -31,9 +31,14 @@ enum Shell {
 
     /// 啟動 scripts/<name> 後不等待也不讀取輸出；App 結束後仍繼續執行（update.sh install）。
     static func spawn(_ name: String, _ args: [String] = []) throws {
+        try spawn(path: AppPaths.script(name), args)
+    }
+
+    /// 同 `spawn(_:_:)`，但指定腳本路徑（解除安裝時 App 已移到垃圾桶，`AppPaths.scripts` 不再有效）。
+    static func spawn(path: String, _ args: [String] = []) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [AppPaths.script(name)] + args
+        process.arguments = [path] + args
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice

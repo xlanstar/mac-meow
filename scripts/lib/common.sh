@@ -33,7 +33,7 @@ MACMEOW_REQUIREMENT="anchor apple generic and identifier \"$MACMEOW_BUNDLE_ID\" 
 and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists \
 and certificate leaf[subject.OU] = \"$MACMEOW_TEAM_ID\""
 # Homebrew cask（第三方 tap；cask 範本 packaging/homebrew/macmeow.rb，由 tools/release.sh tap 發佈）。
-# update.sh homebrew 以 <prefix>/Caskroom/<token> 判斷 App 是否由 Homebrew 安裝。
+# homebrew_app 以 <prefix>/Caskroom/<token> 判斷 App 是否由 Homebrew 安裝。
 MACMEOW_CASK="macmeow"
 MACMEOW_TAP_REPO="xlanstar/homebrew-tap" # brew 的 tap 名稱為 xlanstar/tap
 HOMEBREW_PREFIXES=(/opt/homebrew /usr/local)
@@ -53,6 +53,24 @@ LAUNCHER_EXE="貓貓TMS登入器.exe"
 die() {
   echo "$*" >&2
   exit 1
+}
+
+# homebrew_app <.app>：App 由 Homebrew cask 安裝（update.sh、uninstall.sh 改為提示 brew 指令）。
+# 條件：任一 Homebrew prefix 有本 cask 的 Caskroom，且 App 位於該次安裝的 appdir（--appdir；
+# 記錄在 Caskroom/<token>/.metadata/config.json，優先序 explicit → env → default）；排除 dist/ 等其他位置的複本。
+homebrew_app() {
+  local prefix room key dir
+  for prefix in "${HOMEBREW_PREFIXES[@]}"; do
+    room="$prefix/Caskroom/$MACMEOW_CASK"
+    [[ -d "$room" ]] || continue
+    dir=""
+    for key in explicit env default; do
+      dir="$(/usr/bin/plutil -extract "$key.appdir" raw -o - "$room/.metadata/config.json" 2>/dev/null)" && break
+      dir=""
+    done
+    [[ "$1" == "${dir:-/Applications}/MacMeow.app" ]] && return 0
+  done
+  return 1
 }
 
 # 依序尋找 Cyder.app；找到則輸出路徑。

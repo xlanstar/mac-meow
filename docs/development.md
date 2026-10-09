@@ -11,7 +11,7 @@
 - `scripts/`：使用者流程，會打包進 `MacMeow.app`，只能用 macOS 內建指令。共用路徑、常數與函式在 `scripts/lib/common.sh`（遊戲檔案清單、迴路位址、Cyder 路徑、`wine_running`、`wineserver_kill` 等），新增腳本請 source 它，不要重複定義。
 - `app/`：SwiftUI App（`app/Sources/`，Swift 5 語言模式、最低 macOS 13），由 `app/build-app.sh` 以 `swiftc` 編譯，不需要 Xcode 專案。App 只負責 UI：需要新狀態就加到 `play.sh` 的 `porcelain()` 並同步 `app/Sources/Status.swift`；需要新進度就在腳本呼叫 `progress <id> <訊息>`，並在 `Step.fromProgress` 對應清單項目。
 - `tools/`：開發與診斷，可用 Xcode、Homebrew、`python3`。入口腳本放在 `tools/*.sh`，共用函式在 `tools/lib.sh`（建立在 `common.sh` 之上），原始碼在 `tools/src/<工具>/`，建置產物一律輸出到 `build/tools/`，診斷紀錄一律寫到 `debug/`。
-- 例外：`tools/sign-debug.sh` 會被 `scripts/uninstall.sh` 呼叫，因此只用 macOS 內建指令。
+- 例外：`tools/sign-debug.sh` 會被 `scripts/uninstall.sh` 呼叫（只在 repo 內執行時；App 不打包 `tools/`），因此只用 macOS 內建指令。
 - `packaging/homebrew/macmeow.rb`：Homebrew cask 範本（`@VERSION@`、`@SHA256@` 由 `release.sh tap` 填入），發佈到第三方 tap [`xlanstar/homebrew-tap`](https://github.com/xlanstar/homebrew-tap)（`common.sh` 的 `MACMEOW_TAP_REPO`）。tap 的 `Casks/` 只由 `release.sh tap` 產生，不直接修改。
 
 ## 建置與測試
@@ -24,6 +24,16 @@ GAME_DIR=~/Games/MapleStory bash scripts/play.sh   # 直接跑使用者流程
 bash scripts/play.sh status                        # 通道／程序狀態
 bash scripts/patch-cyder-dlls.sh check             # 各修補也都有 check
 bash scripts/session.sh status                     # 遊戲階段監看；記錄在 ~/Library/Logs/MacMeow/session.log
+```
+
+測試 `uninstall.sh` 時不要直接執行：除了 `brew-command` 以外的子指令都會真的還原修補、移除本機網路位址並刪除 App 設定。複製到暫存資料夾、把有副作用的函式換成 echo 後再跑；`cask` 的判斷可以放在假的 brew 程序底下驗證（perl 改 `$0` 模擬 `brew.rb <子指令>` 的命令列）：
+
+```sh
+T="$(mktemp -d)" && mkdir -p "$T/scripts" && cp -R scripts/lib "$T/scripts/"
+sed 's/^  cmd_all$/  echo WOULD_UNINSTALL/' scripts/uninstall.sh >"$T/scripts/uninstall.sh"
+for sub in upgrade reinstall install uninstall; do
+  perl -e '$0 = "/x/ruby /opt/homebrew/Library/Homebrew/brew.rb '"$sub"' --cask macmeow"; system("/usr/bin/env", "/bin/bash", "'"$T"'/scripts/uninstall.sh", "cask")'
+done # 前三個應輸出「保留 MacMeow 的修補與設定」，uninstall 輸出 WOULD_UNINSTALL
 ```
 
 ## 提交前檢查（prek）

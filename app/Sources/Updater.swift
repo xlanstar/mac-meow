@@ -120,8 +120,8 @@ final class Updater: ObservableObject {
             await showHomebrew(release, command)
             return
         }
-        guard !Launcher.shared.isWorking else {
-            await Dialog.ask("遊戲啟動中", "完成後再更新。")
+        guard !Launcher.shared.busy else {
+            await Dialog.ask(Launcher.shared.uninstalling ? "正在解除安裝" : "遊戲啟動中", "完成後再更新。")
             return
         }
         state = .working

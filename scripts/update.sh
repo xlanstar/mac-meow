@@ -85,19 +85,10 @@ check_target() {
   [[ -w "$1" && -w "$(dirname "$1")" ]] || die "沒有權限取代 ${1}"
 }
 
-# homebrew_command <.app>：App 由 Homebrew cask 安裝時輸出更新指令。
-# 條件：任一 Homebrew prefix 有本 cask 的 Caskroom，且 App 位於 cask 的安裝位置
-# （/Applications 或 ~/Applications，即 --appdir 的常見設定），排除 dist/ 等其他位置的複本。
+# homebrew_command <.app>：App 由 Homebrew cask 安裝時輸出更新指令（判斷見 common.sh 的 homebrew_app）。
 homebrew_command() {
-  local prefix
-  [[ "$1" == /Applications/MacMeow.app || "$1" == "$HOME/Applications/MacMeow.app" ]] || return 1
-  for prefix in "${HOMEBREW_PREFIXES[@]}"; do
-    if [[ -d "$prefix/Caskroom/$MACMEOW_CASK" ]]; then
-      echo "brew upgrade --cask $MACMEOW_CASK"
-      return 0
-    fi
-  done
-  return 1
+  homebrew_app "$1" || return 1
+  echo "brew upgrade --cask $MACMEOW_CASK"
 }
 
 # verify_app <新版 .app> <X.Y.Z>：官方簽章（MACMEOW_REQUIREMENT，含 bundle id）且版本正確
