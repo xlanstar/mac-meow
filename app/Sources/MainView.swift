@@ -559,12 +559,73 @@ private struct SyncCard: View {
             }
             .padding(.vertical, 7)
             Divider()
+            GraphicsRow(launcher: launcher)
+            Divider()
+            ToggleRow(
+                symbol: "speedometer", title: "效能 HUD（顯示 FPS）",
+                help:
+                    "在遊戲畫面顯示 Metal 效能 HUD（FPS 等），DXMT 與 D3DMetal 都適用。寫入 Cyder 的全域設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。",
+                isOn: $launcher.config.hud)
+            Divider()
             ToggleRow(
                 symbol: "xmark.app", title: "遊戲關閉時自動收尾",
                 help: "遊戲關閉後，自動關閉登入器、HostShield 等背景程式，Wine 也會跟著結束。不會關閉其他 Cyder 遊戲。",
                 isOn: $launcher.config.autoClose)
         }
         .modifier(Card(padding: 14))
+    }
+}
+
+/// 圖形後端。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷；無法使用時 cyder-settings.sh 改寫 DXMT。
+private struct GraphicsRow: View {
+    @ObservedObject var launcher: Launcher
+
+    /// 狀態已讀取且 D3DMetal 無法使用（狀態尚未讀取時不提示）。
+    private var d3dmetalUnavailable: Bool { launcher.status.loaded && !launcher.status.d3dmetal }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Image(systemName: "display")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.orange)
+                    .frame(width: 22)
+                HStack(spacing: 4) {
+                    Text("圖形後端").font(.system(size: 13, weight: .medium))
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .help(
+                            "DXMT 是預設值。D3DMetal 是 Apple GPTK 的轉譯層，需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時改用 DXMT。寫入 Cyder 的全域設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。"
+                        )
+                }
+                Spacer(minLength: 8)
+                Picker("圖形後端", selection: $launcher.config.graphics) {
+                    ForEach(GraphicsBackend.allCases) { backend in
+                        let unavailable = backend == .d3dmetal && d3dmetalUnavailable
+                        Text(unavailable ? "\(backend.title)（無法使用）" : backend.title)
+                            .tag(backend)
+                            .disabled(unavailable)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+            }
+            if d3dmetalUnavailable {
+                Text(
+                    launcher.config.graphics == .d3dmetal
+                        ? "D3DMetal 無法使用，會改用 DXMT：需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
+                        : "D3DMetal 需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
+                )
+                .font(.caption)
+                .foregroundStyle(launcher.config.graphics == .d3dmetal ? Color.orange : Color.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 34)
+            }
+        }
+        .padding(.vertical, 7)
     }
 }
 

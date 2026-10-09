@@ -1,15 +1,18 @@
 #!/bin/bash
-# Cyder 全域設定（settings.json）：wineLocale、graphicsBackend、msync、esync。
+# Cyder 全域設定（settings.json）：wineLocale、graphicsBackend、graphicsHud、msync、esync。
 # Cyder 只在「直接啟動 MapleStory.exe」時套用楓之谷設定；經由登入器啟動時要改成全域設定，子程序才會繼承。
 # 同步機制預設 MSync（Cyder 預設關閉，此時每次同步都經 wineserver，楓之谷會明顯卡頓）。
+# 圖形後端預設 DXMT；選 D3DMetal 但無法使用時（macOS 14 以下或沒有 GPTK）改寫 DXMT，
+# 否則 Cyder 會退回 Wine 內建的 wined3d（docs/technical-notes.md #13）。
 #
 # 第一次修改前把原檔備份為 settings.json.macmeow-orig（已有備份就保留，備份即最初的原值）。
 #
 # 用法：bash scripts/cyder-settings.sh check|apply|restore
-#   check    設定都符合則回傳 0（同步機制依 MAPLE_SYNC）
+#   check    設定都符合則回傳 0（依 MAPLE_SYNC、MAPLE_GFX、MAPLE_HUD）
 #   apply    寫入不符合的設定
-#   restore  把上述設定還原成備份中的原值並刪除備份；目前值已不是本專案寫入的值（使用者事後改過）就保留
-# 環境變數：MAPLE_SYNC=msync|esync|none（預設 msync）
+#   restore  把上述設定還原成備份中的原值並刪除備份；目前值已不是本專案會寫入的值（使用者事後改過）就保留
+# 環境變數：MAPLE_SYNC=msync|esync|none（預設 msync）、MAPLE_GFX=dxmt|d3dmetal（預設 dxmt）、
+#           MAPLE_HUD=0|1（預設 0；1 為 Metal 效能 HUD）
 set -euo pipefail
 # shellcheck source=lib/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
@@ -23,19 +26,46 @@ case "${MAPLE_SYNC:-msync}" in
   *) die "MAPLE_SYNC 只能是 msync|esync|none" ;;
 esac
 
-# 每行「key 型別 本專案寫入的值」；值為 * 表示可能寫入任何值（依 MAPLE_SYNC）。
+case "${MAPLE_GFX:-dxmt}" in
+  dxmt | d3dmetal) want_gfx="${MAPLE_GFX:-dxmt}" ;;
+  *) die "MAPLE_GFX 只能是 dxmt|d3dmetal" ;;
+esac
+
+case "${MAPLE_HUD:-0}" in
+  0) want_hud=off ;;
+  1) want_hud=metal ;;
+  *) die "MAPLE_HUD 只能是 0|1" ;;
+esac
+
+# 每行「key 型別 本專案可能寫入的值」；多個值以 | 分隔（依環境變數而定）。
+# restore 以此判斷目前值是否仍是本專案寫入的。
 SPEC="wineLocale string zh_TW
-graphicsBackend string dxmt
-msync bool *
-esync bool *"
+graphicsBackend string dxmt|d3dmetal
+graphicsHud string off|metal
+msync bool true|false
+esync bool true|false"
+
+# 選了 D3DMetal 但無法使用時改用 DXMT（只在 check／apply 檢查；restore 不需要）。
+gfx_fallback=0
+resolve_gfx() {
+  if [[ "$want_gfx" == d3dmetal ]] && ! d3dmetal_available; then
+    want_gfx=dxmt gfx_fallback=1
+  fi
+  return 0
+}
 
 want() {
   case "$1" in
+    graphicsBackend) echo "$want_gfx" ;;
+    graphicsHud) echo "$want_hud" ;;
     msync) echo "$want_msync" ;;
     esync) echo "$want_esync" ;;
     *) echo "$SPEC" | /usr/bin/awk -v k="$1" '$1 == k { print $3 }' ;;
   esac
 }
+
+# ours <可能寫入的值> <目前值>：目前值是本專案可能寫入的值之一。
+ours() { [[ "|$1|" == *"|$2|"* ]]; }
 
 # 輸出不符合的 key
 mismatched() {
@@ -47,9 +77,12 @@ mismatched() {
 
 case "${1:-}" in
   check)
+    resolve_gfx
     [[ -z "$(mismatched)" ]]
     ;;
   apply)
+    resolve_gfx
+    ((gfx_fallback)) && echo "注意：D3DMetal 無法使用（需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK），改用 DXMT"
     keys="$(mismatched)"
     [[ -n "$keys" ]] || exit 0
     if [[ ! -f "$BAK" ]]; then
@@ -75,11 +108,11 @@ case "${1:-}" in
       rm -f "$BAK"
       exit 0
     }
-    while read -r key type ours; do
+    while read -r key type values; do
       cur="$(cyder_setting "$key")"
       if orig="$(/usr/bin/plutil -extract "$key" raw -o - "$BAK" 2>/dev/null)"; then
         [[ "$cur" == "$orig" ]] && continue
-        if [[ "$ours" != "*" && "$cur" != "$ours" ]]; then
+        if ! ours "$values" "$cur"; then
           echo "Cyder 設定：${key} 已被改成 ${cur}，保留"
           continue
         fi
@@ -87,7 +120,7 @@ case "${1:-}" in
         echo "Cyder 設定：${key} 已還原為 ${orig}"
       else
         /usr/bin/plutil -extract "$key" raw -o - "$CYDER_SETTINGS" >/dev/null 2>&1 || continue
-        if [[ "$ours" != "*" && "$cur" != "$ours" ]]; then
+        if ! ours "$values" "$cur"; then
           echo "Cyder 設定：${key} 已被改成 ${cur}，保留"
           continue
         fi

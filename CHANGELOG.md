@@ -5,6 +5,9 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- `MacMeow.app` 的「Wine 設定」新增「圖形後端」：可改用 D3DMetal（需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時自動改用 DXMT）
+- `MacMeow.app` 的「Wine 設定」新增「效能 HUD」：在遊戲畫面顯示 FPS
+
 ## 0.3.0 — 2026-10-10
 
 - `MacMeow.app` 新增「解除安裝⋯」（App 選單）：還原所有修補與設定、移除本機網路位址與 App 的設定記錄，並把 App 移到垃圾桶，不必再執行 `uninstall.sh`

@@ -31,7 +31,8 @@ final class Launcher: ObservableObject {
     /// 上次成功「開始遊戲」時套用的設定；與 config 不同表示有尚未套用的變更。
     @Published private(set) var applied = AppConfig.load()
     var settingsDirty: Bool {
-        config.sync != applied.sync || config.autoClose != applied.autoClose
+        config.sync != applied.sync || config.graphics != applied.graphics || config.hud != applied.hud
+            || config.autoClose != applied.autoClose
     }
 
     private let logFile = LogFile()

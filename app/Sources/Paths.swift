@@ -41,10 +41,25 @@ enum SyncMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// Cyder 的圖形後端（傳給 play.sh 的 MAPLE_GFX）。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷。
+enum GraphicsBackend: String, CaseIterable, Identifiable {
+    case dxmt, d3dmetal
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .dxmt: return "DXMT（建議）"
+        case .d3dmetal: return "D3DMetal"
+        }
+    }
+}
+
 /// ~/Library/Application Support/MacMeow/config（KEY=VALUE；uninstall.sh 會刪除）。
 struct AppConfig: Equatable {
     var gameDir: String?
     var sync: SyncMode = .msync
+    var graphics: GraphicsBackend = .dxmt
+    /// Metal 效能 HUD，顯示 FPS（play.sh 的 MAPLE_HUD）。
+    var hud = false
     /// 遊戲關閉時自動關閉登入器與背景程式（play.sh 的 AUTO_CLOSE）。
     var autoClose = true
 
@@ -57,6 +72,8 @@ struct AppConfig: Equatable {
             switch line[..<eq] {
             case "GAME_DIR": config.gameDir = value.isEmpty ? nil : value
             case "MAPLE_SYNC": config.sync = SyncMode(rawValue: value) ?? .msync
+            case "MAPLE_GFX": config.graphics = GraphicsBackend(rawValue: value) ?? .dxmt
+            case "MAPLE_HUD": config.hud = value == "1"
             case "AUTO_CLOSE": config.autoClose = value != "0"
             default: break
             }
@@ -68,6 +85,8 @@ struct AppConfig: Equatable {
         var text = ""
         if let gameDir { text += "GAME_DIR=\(gameDir)\n" }
         text += "MAPLE_SYNC=\(sync.rawValue)\n"
+        text += "MAPLE_GFX=\(graphics.rawValue)\n"
+        text += "MAPLE_HUD=\(hud ? 1 : 0)\n"
         text += "AUTO_CLOSE=\(autoClose ? 1 : 0)\n"
         try? FileManager.default.createDirectory(at: AppPaths.supportDir, withIntermediateDirectories: true)
         try? text.write(to: AppPaths.configFile, atomically: true, encoding: .utf8)
@@ -77,6 +96,8 @@ struct AppConfig: Equatable {
     var environment: [String: String] {
         var env = [
             "MAPLE_SYNC": sync.rawValue,
+            "MAPLE_GFX": graphics.rawValue,
+            "MAPLE_HUD": hud ? "1" : "0",
             "AUTO_CLOSE": autoClose ? "1" : "0",
         ]
         if let gameDir { env["GAME_DIR"] = gameDir }
