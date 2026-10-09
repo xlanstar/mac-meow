@@ -22,10 +22,10 @@ bash "$ROOT/tools/sign-debug.sh" restore || rc=1
 echo "移除 lo0 位址與 LaunchDaemon（需要管理員密碼）："
 sudo bash "$ROOT/scripts/setup-loopback.sh" uninstall || rc=1
 
-rm -rf "$HOME/Library/Application Support/MacMeow" "$HOME/Library/Logs/MacMeow" \
-  "$HOME/Library/Saved Application State/tw.macmeow.launcher.savedState"
-# SwiftUI 視窗位置（tw.macmeow.launcher 偏好設定）
-/usr/bin/defaults delete tw.macmeow.launcher >/dev/null 2>&1 || true
+rm -rf "$MACMEOW_SUPPORT" "$MACMEOW_LOGS" "$MACMEOW_CACHE" \
+  "$HOME/Library/Saved Application State/$MACMEOW_BUNDLE_ID.savedState"
+# SwiftUI 視窗位置與檢查更新設定（tw.macmeow.launcher 偏好設定）
+/usr/bin/defaults delete "$MACMEOW_BUNDLE_ID" >/dev/null 2>&1 || true
 echo "已刪除 MacMeow.app 的設定與記錄"
 
 if ((rc)); then

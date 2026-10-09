@@ -9,10 +9,14 @@ enum Theme {
 
 struct MainView: View {
     @ObservedObject var launcher: Launcher
+    @ObservedObject var updater: Updater
 
     var body: some View {
         VStack(spacing: 14) {
             HeaderView(launcher: launcher)
+            if let release = updater.notice {
+                UpdateBanner(updater: updater, release: release)
+            }
             StatusSummaryCard(launcher: launcher)
             ChecklistCard(launcher: launcher)
             SyncCard(launcher: launcher)
@@ -118,6 +122,49 @@ private struct HeaderIcon: View {
             .frame(width: 30, height: 30)
             .background(Circle().fill(Color.primary.opacity(0.06)))
             .contentShape(Circle())
+    }
+}
+
+// MARK: - 新版本
+
+private struct UpdateBanner: View {
+    @ObservedObject var updater: Updater
+    let release: Updater.Release
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Theme.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("新版本 \(release.version)")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Link("更新內容", destination: release.page)
+                    .font(.caption)
+            }
+            Spacer(minLength: 8)
+            switch updater.state {
+            case .downloading(let progress):
+                ProgressView(value: progress).tint(Theme.orange).frame(width: 90)
+                Text("\(Int(progress * 100))%")
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, alignment: .trailing)
+            case .waiting, .working:
+                ProgressView().controlSize(.small)
+                Text(updater.state == .waiting ? "等待網路…" : "更新中…")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            case nil:
+                Button("略過") { updater.skip(release) }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                Button("更新") { Task { await updater.install(release) } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.orange)
+            }
+        }
+        .modifier(Card(padding: 14))
     }
 }
 

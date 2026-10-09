@@ -19,6 +19,19 @@ WINESERVER_BIN="$CYDER_ENGINE/bin/wineserver"
 # MacMeow 自己的設定與記錄（uninstall.sh 整個刪除；App 端路徑見 app/Sources/Paths.swift）。
 MACMEOW_SUPPORT="$HOME/Library/Application Support/MacMeow"
 MACMEOW_LOGS="$HOME/Library/Logs/MacMeow"
+MACMEOW_CACHE="$HOME/Library/Caches/MacMeow" # update.sh 下載的新版
+
+# ---------- MacMeow.app 發佈 ----------
+# 一鍵更新（update.sh）只從這個 repo 的 Release 下載，且新版必須符合 MACMEOW_REQUIREMENT；
+# release.sh 發佈前也以此驗證。App 端的網址在 app/Sources/Paths.swift，改 repo 時一起改。
+MACMEOW_REPO="xlanstar/mac-meow"
+MACMEOW_BUNDLE_ID="tw.macmeow.launcher"
+MACMEOW_TEAM_ID="LJJN3L2PS6"
+# 官方版的簽章需求（codesign -R，即 Developer ID 的 designated requirement）：Apple 簽發的
+# Developer ID Application 憑證、Team ID 與 bundle id 都要符合；只看 TeamIdentifier 欄位可被自簽憑證偽造。
+MACMEOW_REQUIREMENT="anchor apple generic and identifier \"$MACMEOW_BUNDLE_ID\" \
+and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists \
+and certificate leaf[subject.OU] = \"$MACMEOW_TEAM_ID\""
 
 # ---------- 貓貓谷 ----------
 GAME_FILES=(認證器.exe HostShield.exe 貓貓TMS登入器.exe XCGUI.dll MapleStory.exe)
@@ -178,3 +191,40 @@ wait_until() {
 }
 
 sha256() { /usr/bin/shasum -a 256 "$1" | /usr/bin/cut -d' ' -f1; }
+
+# dmg_attach [--readonly] [--nobrowse] [--mountpoint <路徑>] <映像>：掛載磁碟映像，輸出格式同 hdiutil attach
+# （裝置<TAB>內容<TAB>掛載點）。macOS 26 起 hdiutil attach 已棄用（會印警告），改用 diskutil image attach；
+# 沒有 diskutil image 的舊系統退回 hdiutil。diskutil 不會自動建立 --mountPoint 目錄（hdiutil 會），所以先建好。
+# diskutil image attach 的文字輸出會把非 ASCII 掛載點以 MacRoman 重複編碼（與 locale 無關），
+# 所以改讀 --plist 輸出再轉成 hdiutil 的格式。
+dmg_attach() {
+  local d=() h=(-noverify -noautoopen) plist i dev hint mp
+  while (($# > 1)); do
+    case "$1" in
+      --readonly) d+=(--readOnly) h+=(-readonly) ;;
+      --nobrowse) d+=(--nobrowse) h+=(-nobrowse) ;;
+      --mountpoint)
+        d+=(--mountPoint "$2") h+=(-mountpoint "$2")
+        mkdir -p "$2" || return
+        shift
+        ;;
+      *)
+        echo "dmg_attach：未知選項 $1" >&2
+        return 2
+        ;;
+    esac
+    shift
+  done
+  if diskutil image attach --help >/dev/null 2>&1; then
+    plist="$(diskutil image attach --plist ${d[@]+"${d[@]}"} "$1")" || return
+    i=0
+    while dev="$(plutil -extract "system-entities.$i.dev-entry" raw -o - - <<<"$plist" 2>/dev/null)"; do
+      hint="$(plutil -extract "system-entities.$i.content-hint" raw -o - - <<<"$plist" 2>/dev/null)" || hint=
+      mp="$(plutil -extract "system-entities.$i.mount-point" raw -o - - <<<"$plist" 2>/dev/null)" || mp=
+      printf '/dev/%s\t%s\t%s\n' "$dev" "$hint" "$mp"
+      i=$((i + 1))
+    done
+  else
+    hdiutil attach "${h[@]}" "$1"
+  fi
+}

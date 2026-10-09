@@ -52,7 +52,7 @@ iconutil -c icns -o "$RES/AppIcon.icns" "$WORK/AppIcon.iconset"
 
 # 只打包使用者流程（scripts/ 下的腳本與共用函式）；uninstall.sh 需要 repo 內的 tools/，不打包。
 for s in play.sh report.sh setup-loopback.sh patch-cyder-loopback.sh patch-cyder-dlls.sh patch-cyder-winemac.sh \
-  launcher-dock.sh session.sh; do
+  launcher-dock.sh session.sh update.sh; do
   install -m 755 "$ROOT/scripts/$s" "$RES/scripts/$s"
 done
 install -m 644 "$ROOT/scripts/lib/common.sh" "$RES/scripts/lib/common.sh"
@@ -64,7 +64,7 @@ cat >"$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>MacMeow</string>
-  <key>CFBundleIdentifier</key><string>tw.macmeow.launcher</string>
+  <key>CFBundleIdentifier</key><string>$MACMEOW_BUNDLE_ID</string>
   <key>CFBundleName</key><string>MacMeow</string>
   <key>CFBundleDisplayName</key><string>貓貓谷 for Mac</string>
   <key>CFBundlePackageType</key><string>APPL</string>

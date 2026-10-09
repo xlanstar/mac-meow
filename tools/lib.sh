@@ -56,43 +56,6 @@ need_tool() {
   ((${#missing[@]} == 0)) || bash "$ROOT/tools/build.sh" "${missing[@]}"
 }
 
-# dmg_attach [--readonly] [--nobrowse] [--mountpoint <路徑>] <映像>：掛載磁碟映像，輸出格式同 hdiutil attach
-# （裝置<TAB>內容<TAB>掛載點）。macOS 26 起 hdiutil attach 已棄用（會印警告），改用 diskutil image attach；
-# 沒有 diskutil image 的舊系統退回 hdiutil。diskutil 不會自動建立 --mountPoint 目錄（hdiutil 會），所以先建好。
-# diskutil image attach 的文字輸出會把非 ASCII 掛載點以 MacRoman 重複編碼（與 locale 無關），
-# 所以改讀 --plist 輸出再轉成 hdiutil 的格式。
-dmg_attach() {
-  local d=() h=(-noverify -noautoopen) plist i dev hint mp
-  while (($# > 1)); do
-    case "$1" in
-      --readonly) d+=(--readOnly) h+=(-readonly) ;;
-      --nobrowse) d+=(--nobrowse) h+=(-nobrowse) ;;
-      --mountpoint)
-        d+=(--mountPoint "$2") h+=(-mountpoint "$2")
-        mkdir -p "$2" || return
-        shift
-        ;;
-      *)
-        echo "dmg_attach：未知選項 $1" >&2
-        return 2
-        ;;
-    esac
-    shift
-  done
-  if diskutil image attach --help >/dev/null 2>&1; then
-    plist="$(diskutil image attach --plist ${d[@]+"${d[@]}"} "$1")" || return
-    i=0
-    while dev="$(plutil -extract "system-entities.$i.dev-entry" raw -o - - <<<"$plist" 2>/dev/null)"; do
-      hint="$(plutil -extract "system-entities.$i.content-hint" raw -o - - <<<"$plist" 2>/dev/null)" || hint=
-      mp="$(plutil -extract "system-entities.$i.mount-point" raw -o - - <<<"$plist" 2>/dev/null)" || mp=
-      printf '/dev/%s\t%s\t%s\n' "$dev" "$hint" "$mp"
-      i=$((i + 1))
-    done
-  else
-    hdiutil attach "${h[@]}" "$1"
-  fi
-}
-
 # 設定 LLVM_BIN／LLD_BIN／BISON_BIN（Homebrew：brew install llvm lld bison）；缺少時回傳 1。
 llvm_paths() {
   local brew

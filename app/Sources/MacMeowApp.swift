@@ -4,16 +4,20 @@ import SwiftUI
 struct MacMeowApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let launcher = Launcher.shared
+    private let updater = Updater.shared
 
     var body: some Scene {
         Window("貓貓谷 for Mac", id: "main") {
-            MainView(launcher: launcher)
+            MainView(launcher: launcher, updater: updater)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
         .defaultPosition(.center)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(after: .appInfo) {
+                UpdateCommands(updater: updater)
+            }
             CommandMenu("遊戲") {
                 Button("開始遊戲") { Task { await launcher.start() } }
                     .keyboardShortcut("r")
@@ -36,7 +40,7 @@ struct MacMeowApp: App {
 
         // 關閉視窗只會縮到 Dock，選單列圖示讓 App 隨時可以叫回主視窗。
         MenuBarExtra("貓貓谷 for Mac", systemImage: "pawprint.fill") {
-            MenuBarContent(launcher: launcher)
+            MenuBarContent(launcher: launcher, updater: updater)
         }
     }
 }
@@ -100,11 +104,20 @@ struct MainWindowAccessor: NSViewRepresentable {
 /// 選單列圖示的選單。
 private struct MenuBarContent: View {
     @ObservedObject var launcher: Launcher
+    @ObservedObject var updater: Updater
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Text(launcher.statusSummary.title)
         Divider()
+        if let release = updater.notice {
+            Button("更新到 \(release.version)") {
+                MainWindow.show(openWindow)
+                Task { await updater.install(release) }
+            }
+            .disabled(updater.installing)
+            Divider()
+        }
         Button("顯示主視窗") { MainWindow.show(openWindow) }
         if launcher.status.running && !launcher.isWorking {
             Button("全部關閉…") {
@@ -123,6 +136,17 @@ private struct MenuBarContent: View {
     }
 }
 
+/// App 選單的「檢查更新⋯」與「自動檢查更新」。
+private struct UpdateCommands: View {
+    @ObservedObject var updater: Updater
+
+    var body: some View {
+        Button("檢查更新…") { Task { await updater.checkNow() } }
+            .disabled(updater.checking || updater.installing)
+        Toggle("自動檢查更新", isOn: $updater.automatic)
+    }
+}
+
 /// 選單「顯示登入器」：登入器執行中才可用（需要觀察狀態，所以獨立成 View）。
 private struct ShowLauncherButton: View {
     @ObservedObject var launcher: Launcher
@@ -135,6 +159,10 @@ private struct ShowLauncherButton: View {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Updater.shared.start()
+    }
+
     /// 主視窗關閉鈕只會隱藏視窗；選單列圖示仍在，所以沒有視窗時也不結束。
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 

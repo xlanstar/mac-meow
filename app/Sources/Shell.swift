@@ -29,6 +29,17 @@ enum Shell {
         stream("/bin/bash", [AppPaths.script(name)] + args, env: env)
     }
 
+    /// 啟動 scripts/<name> 後不等待也不讀取輸出；App 結束後仍繼續執行（update.sh install）。
+    static func spawn(_ name: String, _ args: [String] = []) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [AppPaths.script(name)] + args
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+    }
+
     static func stream(_ executable: String, _ args: [String], env: [String: String] = [:]) -> AsyncStream<ShellEvent> {
         AsyncStream { continuation in
             DispatchQueue.global(qos: .userInitiated).async {

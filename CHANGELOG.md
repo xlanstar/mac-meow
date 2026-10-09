@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- `MacMeow.app` 新增一鍵更新：自動檢查新版本，按「更新」即下載、安裝並重新開啟 App，網路中斷時會等待並從中斷處繼續下載；也可從選單「檢查更新⋯」手動檢查
+
 ## 0.2.0 — 2026-10-09
 
 - `MacMeow.app` 按左上角關閉鈕改為隱藏視窗並從 Dock 移除圖示，不再結束 App；新增選單列貓掌圖示，可叫回主視窗、開始遊戲或全部關閉

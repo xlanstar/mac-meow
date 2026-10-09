@@ -119,7 +119,8 @@ cmd_prepare() {
   echo "下一步：bash tools/release.sh build ${v} 並冒煙測試，再 publish ${v}（push 後由 GitHub Actions 建置並正式發佈）"
 }
 
-# verify_dmg <dmg> <X.Y.Z>：dmg（非 ad-hoc 時）已簽章、公證；掛載後 App 簽章有效、已公證且 Gatekeeper 認可、版本正確
+# verify_dmg <dmg> <X.Y.Z>：dmg（非 ad-hoc 時）已簽章、公證；掛載後 App 簽章有效、已公證且 Gatekeeper 認可、
+# 符合一鍵更新的簽章需求、版本正確
 verify_dmg() {
   local dmg="$1" v="$2" chk mnt
   if ! adhoc_release; then
@@ -147,6 +148,12 @@ verify_dmg() {
     spctl --assess --type exec -vv "$chk/MacMeow.app" 2>&1 | grep 'source=Notarized Developer ID' >/dev/null \
       || die "Gatekeeper 未認可 dmg 內 App（spctl --assess --type exec -vv）"
     ok "App：Notarized Developer ID"
+    # 舊版 App 的一鍵更新（scripts/update.sh）只接受符合 MACMEOW_REQUIREMENT 的新版
+    codesign --verify -R="$MACMEOW_REQUIREMENT" "$chk/MacMeow.app" \
+      || die "App 不是以 Team ID ${MACMEOW_TEAM_ID} 簽章，舊版 App 將無法一鍵更新（scripts/lib/common.sh）"
+    ok "App：Team ID ${MACMEOW_TEAM_ID}"
+  else
+    echo "注意：ad-hoc 版本無法透過 App 的一鍵更新安裝，使用者需手動下載"
   fi
   [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$chk/MacMeow.app/Contents/Info.plist")" == "$v" ]] \
     || die "dmg 內 App 版本不是 ${v}"
