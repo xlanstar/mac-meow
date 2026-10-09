@@ -5,6 +5,7 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- 用 Homebrew 安裝的 `MacMeow.app` 有新版本時，改為提示在終端機執行 `brew upgrade --cask macmeow`（可一鍵複製）
 - 修正 `MacMeow.app` 視窗內容（例如展開詳細記錄）比螢幕高時超出螢幕；現在視窗最高到螢幕可用高度，其餘內容可捲動
 - 可以用 Homebrew 安裝：`brew install --cask xlanstar/tap/macmeow`
 - 修正其他 Cyder bottle 或其他私服的 `MapleStory.exe` 執行中時，開始遊戲會誤判貓貓谷「已在執行中」而不啟動；現在只認遊戲資料夾內的程式

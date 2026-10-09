@@ -111,7 +111,8 @@ private struct MenuBarContent: View {
         Text(launcher.statusSummary.title)
         Divider()
         if let release = updater.notice {
-            Button("更新到 \(release.version)") {
+            // Homebrew 安裝時 install 只顯示 brew 指令的對話框
+            Button("更新到 \(release.version)\(updater.homebrewCommand == nil ? "" : "…")") {
                 MainWindow.show(openWindow)
                 Task { await updater.install(release) }
             }

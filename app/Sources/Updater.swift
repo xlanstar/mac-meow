@@ -1,7 +1,8 @@
 import AppKit
 
 /// 檢查與安裝更新：讀取 GitHub 最新正式版（`releases/latest` 不含草稿與預先發行版），
-/// 「更新」交給 scripts/update.sh 下載、驗證並取代 App 後重新開啟。
+/// 「更新」交給 scripts/update.sh 下載、驗證並取代 App 後重新開啟；
+/// App 由 Homebrew 安裝時（`update.sh homebrew`）改為顯示 brew 的更新指令。
 /// 偏好設定存在 App 的 UserDefaults（`tw.macmeow.launcher`，uninstall.sh 會刪除）。
 @MainActor
 final class Updater: ObservableObject {
@@ -29,6 +30,9 @@ final class Updater: ObservableObject {
         /// 網路中斷，等待後從中斷處繼續下載。
         case waiting
     }
+
+    /// App 由 Homebrew 安裝時的更新指令（`update.sh homebrew` 輸出）；nil 表示使用一鍵更新。每次檢查更新時重新判斷。
+    @Published private(set) var homebrewCommand: String?
 
     /// 更新進度；nil 表示沒有在更新。
     @Published private(set) var state: InstallState?
@@ -88,6 +92,10 @@ final class Updater: ObservableObject {
                 return
             }
             notice = release
+            if let command = homebrewCommand {
+                await showHomebrew(release, command)
+                return
+            }
             let choice = await Dialog.ask(
                 "有新版本 \(release.version)", "目前版本 \(appVersion)", buttons: ["更新", "稍後"])
             if choice == 0 { await install(release) }
@@ -108,6 +116,10 @@ final class Updater: ObservableObject {
     /// 再啟動 update.sh install 並結束 App，由它取代 App 後重新開啟。
     func install(_ release: Release) async {
         guard !installing else { return }
+        if let command = homebrewCommand {
+            await showHomebrew(release, command)
+            return
+        }
         guard !Launcher.shared.isWorking else {
             await Dialog.ask("遊戲啟動中", "完成後再更新。")
             return
@@ -126,6 +138,28 @@ final class Updater: ObservableObject {
         }
         // 啟動流程進行中時 AppDelegate 會詢問；取消結束的話 update.sh install 等候逾時後放棄。
         NSApp.terminate(nil)
+    }
+
+    // MARK: - Homebrew
+
+    /// Homebrew 安裝的 App 不自行取代，請使用者以 brew 更新（Homebrew 記錄的版本才會一致）。
+    private func showHomebrew(_ release: Release, _ command: String) async {
+        let choice = await Dialog.ask(
+            "有新版本 \(release.version)",
+            "目前版本 \(appVersion)。這個 App 是用 Homebrew 安裝的，請在「終端機」執行以下指令更新：\n\n\(command)",
+            buttons: ["複製指令", "好"])
+        if choice == 0 { copyHomebrewCommand() }
+    }
+
+    func copyHomebrewCommand() {
+        guard let command = homebrewCommand else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(command, forType: .string)
+    }
+
+    private func refreshInstallSource() async {
+        let result = await Shell.collect(Shell.script("update.sh", ["homebrew", Bundle.main.bundlePath]))
+        homebrewCommand = result.ok ? result.lines.last(where: { !$0.isEmpty }) : nil
     }
 
     /// update.sh prepare：把「@@PROGRESS <百分比>」與「@@WAIT」轉成 `state`，失敗時以最後一行錯誤訊息拋出。
@@ -155,6 +189,7 @@ final class Updater: ObservableObject {
     private func fetchNewer() async throws -> Release? {
         checking = true
         defer { checking = false }
+        await refreshInstallSource()
         let release = try await Updater.latest()
         // 逐段數字比較（0.10.0 > 0.9.1）；版本號不是數字的開發版（"dev"）排在正式版之後，不會提示更新
         return release.version.compare(appVersion, options: .numeric) == .orderedDescending ? release : nil

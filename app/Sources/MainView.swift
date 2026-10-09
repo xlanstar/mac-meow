@@ -130,6 +130,8 @@ private struct HeaderIcon: View {
 private struct UpdateBanner: View {
     @ObservedObject var updater: Updater
     let release: Updater.Release
+    /// Homebrew 安裝時按下「複製指令」後短暫顯示「已複製」。
+    @State private var copied = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -139,6 +141,12 @@ private struct UpdateBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("新版本 \(release.version)")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
+                if let command = updater.homebrewCommand {
+                    Text("在終端機執行：\(command)")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
                 Link("更新內容", destination: release.page)
                     .font(.caption)
             }
@@ -159,12 +167,27 @@ private struct UpdateBanner: View {
                 Button("略過") { updater.skip(release) }
                     .buttonStyle(.link)
                     .font(.callout)
-                Button("更新") { Task { await updater.install(release) } }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.orange)
+                if updater.homebrewCommand != nil {
+                    Button(copied ? "已複製" : "複製指令") { copy() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.orange)
+                } else {
+                    Button("更新") { Task { await updater.install(release) } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.orange)
+                }
             }
         }
         .modifier(Card(padding: 14))
+    }
+
+    private func copy() {
+        updater.copyHomebrewCommand()
+        copied = true
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            copied = false
+        }
     }
 }
 

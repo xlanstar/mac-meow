@@ -10,13 +10,16 @@
 #   update.sh install <目前的 .app> <App PID>
 #     App 啟動後隨即結束；本指令等 App 結束後以暫存的新版取代並重新開啟。
 #     取代失敗時還原舊版並重新開啟。輸出寫到 $MACMEOW_LOGS/update.log。
+#   update.sh homebrew <目前的 .app>
+#     App 由 Homebrew cask 安裝時輸出更新指令（brew upgrade --cask …）並回傳 0，否則回傳 1。
+#     Homebrew 安裝的 App 不做一鍵更新，交給 brew 升級，Homebrew 記錄的版本才會一致。
 set -euo pipefail
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
 UPDATE_DIR="$MACMEOW_CACHE/update"
 
-usage() { die "用法：update.sh prepare <X.Y.Z> <目前的 .app> | install <目前的 .app> <App PID>"; }
+usage() { die "用法：update.sh prepare <X.Y.Z> <目前的 .app> | install <目前的 .app> <App PID> | homebrew <目前的 .app>"; }
 
 plist_value() { /usr/libexec/PlistBuddy -c "Print $2" "$1/Contents/Info.plist" 2>/dev/null; }
 # shellcheck disable=SC2329  # 由 wait_until 呼叫
@@ -82,6 +85,21 @@ check_target() {
   [[ -w "$1" && -w "$(dirname "$1")" ]] || die "沒有權限取代 ${1}"
 }
 
+# homebrew_command <.app>：App 由 Homebrew cask 安裝時輸出更新指令。
+# 條件：任一 Homebrew prefix 有本 cask 的 Caskroom，且 App 位於 cask 的安裝位置
+# （/Applications 或 ~/Applications，即 --appdir 的常見設定），排除 dist/ 等其他位置的複本。
+homebrew_command() {
+  local prefix
+  [[ "$1" == /Applications/MacMeow.app || "$1" == "$HOME/Applications/MacMeow.app" ]] || return 1
+  for prefix in "${HOMEBREW_PREFIXES[@]}"; do
+    if [[ -d "$prefix/Caskroom/$MACMEOW_CASK" ]]; then
+      echo "brew upgrade --cask $MACMEOW_CASK"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # verify_app <新版 .app> <X.Y.Z>：官方簽章（MACMEOW_REQUIREMENT，含 bundle id）且版本正確
 verify_app() {
   /usr/bin/codesign --verify --deep --strict -R="$MACMEOW_REQUIREMENT" "$1" 2>/dev/null \
@@ -91,10 +109,13 @@ verify_app() {
 
 cmd_prepare() {
   (($# == 2)) || usage
-  local v="$1" target="$2" url dmg mnt copied=0
+  local v="$1" target="$2" url dmg mnt copied=0 brew_cmd
   [[ "$v" =~ ^[0-9]+(\.[0-9]+)+$ ]] || die "版本號不正確：${v}"
   # 網址由版本號組成，不接受外部傳入（只會下載本專案的 Release 附件，命名同 tools/release.sh）
   url="https://github.com/$MACMEOW_REPO/releases/download/v$v/MacMeow-$v.dmg"
+  if brew_cmd="$(homebrew_command "$target")"; then
+    die "這個 App 由 Homebrew 安裝，請在終端機執行：${brew_cmd}"
+  fi
   check_target "$target"
   # 保留同一個 dmg 的未完成下載以便續傳，其餘（舊版 dmg、上次取出的 App）刪除
   dmg="$UPDATE_DIR/${url##*/}"
@@ -159,6 +180,11 @@ cmd_install() {
   case "${1:-}" in
     prepare) shift && cmd_prepare "$@" ;;
     install) shift && cmd_install "$@" ;;
+    homebrew)
+      shift
+      (($# == 1)) || usage
+      homebrew_command "$1"
+      ;;
     *) usage ;;
   esac
   exit
