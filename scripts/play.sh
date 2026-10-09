@@ -38,8 +38,11 @@ status() {
   echo "== HostShield 通道監聽（位址：port 數，預期 ${#HOSTSHIELD_IPS[@]} 個位址、各 ${HOSTSHIELD_PORTS}）"
   listeners | /usr/bin/awk '{printf "%-16s %s\n", $2, $1}'
   echo "== Wine 程序"
-  /bin/ps -axo pid=,command= | /usr/bin/grep -E '(認證器|HostShield|貓貓TMS登入器|MapleStory)\.exe|BlackCipher|BlackXchg' \
-    | /usr/bin/grep -vE 'grep|cyder_launcher|CyderSwift' | /usr/bin/cut -c1-160 || true
+  # 比照 session_procs：ps 固定以 UTF-8 執行，否則 App（未設 LANG）下中文會被跳脫成 M-… 而比對不到；
+  # grep 以 C locale 逐位元組比對，cut 以 UTF-8 依字元截斷，避免切斷中文。
+  LC_ALL=en_US.UTF-8 /bin/ps -axo pid=,command= \
+    | LC_ALL=C /usr/bin/grep -E '(認證器|HostShield|貓貓TMS登入器|MapleStory)\.exe|BlackCipher|BlackXchg' \
+    | LC_ALL=C /usr/bin/grep -vE 'grep|cyder_launcher|CyderSwift' | LC_ALL=en_US.UTF-8 /usr/bin/cut -c1-160 || true
   echo "== 自動收尾與 Dock"
   bash "$SCRIPT_DIR/session.sh" status || true
   bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check || true

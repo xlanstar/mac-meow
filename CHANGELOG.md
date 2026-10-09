@@ -5,6 +5,7 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- 修正從 `MacMeow.app` 產生的診斷檔中，程序清單缺少登入器與認證器
 - 修正開始遊戲時若只剩前一次的認證器或 HostShield 殘留，會連同 Cyder 內其他正在執行的遊戲一起關閉；現在只結束貓貓谷自己的程式
 - 修正 App 查詢狀態與開始遊戲或「全部關閉」同時進行時，可能誤報「請先關閉所有 Cyder 遊戲」或「Wine 仍在執行」；Cyder 有其他 bottle 開著時，「全部關閉」不再等到逾時後誤報失敗
 - `MacMeow.app` 新增一鍵更新：自動檢查新版本，按「更新」即下載、安裝並重新開啟 App，網路中斷時會等待並從中斷處繼續下載；也可從選單「檢查更新⋯」手動檢查
