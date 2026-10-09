@@ -1,5 +1,5 @@
-# push tag vX.Y.Z（bash tools/release.sh publish X.Y.Z）後：建置、Developer ID 簽章、公證，並建立 GitHub Release 草稿。
-# 草稿需人工冒煙測試後再正式發佈；流程與所需 Secrets 見 docs/development.md「發佈」。
+# push tag vX.Y.Z（bash tools/release.sh publish X.Y.Z）後：建置、Developer ID 簽章、公證，並正式發佈 GitHub Release（標為 Latest）。
+# 不經草稿審核，所以 publish 前必須以本機 build 的產物冒煙測試；流程與所需 Secrets 見 docs/development.md「發佈」。
 name: Release
 
 on:
@@ -37,7 +37,7 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: bash tools/ci-keychain.sh setup
 
-      - name: 建置、公證並建立 Release 草稿
+      - name: 建置、公證並發佈 Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash tools/release.sh ci "${GITHUB_REF_NAME#v}"

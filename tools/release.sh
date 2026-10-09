@@ -5,15 +5,16 @@
 #   check    只做發佈前檢查（乾淨工作目錄、在 main、Unreleased 有內容、版本號遞增、
 #            tag 不存在、bash -n、patches/bin/SHA256SUMS、簽章與公證設定）
 #   prepare  check 後改寫 CHANGELOG.md 與 VERSION，commit「chore(release): X.Y.Z」並建立 annotated tag vX.Y.Z（不 push）
-#   publish  push main 與 tag；GitHub Actions（.github/workflows/release.yml）接著執行 ci
-#   ci       CI 專用：確認 tag 在 origin/main 上、VERSION 與 CHANGELOG 一致，再執行 build 與 draft
+#   publish  push main 與 tag；GitHub Actions（.github/workflows/release.yml）接著執行 ci，正式發佈 Release
+#   ci       CI 專用：確認 tag 在 origin/main 上、VERSION 與 CHANGELOG 一致，再執行 build、draft 與 release
 #   build    從 tag vX.Y.Z 以 git archive 取出乾淨原始碼到 build/release/，執行 app/build-app.sh，
 #            產物放到 dist/release/X.Y.Z/：MacMeow-X.Y.Z.zip、.sha256、release-notes.md
 #            需設定 MACMEOW_SIGN_ID 與 MACMEOW_NOTARY_PROFILE（環境變數或 .env；Developer ID 簽章＋公證）；
 #            MACMEOW_ALLOW_ADHOC=1 可改發未公證的 ad-hoc 版本
 #   draft    以 dist/release/X.Y.Z/ 的產物建立或更新 GitHub Release 草稿（需 gh 登入或 GH_TOKEN）
+#   release  下載草稿附件驗證 SHA-256、簽章、公證與版本後，正式發佈並標為 Latest（repo 首頁可見）
 #
-# 草稿建立後、正式發佈前必須手動冒煙測試（見 docs/development.md）。
+# CI 會直接正式發佈，所以 publish 之前必須以本機 build 的產物手動冒煙測試（見 docs/development.md）。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib.sh
@@ -111,7 +112,26 @@ cmd_prepare() {
   git commit -q -m "chore(release): $v" -m "Move the Unreleased changelog entries under $v and set VERSION to $v."
   git tag -a "v$v" -m "MacMeow $v"
   echo "已建立 commit「chore(release): ${v}」與 tag v${v}（尚未 push）。"
-  echo "下一步：bash tools/release.sh publish ${v}（push 後由 GitHub Actions 建置並建立草稿）"
+  echo "下一步：bash tools/release.sh build ${v} 並冒煙測試，再 publish ${v}（push 後由 GitHub Actions 建置並正式發佈）"
+}
+
+# verify_zip <zip> <X.Y.Z>：解壓縮後簽章有效、（非 ad-hoc 時）已公證且 Gatekeeper 認可、版本正確
+verify_zip() {
+  local zip="$1" v="$2" chk
+  chk="$(mktemp -d)"
+  ditto -x -k "$zip" "$chk"
+  codesign --verify --deep --strict "$chk/MacMeow.app" || die "zip 內 App 簽章驗證失敗"
+  ok "codesign"
+  if ! adhoc_release; then
+    xcrun stapler validate -q "$chk/MacMeow.app" || die "zip 內 App 沒有公證票證"
+    spctl --assess --type exec -vv "$chk/MacMeow.app" 2>&1 | grep 'source=Notarized Developer ID' >/dev/null \
+      || die "Gatekeeper 未認可 zip 內 App（spctl --assess --type exec -vv）"
+    ok "Gatekeeper：Notarized Developer ID"
+  fi
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$chk/MacMeow.app/Contents/Info.plist")" == "$v" ]] \
+    || die "zip 內 App 版本不是 ${v}"
+  ok "App 版本 ${v}"
+  rm -rf "$chk"
 }
 
 cmd_build() {
@@ -135,19 +155,7 @@ cmd_build() {
   cp "$src/dist/$zip" "$out/"
   ( cd "$out" && shasum -a 256 "$zip" >"$zip.sha256" )
 
-  # 驗證：解壓縮後簽章有效、版本正確
-  local chk; chk="$(mktemp -d)"
-  ditto -x -k "$out/$zip" "$chk"
-  codesign --verify --deep --strict "$chk/MacMeow.app" || die "zip 內 App 簽章驗證失敗"
-  if ! adhoc_release; then
-    xcrun stapler validate -q "$chk/MacMeow.app" || die "zip 內 App 沒有公證票證"
-    spctl --assess --type exec -vv "$chk/MacMeow.app" 2>&1 | grep 'source=Notarized Developer ID' >/dev/null \
-      || die "Gatekeeper 未認可 zip 內 App（spctl --assess --type exec -vv）"
-    ok "Gatekeeper：Notarized Developer ID"
-  fi
-  [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$chk/MacMeow.app/Contents/Info.plist")" == "$v" ]] \
-    || die "zip 內 App 版本不是 ${v}"
-  rm -rf "$chk"
+  verify_zip "$out/$zip" "$v"
 
   {
     changelog_section "$v" | awk 'NF{for(;b>0;b--)print ""; s=1; print; next} s{b++}'   # 去掉頭尾空行
@@ -172,7 +180,7 @@ cmd_build() {
   echo "產物：$out"
   ls -1 "$out" | sed 's/^/  /'
   [[ -n "${GITHUB_ACTIONS:-}" ]] \
-    || echo "本機建置可先冒煙測試 ${out}/${zip}；正式發佈用 publish（由 CI 建置），CI 無法使用時改用 draft ${v}"
+    || echo "請先冒煙測試 ${out}/${zip}；正式發佈用 publish（由 CI 建置），CI 無法使用時改用 draft ${v} 與 release ${v}"
 }
 
 cmd_publish() {
@@ -181,8 +189,7 @@ cmd_publish() {
   git remote get-url origin >/dev/null 2>&1 || die "尚未設定 git remote origin"
   [[ "$(git rev-parse "v$v^{commit}")" == "$(git rev-parse main)" ]] || echo "注意：tag v${v} 不是 main 的最新 commit"
   git push --atomic origin main "v$v"   # 兩者同時成功或同時失敗
-  echo "已 push。GitHub Actions 會建置、簽章、公證並建立 Release 草稿（gh run watch 或 repo 的 Actions 頁面）。"
-  echo "草稿完成後依 docs/development.md 冒煙測試，通過後：gh release edit v$v --draft=false"
+  echo "已 push。GitHub Actions 會建置、簽章、公證並正式發佈 Release（gh run watch 或 repo 的 Actions 頁面）。"
 }
 
 cmd_ci() {
@@ -197,6 +204,7 @@ cmd_ci() {
   ok "tag v${v} 在 origin/main 上"
   cmd_build "$v"
   cmd_draft "$v"
+  cmd_release "$v"
 }
 
 cmd_draft() {
@@ -214,7 +222,31 @@ cmd_draft() {
       --notes-file "$out/release-notes.md" "${assets[@]}"
     echo "已建立 GitHub Release 草稿 v${v}"
   fi
-  echo "冒煙測試通過後：gh release edit v$v --draft=false"
+  [[ -n "${GITHUB_ACTIONS:-}" ]] || echo "冒煙測試通過後：bash tools/release.sh release ${v}"
+}
+
+cmd_release() {
+  local v="$1" zip="MacMeow-$1.zip" state tmp
+  command -v gh >/dev/null || die "需要 gh（brew install gh）"
+  echo "正式發佈 ${v}："
+  state="$(gh release view "v$v" --json isDraft --jq .isDraft 2>/dev/null)" \
+    || die "GitHub 上沒有 v${v} 的 Release，請先 publish（CI 建立草稿）或 draft"
+  if [[ "$state" != true ]]; then
+    echo "v${v} 已正式發佈：$(gh release view "v$v" --json url --jq .url)"
+    return
+  fi
+  ok "草稿 v${v} 存在"
+
+  # 驗證的是使用者實際會下載的附件，而非本機 dist/
+  tmp="$(mktemp -d)"
+  gh release download "v$v" --pattern "$zip" --pattern "$zip.sha256" -D "$tmp"
+  ( cd "$tmp" && shasum -a 256 -c "$zip.sha256" >/dev/null ) || die "${zip} 與 ${zip}.sha256 不符"
+  ok "SHA-256"
+  verify_zip "$tmp/$zip" "$v"
+  rm -rf "$tmp"
+
+  gh release edit "v$v" --draft=false --latest >/dev/null
+  echo "已正式發佈 v${v}（Latest）：$(gh release view "v$v" --json url --jq .url)"
 }
 
 usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
@@ -228,5 +260,6 @@ case "$1" in
   publish) cmd_publish "$2" ;;
   ci)      cmd_ci "$2" ;;
   draft)   cmd_draft "$2" ;;
+  release) cmd_release "$2" ;;
   *) die "未知指令：$1" ;;
 esac

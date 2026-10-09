@@ -113,10 +113,9 @@ App 本身只有一個 Mach-O，`scripts/` 與 Windows DLL 是資源檔，由 bu
 ```sh
 bash tools/release.sh check   X.Y.Z   # 只檢查，不修改
 bash tools/release.sh prepare X.Y.Z   # 改 CHANGELOG／VERSION，commit「chore(release): X.Y.Z」+ tag vX.Y.Z（不 push）
-bash tools/release.sh build   X.Y.Z   # （建議）本機從 tag 建置 → dist/release/X.Y.Z/，push 前先冒煙測試
-bash tools/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章、公證、建立 Release 草稿
+bash tools/release.sh build   X.Y.Z   # 本機從 tag 建置 → dist/release/X.Y.Z/，push 前必須冒煙測試
+bash tools/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章、公證並正式發佈（Latest）
 gh run watch                          # 等 CI 完成
-gh release edit vX.Y.Z --draft=false  # 檢查草稿後正式發佈
 ```
 
 - `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck`、`patches/bin/SHA256SUMS` 與 DLL 相符、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
@@ -126,12 +125,13 @@ gh release edit vX.Y.Z --draft=false  # 檢查草稿後正式發佈
   - `MacMeow-X.Y.Z.zip`、`MacMeow-X.Y.Z.zip.sha256`
   - `release-notes.md`：CHANGELOG 該版內容 + 安裝方式 + zip 的 SHA-256 + `patches/SOURCES.md` 的 LGPL 原始碼表（Release 內附修補版 Wine DLL，必須附上）。
 - `publish`：`git push --atomic origin main vX.Y.Z`。需要 `origin` remote。
-- `ci`（只在 CI 執行）：確認 tag 的 `VERSION` 為 X.Y.Z、`CHANGELOG.md` 有 `## X.Y.Z` 段落、tag 在 `origin/main` 上，再執行 `build` 與 `draft`。
+- `ci`（只在 CI 執行）：確認 tag 的 `VERSION` 為 X.Y.Z、`CHANGELOG.md` 有 `## X.Y.Z` 段落、tag 在 `origin/main` 上，再執行 `build`、`draft` 與 `release`，push tag 即正式發佈，不經人工審核草稿。
 - `draft`：以 `dist/release/X.Y.Z/` 的產物建立 GitHub Release 草稿；草稿已存在時覆蓋附件與說明，已正式發佈則拒絕。CI 無法使用時可在本機 `build` 後執行（需 `gh auth login`）。
+- `release`：下載草稿的 zip 與 `.sha256`，驗證 SHA-256、`codesign`、公證票證、Gatekeeper 與 App 版本後，以 `gh release edit --draft=false --latest` 正式發佈；CI 由 `ci` 呼叫，CI 無法使用時可在本機 `draft` 後執行。repo 首頁的 Releases 區塊與 README 的下載連結（`releases/latest`）即指向此版。已正式發佈時只印出網址。
 
 ### GitHub Actions
 
-`.github/workflows/release.yml` 在 push `vX.Y.Z` tag 時於 `macos-15`（arm64）執行：`tools/ci-keychain.sh setup` 建立暫時鑰匙圈，匯入 Developer ID 憑證與 Developer ID G2 中繼憑證、存入 notarytool profile，並把 `MACMEOW_SIGN_ID`／`MACMEOW_NOTARY_PROFILE`／`MACMEOW_NOTARY_KEYCHAIN` 寫入 `$GITHUB_ENV`；接著 `release.sh ci`；最後無論成敗都 `ci-keychain.sh cleanup` 刪除鑰匙圈。Swift 工具鏈以 runner 映像的 Xcode 為準，版本印在「工具版本」步驟。
+`.github/workflows/release.yml` 在 push `vX.Y.Z` tag 時於 `macos-15`（arm64）執行：`tools/ci-keychain.sh setup` 建立暫時鑰匙圈，匯入 Developer ID 憑證與 Developer ID G2 中繼憑證、存入 notarytool profile，並把 `MACMEOW_SIGN_ID`／`MACMEOW_NOTARY_PROFILE`／`MACMEOW_NOTARY_KEYCHAIN` 寫入 `$GITHUB_ENV`；接著 `release.sh ci`（建置、公證並正式發佈）；最後無論成敗都 `ci-keychain.sh cleanup` 刪除鑰匙圈。Swift 工具鏈以 runner 映像的 Xcode 為準，版本印在「工具版本」步驟。
 
 Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `gh auth login` 的終端機執行 `bash tools/setup-ci-secrets.sh` 即可一次設定：
 
@@ -147,11 +147,11 @@ Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `
 
 ### 冒煙測試
 
-Agent shell 無法啟動 GUI Wine 程式；這一步需在 Terminal.app 或 Finder 由人執行，或在回報中寫明未執行。建議 `publish` 前先以本機 `build` 的產物完整測試；CI 草稿至少重做第 1 步（`gh release download vX.Y.Z --pattern '*.zip' -D <暫存資料夾>` 下載草稿附件）。
+Agent shell 無法啟動 GUI Wine 程式；這一步需在 Terminal.app 或 Finder 由人執行，或在回報中寫明未執行。CI 會直接正式發佈，所以 `publish` 前必須以本機 `build` 的產物完整測試；發佈後可再以 `gh release download vX.Y.Z --pattern '*.zip' -D <暫存資料夾>` 下載正式附件重做第 1 步。
 
 1. 結束 Cyder 的 Wine 程序後，把 zip 解壓縮到暫存資料夾，加上 quarantine 模擬下載：`xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");Safari;" MacMeow.app`，雙擊開啟：應只出現「從網際網路下載」的確認，不能出現「無法驗證開發者」或「Apple 無法檢查」。
 2. `bash scripts/play.sh status`：4 個 HostShield 位址在 `37601-37630` 監聽，`貓貓TMS登入器.exe` 在執行。
 3. 按「開始遊戲」，進入遊戲並登入角色。
 4. 若本版改了修補或外部狀態：`bash scripts/uninstall.sh` 後各 `check` 回報未修補，再以 App 重新套用一次。
 
-測試失敗且尚未 push：`git tag -d vX.Y.Z && git reset --hard HEAD~1` 撤回「chore(release): X.Y.Z」，修正並 commit 後從 `prepare` 重來。已 push：刪除草稿（`gh release delete vX.Y.Z`），tag 不移動、不重用，修正後改發下一個 patch 版本。CI 失敗但產物沒問題（例如 Secret 設錯）：修正後在 Actions 頁面 Re-run，`draft` 會覆蓋同一個草稿。
+測試失敗且尚未 push：`git tag -d vX.Y.Z && git reset --hard HEAD~1` 撤回「chore(release): X.Y.Z」，修正並 commit 後從 `prepare` 重來。已 push：tag 不移動、不重用，修正後改發下一個 patch 版本（已發佈的壞版本可在說明中標註或刪除）。CI 失敗但產物沒問題（例如 Secret 設錯）：修正後在 Actions 頁面 Re-run；若停在草稿，`draft` 會覆蓋同一個草稿，`release` 再正式發佈。
