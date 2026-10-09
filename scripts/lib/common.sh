@@ -189,22 +189,74 @@ missing_game_file() {
 # cyder_setting <key>：讀取 Cyder settings.json 的值（不存在則輸出空字串）。
 cyder_setting() { plist_value "$CYDER_SETTINGS" "$1" || true; }
 
-# gptk_complete <GPTK 目錄>：external/libd3dshared.dylib 可讀、external/D3DMetal.framework 存在
-# （與 Cyder 的 cyder_d3dmetal_launch_allowed 檢查的檔案相同；tools/run-game.sh 也使用）。
+# ---------- 圖形後端 ----------
+# 退回順序（由快到慢）。設定的後端無法使用時改用後面第一個可用的；wined3d 一定可用。
+GRAPHIC_BACKENDS="d3dmetal dxmt dxvk wined3d"
+
+# macos_at_least <主版本>
+macos_at_least() {
+  local major
+  major="$(/usr/bin/sw_vers -productVersion 2>/dev/null)" || return 1
+  major="${major%%.*}"
+  [[ "$major" =~ ^[0-9]+$ ]] && ((major >= $1))
+}
+
+# files_readable <目錄> <相對路徑>...
+files_readable() {
+  local dir="$1" f
+  shift
+  for f in "$@"; do [[ -r "$dir/$f" ]] || return 1; done
+}
+
+# gptk_complete <GPTK 目錄>：與 Cyder 的 cyder_gptk_root_is_valid 相同（tools/run-game.sh 也使用）。
 gptk_complete() { [[ -r "$1/external/libd3dshared.dylib" && -d "$1/external/D3DMetal.framework" ]]; }
 
-# d3dmetal_available：Cyder 可以使用 D3DMetal（Apple GPTK）圖形後端。與 Cyder 的 cyder_d3dmetal_launch_allowed 相同：
-# macOS 14 以上，且 Cyder 設定安裝的 GPTK（runtime/apple_gptk）或 CrossOver 內建的 GPTK 完整（gptk_complete）。
-# 不符合時 Cyder 會把 graphicsBackend=d3dmetal 當成 default 且停用自動選擇，結果是 Wine 內建的 wined3d。
-d3dmetal_available() {
-  local version major root
-  version="$(/usr/bin/sw_vers -productVersion 2>/dev/null)" || return 1
-  major="${version%%.*}"
-  [[ "$major" =~ ^[0-9]+$ ]] && ((major >= 14)) || return 1
-  for root in "$CYDER_SUPPORT_DIR/runtime/apple_gptk" /Applications/CrossOver.app/Contents/SharedSupport/CrossOver/lib64/apple_gptk; do
-    gptk_complete "$root" && return 0
+# graphic_backend_available <後端>：與 Cyder 的 cyder_<後端>_launch_allowed 相同。
+# Cyder 遇到無法使用的後端會直接改用 wined3d（technical-notes.md #13）。
+graphic_backend_available() {
+  local lib="$CYDER_ENGINE/lib" root
+  case "$1" in
+    d3dmetal)
+      macos_at_least 14 || return 1
+      for root in "$CYDER_SUPPORT_DIR/runtime/apple_gptk" /Applications/CrossOver.app/Contents/SharedSupport/CrossOver/lib64/apple_gptk; do
+        gptk_complete "$root" && return 0
+      done
+      return 1
+      ;;
+    dxmt)
+      macos_at_least 15 && files_readable "$lib/dxmt" \
+        x86_64-windows/d3d11.dll x86_64-windows/dxgi.dll x86_64-windows/winemetal.dll \
+        i386-windows/d3d11.dll i386-windows/dxgi.dll i386-windows/winemetal.dll x86_64-unix/winemetal.so
+      ;;
+    dxvk)
+      files_readable "$lib/dxvk" x86_64-windows/d3d11.dll x86_64-windows/dxgi.dll \
+        && { [[ -r "$lib/wine/x86_64-unix/libMoltenVK.dylib" ]] || [[ -r "$CYDER_ENGINE/lib64/libMoltenVK.dylib" ]]; }
+      ;;
+    wined3d) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# effective_graphic_backend <後端>：從該後端開始第一個可用的；不是已知的後端時回傳 1。
+effective_graphic_backend() {
+  local graphic_backend reached=0
+  for graphic_backend in $GRAPHIC_BACKENDS; do
+    [[ "$graphic_backend" == "$1" ]] && reached=1
+    ((reached)) && graphic_backend_available "$graphic_backend" && {
+      echo "$graphic_backend"
+      return 0
+    }
   done
   return 1
+}
+
+# available_graphic_backends：可用的後端，以空白分隔。
+available_graphic_backends() {
+  local graphic_backend list=""
+  for graphic_backend in $GRAPHIC_BACKENDS; do
+    graphic_backend_available "$graphic_backend" && list="${list:+$list }$graphic_backend"
+  done
+  echo "$list"
 }
 
 # cyder_profile_id <exe>：Cyder 的 perProfile 設定 key，與 cyder-profile.sh 的 cyder_profile_id_for_path 相同：

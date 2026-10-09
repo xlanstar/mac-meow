@@ -61,6 +61,7 @@ summary() {
   fi
   echo "- Cyder 設定：wineLocale=$(cyder_setting wineLocale) graphicsBackend=$(cyder_setting graphicsBackend) graphicsHud=$(cyder_setting graphicsHud) dxvkFrameRate=$(cyder_setting dxvkFrameRate) msync=$(cyder_setting msync) esync=$(cyder_setting esync)"
   echo "- MacMeow 設定：$(settings_summary)"
+  echo "- 可用的圖形後端：$(available_graphic_backends)"
   if missing="$(missing_game_file "$GAME_DIR")"; then
     echo "- 遊戲資料夾：缺少 ${missing}"
   else

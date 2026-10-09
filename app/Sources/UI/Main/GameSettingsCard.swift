@@ -21,15 +21,15 @@ struct GameSettingsCard: View {
             Divider()
             GraphicsBackendRow(
                 selection: settings.graphicsBackend,
-                d3dmetalUnavailable: status.status.loaded && !status.status.d3dmetalAvailable,
+                status: status.status,
                 help:
-                    "D3DMetal 是預設值，為 Apple GPTK 的轉譯層，需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK；無法使用時自動改用 DXMT。\(Self.appliesNextLaunch)"
+                    "D3DMetal 是預設值，為 Apple GPTK 的轉譯層，需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK；DXMT 需要 macOS 15 以上。選的後端無法使用時，依 D3DMetal → DXMT → DXVK → wined3d 的順序自動改用第一個可用的。\(Self.appliesNextLaunch)"
             )
             Divider()
             CardRow(
                 symbol: "film.stack", title: "FPS 上限",
                 help:
-                    "選項與 Cyder 相同，DXMT 與 D3DMetal 都適用；「不限制」時最高為螢幕更新率。寫入 Cyder 的設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。"
+                    "選項與 Cyder 相同，D3DMetal、DXMT 與 DXVK 適用（wined3d 不適用）；「不限制」時最高為螢幕更新率。\(Self.appliesNextLaunch)"
             ) {
                 MenuPicker("FPS 上限", selection: settings.fpsCap, options: FPSCap.allCases) { Text($0.title) }
             }
@@ -66,32 +66,26 @@ struct GameSettingsCard: View {
     }
 }
 
-/// 圖形後端。D3DMetal 無法使用時（cyder-settings.sh 會改寫 DXMT）停用該選項並說明原因。
+/// 圖形後端：標示無法使用的選項，並說明實際改用的後端。
 private struct GraphicsBackendRow: View {
     @Binding var selection: GraphicsBackend
-    /// 狀態已讀取且 D3DMetal 無法使用（狀態尚未讀取時不提示）。
-    let d3dmetalUnavailable: Bool
+    let status: EnvStatus
     let help: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             CardRow(symbol: "display", title: "圖形後端", help: help) {
-                MenuPicker("圖形後端", selection: $selection, options: GraphicsBackend.allCases) { backend in
-                    let unavailable = backend == .d3dmetal && d3dmetalUnavailable
-                    Text(unavailable ? "\(backend.title)（無法使用）" : backend.title).disabled(unavailable)
+                MenuPicker("圖形後端", selection: $selection, options: GraphicsBackend.selectable) { backend in
+                    Text(status.isUnavailable(backend) ? "\(backend.title)（無法使用）" : backend.title)
                 }
             }
-            if d3dmetalUnavailable {
-                Text(
-                    selection == .d3dmetal
-                        ? "D3DMetal 無法使用，目前改用 DXMT：需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
-                        : "D3DMetal 需要安裝 CrossOver 或在 Cyder 設定安裝 GPTK（macOS 14 以上）"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.leading, 34)
-                .padding(.bottom, 7)
+            if let note = status.graphicsFallbackNote(for: selection) {
+                Text(note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 34)
+                    .padding(.bottom, 7)
             }
         }
     }

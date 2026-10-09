@@ -3,8 +3,7 @@
 # 以及 認證器.exe 的 perProfile 環境變數 D3DM_MAX_FPS。
 # Cyder 只在「直接啟動 MapleStory.exe」時套用楓之谷設定；經由登入器啟動時要改成全域設定，子程序才會繼承。
 # 同步機制預設 MSync（Cyder 預設關閉，此時每次同步都經 wineserver，楓之谷會明顯卡頓）。
-# 圖形後端預設 D3DMetal；無法使用時（macOS 14 以下或沒有 GPTK）改寫 DXMT，
-# 否則 Cyder 會退回 Wine 內建的 wined3d（docs/technical-notes.md #13）。
+# 圖形後端寫入實際可用的（common.sh 的 effective_graphic_backend），否則 Cyder 會改用最慢的 wined3d（#13）。
 # FPS 上限：Cyder 的 dxvkFrameRate 只套用到 DXVK／DXMT，D3DMetal 改由 D3DM_MAX_FPS 限制；Cyder 不設這個變數，
 # 所以寫進 認證器.exe 的 perProfile.<id>.environment，由 Wine 傳給登入器與 MapleStory.exe（#13）。
 #
@@ -33,7 +32,7 @@ fi
 # 每行「key 型別 本專案可能寫入的值」；多個值以 | 分隔（依環境變數而定），空值表示 key 不存在。
 # restore 以此判斷目前值是否仍是本專案寫入的。
 SPEC="wineLocale string zh_TW
-graphicsBackend string dxmt|d3dmetal
+graphicsBackend string ${GRAPHIC_BACKENDS// /|}
 graphicsHud string off|metal
 dxvkFrameRate string sixty|120|144|unlimited
 msync bool true|false
@@ -45,10 +44,8 @@ $d3dm_fps_key string $D3DM_FPS_VALUES"
 spec_field() { echo "$SPEC" | /usr/bin/awk -v k="$1" -v f="$2" '$1 == k { print $f }'; }
 
 # resolve_wanted：依設定算出要寫入的值（want_<設定>；只在 check／apply 使用，restore 不讀取設定）。
-# 選了 D3DMetal 但無法使用時改用 DXMT（backend_fallback=1）。
 # want_dxvk_fps：dxvkFrameRate 的值，與 Cyder App 寫入的相同（sixty|120|144|unlimited）。
 # want_d3dm_fps：D3DM_MAX_FPS 的值；空字串表示不設（移除）。
-backend_fallback=0
 resolve_wanted() {
   validate_settings
   case "$MACMEOW_SYNC" in
@@ -56,10 +53,7 @@ resolve_wanted() {
     esync) want_msync=false want_esync=true ;;
     none) want_msync=false want_esync=false ;;
   esac
-  want_backend="$MACMEOW_GRAPHICS_BACKEND"
-  if [[ "$want_backend" == d3dmetal ]] && ! d3dmetal_available; then
-    want_backend=dxmt backend_fallback=1
-  fi
+  want_graphic_backend="$(effective_graphic_backend "$MACMEOW_GRAPHICS_BACKEND")"
   if [[ "$MACMEOW_HUD" == 1 ]]; then want_hud=metal; else want_hud=off; fi
   case "$MACMEOW_MAX_FPS" in
     60) want_dxvk_fps=sixty want_d3dm_fps=60 ;;
@@ -71,7 +65,7 @@ resolve_wanted() {
 # wanted_value <key>：本次要寫入的值（空字串表示要移除）。
 wanted_value() {
   case "$1" in
-    graphicsBackend) echo "$want_backend" ;;
+    graphicsBackend) echo "$want_graphic_backend" ;;
     graphicsHud) echo "$want_hud" ;;
     dxvkFrameRate) echo "$want_dxvk_fps" ;;
     msync) echo "$want_msync" ;;
@@ -161,7 +155,8 @@ cmd_check() {
 cmd_apply() {
   local keys key value
   resolve_wanted
-  ((backend_fallback)) && echo "注意：D3DMetal 無法使用（需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK），改用 DXMT"
+  [[ "$want_graphic_backend" == "$MACMEOW_GRAPHICS_BACKEND" ]] \
+    || echo "注意：圖形後端 ${MACMEOW_GRAPHICS_BACKEND} 無法使用，改用 ${want_graphic_backend}"
   keys="$(mismatched_keys)"
   [[ -n "$keys" ]] || return 0
   if [[ ! -f "$BAK" ]]; then

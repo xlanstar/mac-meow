@@ -26,6 +26,11 @@ func testAppConfig() {
     let invalid = ["SYNC": "fsync", "GRAPHICS_BACKEND": "vulkan", "HUD": "yes", "MAX_FPS": "30", "AUTO_CLOSE": "1"]
     expectEqual(AppConfig(values: invalid), AppConfig())
 
+    // 圖形後端只接受可選的值（dxvk、wined3d 只會是退回的結果）
+    expectEqual(AppConfig(values: ["GRAPHICS_BACKEND": "dxmt"]).settings.graphicsBackend, .dxmt)
+    expectEqual(AppConfig(values: ["GRAPHICS_BACKEND": "dxvk"]).settings.graphicsBackend, .d3dmetal)
+    expectEqual(AppConfig(values: ["GRAPHICS_BACKEND": "wined3d"]).settings.graphicsBackend, .d3dmetal)
+
     // 空的 GAME_DIR 視為沒選過，不寫入環境變數與設定檔
     expectEqual(AppConfig(values: ["GAME_DIR": ""]).gameDir, nil)
     expectEqual(AppConfig().values["GAME_DIR"], nil)

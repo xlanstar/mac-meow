@@ -13,14 +13,37 @@ enum SyncMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// Cyder 的圖形後端（設定檔的 GRAPHICS_BACKEND）。D3DMetal 能否使用由 play.sh porcelain 的 d3dmetal 判斷。
+/// Cyder 的圖形後端，依退回順序排列（common.sh 的 GRAPHIC_BACKENDS）。設定檔的 GRAPHICS_BACKEND 只能選 `selectable`。
 enum GraphicsBackend: String, CaseIterable, Identifiable {
-    case d3dmetal, dxmt
+    case d3dmetal, dxmt, dxvk, wined3d
+
+    static let selectable: [GraphicsBackend] = [.d3dmetal, .dxmt]
+
+    init?(setting value: String) {
+        guard let backend = Self(rawValue: value), Self.selectable.contains(backend) else { return nil }
+        self = backend
+    }
+
     var id: String { rawValue }
-    var title: String {
+
+    var name: String {
         switch self {
-        case .d3dmetal: return "D3DMetal（建議）"
+        case .d3dmetal: return "D3DMetal"
         case .dxmt: return "DXMT"
+        case .dxvk: return "DXVK"
+        case .wined3d: return "wined3d（Wine 內建，最慢）"
+        }
+    }
+
+    var title: String { self == .d3dmetal ? "D3DMetal（建議）" : name }
+
+    /// 使用條件（common.sh 的 graphic_backend_available）。
+    var requirement: String? {
+        switch self {
+        case .d3dmetal: return "需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK"
+        case .dxmt: return "需要 macOS 15 以上，且 Cyder 有 DXMT 元件"
+        case .dxvk: return "需要 Cyder 的 DXVK 元件"
+        case .wined3d: return nil
         }
     }
 }
@@ -68,7 +91,8 @@ struct AppConfig: Equatable {
         let defaults = GameSettings()
         gameDir = v["GAME_DIR"].flatMap { $0.isEmpty ? nil : $0 }
         settings.sync = (v["SYNC"] ?? v["MAPLE_SYNC"]).flatMap(SyncMode.init) ?? defaults.sync
-        settings.graphicsBackend = v["GRAPHICS_BACKEND"].flatMap(GraphicsBackend.init) ?? defaults.graphicsBackend
+        settings.graphicsBackend =
+            v["GRAPHICS_BACKEND"].flatMap(GraphicsBackend.init(setting:)) ?? defaults.graphicsBackend
         settings.metalHUD = v["HUD"].map { $0 == "1" } ?? defaults.metalHUD
         settings.fpsCap = v["MAX_FPS"].flatMap(FPSCap.init) ?? defaults.fpsCap
         settings.autoClose = v["AUTO_CLOSE"].map { $0 != "0" } ?? defaults.autoClose

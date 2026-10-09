@@ -13,14 +13,13 @@
 #
 # 環境變數：
 #   MACMEOW_SYNC、MACMEOW_GRAPHICS_BACKEND、MACMEOW_HUD：與 play.sh 相同（未設定時沿用 App 的設定，見 common.sh 的 load_settings）；
-#   MACMEOW_GRAPHICS_BACKEND 另可為 dxvk|wined3d；d3dmetal 沒有 GPTK 時改用 dxmt（以環境變數指定時則失敗）
-#     d3dmetal 需要 GPTK（CrossOver 內附或 Cyder 設定安裝），且 Cyder 已把它連結到 engine 的 lib64/apple_gptk
+#   MACMEOW_GRAPHICS_BACKEND 另可為 dxvk|wined3d；無法使用時與 play.sh 一樣退回可用的後端
+#     d3dmetal 需要 Cyder 已把 GPTK 連結到 engine 的 lib64/apple_gptk（以 Cyder 啟動過一次）
 #   WZCACHE=0|1（預設 0：與從 認證器.exe 啟動時相同；1 = Cyder 的 WZ read-ahead 快取）
 #   WINEDEBUG=...（覆寫頻道）  EXTRA_DEBUG=...（附加頻道）
 #   EXTRA_ENV="K=V K2=V2"（額外環境變數）
 # 紀錄：debug/run-<時間>/
 set -euo pipefail
-backend_from_env="${MACMEOW_GRAPHICS_BACKEND:-}" # load_settings 之前：是否以環境變數指定
 # shellcheck source=lib.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
@@ -41,8 +40,10 @@ case "$MACMEOW_SYNC" in
   none) ;;
   *) die "MACMEOW_SYNC 只能是 msync|esync|none" ;;
 esac
-GRAPHICS_BACKEND="$MACMEOW_GRAPHICS_BACKEND"
-case "$GRAPHICS_BACKEND" in dxmt | d3dmetal | dxvk | wined3d) ;; *) die "MACMEOW_GRAPHICS_BACKEND 只能是 dxmt|d3dmetal|dxvk|wined3d" ;; esac
+GRAPHIC_BACKEND="$(effective_graphic_backend "$MACMEOW_GRAPHICS_BACKEND")" \
+  || die "MACMEOW_GRAPHICS_BACKEND 只能是 ${GRAPHIC_BACKENDS// /|}"
+[[ "$GRAPHIC_BACKEND" == "$MACMEOW_GRAPHICS_BACKEND" ]] \
+  || echo "圖形後端 ${MACMEOW_GRAPHICS_BACKEND} 無法使用，改用 ${GRAPHIC_BACKEND}" >&2
 # 與 Cyder 的 cyder_apply_gptk_launch_environment 相同：有 GPTK 時任何後端都帶上這些變數（ntdll 會載入
 # libd3dshared.dylib）。只用 Cyder 已建立的 engine 連結，不自行修改 engine。
 # 不設 DYLD_FRAMEWORK_PATH：/usr/bin/arch 受 SIP 保護會清掉 DYLD_*，而 libd3dshared 以 @rpath
@@ -52,13 +53,10 @@ gptk="$CYDER_ENGINE/lib64/apple_gptk"
 if gptk_complete "$gptk"; then
   gptk="$(cd "$gptk" && pwd -P)"
   export CYDER_GPTK_ROOT="$gptk" CX_APPLEGPTK_LIBD3DSHARED_PATH="$gptk/external/libd3dshared.dylib"
-elif [[ "$GRAPHICS_BACKEND" == d3dmetal && -z "$backend_from_env" ]]; then
-  echo "找不到 GPTK（${gptk}），改用 dxmt。" >&2
-  GRAPHICS_BACKEND=dxmt
-elif [[ "$GRAPHICS_BACKEND" == d3dmetal ]]; then
+elif [[ "$GRAPHIC_BACKEND" == d3dmetal ]]; then
   die "找不到 GPTK（${gptk}）：請安裝 CrossOver 或在 Cyder 設定安裝 GPTK，並以 Cyder 啟動一次"
 fi
-export CX_GRAPHICS_BACKEND="$GRAPHICS_BACKEND" CYDER_GRAPHICS_BACKEND="$GRAPHICS_BACKEND" CYDER_GRAPHICS_BACKENDS_ROOT="$CYDER_ENGINE"
+export CX_GRAPHICS_BACKEND="$GRAPHIC_BACKEND" CYDER_GRAPHICS_BACKEND="$GRAPHIC_BACKEND" CYDER_GRAPHICS_BACKENDS_ROOT="$CYDER_ENGINE"
 export CYDER_MAPLESTORY_FILE_CACHE="${WZCACHE:-0}"
 export PATH="$CYDER_ENGINE/bin:$PATH"
 [[ "$MACMEOW_HUD" == 1 ]] && export MTL_HUD_ENABLED=1
@@ -77,7 +75,7 @@ esac
 export WINEDEBUG="${WINEDEBUG:-$default_debug}${EXTRA_DEBUG:+,$EXTRA_DEBUG}"
 
 {
-  echo "mode=$mode SYNC=$MACMEOW_SYNC GRAPHICS_BACKEND=$GRAPHICS_BACKEND GPTK=${CYDER_GPTK_ROOT:-none} WZCACHE=$CYDER_MAPLESTORY_FILE_CACHE HUD=$MACMEOW_HUD"
+  echo "mode=$mode SYNC=$MACMEOW_SYNC GRAPHIC_BACKEND=$GRAPHIC_BACKEND GPTK=${CYDER_GPTK_ROOT:-none} WZCACHE=$CYDER_MAPLESTORY_FILE_CACHE HUD=$MACMEOW_HUD"
   echo "EXTRA_ENV=${EXTRA_ENV:-}"
   echo "WINEDEBUG=$WINEDEBUG"
 } | tee "$OUT/env.txt"

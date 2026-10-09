@@ -12,8 +12,10 @@ struct EnvStatus: Equatable {
     var loopback = false
     var patched = false
     var vb6 = false
-    /// Cyder 可使用 D3DMetal 圖形後端（porcelain 的 d3dmetal：macOS 14 以上且有 GPTK）。
-    var d3dmetalAvailable = false
+    /// 可用的圖形後端（porcelain 的 graphic_backends）。
+    var availableGraphicsBackends: Set<GraphicsBackend> = []
+    /// 實際使用的圖形後端（porcelain 的 graphic_backend）。
+    var graphicsBackend: GraphicsBackend?
     var helpers = false
     var launcher = false
     var game = false
@@ -36,7 +38,11 @@ struct EnvStatus: Equatable {
         loopback = flag("loopback")
         patched = flag("patched")
         vb6 = flag("vb6")
-        d3dmetalAvailable = flag("d3dmetal")
+        availableGraphicsBackends = Set(
+            (v["graphic_backends"] ?? "").split(separator: " ").compactMap {
+                GraphicsBackend(rawValue: String($0))
+            })
+        graphicsBackend = v["graphic_backend"].flatMap(GraphicsBackend.init(rawValue:))
         helpers = flag("helpers")
         launcher = flag("launcher")
         game = flag("game")
@@ -51,6 +57,21 @@ struct EnvStatus: Equatable {
     }
     var cyderUsable: Bool { cyderPath != nil && !cyderInDownloads }
     var running: Bool { launcher || game }
+
+    /// 狀態已讀取且該圖形後端無法使用。
+    func isUnavailable(_ backend: GraphicsBackend) -> Bool {
+        loaded && !availableGraphicsBackends.contains(backend)
+    }
+
+    /// 設定的圖形後端無法使用時的說明。退回的後端一定排在後面，否則是換設定前的舊狀態，不提示。
+    func graphicsFallbackNote(for selected: GraphicsBackend) -> String? {
+        let order = GraphicsBackend.allCases
+        guard isUnavailable(selected), let effective = graphicsBackend,
+            let from = order.firstIndex(of: selected), let to = order.firstIndex(of: effective), to > from
+        else { return nil }
+        let reason = selected.requirement.map { "（\($0)）" } ?? ""
+        return "\(selected.name) 無法使用\(reason)，目前改用 \(effective.name)"
+    }
 }
 
 /// 環境檢查清單的項目；也對應 play.sh 的 progress id。
