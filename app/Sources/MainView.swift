@@ -582,6 +582,8 @@ private struct GraphicsRow: View {
 
     /// 狀態已讀取且 D3DMetal 無法使用（狀態尚未讀取時不提示）。
     private var d3dmetalUnavailable: Bool { launcher.status.loaded && !launcher.status.d3dmetal }
+    /// 實際會用 DXMT（選了 DXMT，或 D3DMetal 無法使用）。
+    private var usesDXMT: Bool { launcher.config.graphics == .dxmt || d3dmetalUnavailable }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -623,6 +625,13 @@ private struct GraphicsRow: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 34)
+            }
+            if usesDXMT {
+                Label("使用 DXMT 時，遊戲 FPS 可能會被限制在最高 60", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 34)
             }
         }
         .padding(.vertical, 7)
