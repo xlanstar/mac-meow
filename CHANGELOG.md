@@ -5,6 +5,7 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- `MacMeow.app` 的「已知問題」改為開啟已知問題與解法文件，並可另外查看已回報的問題
 - 從終端機執行 `scripts/play.sh` 等腳本時沿用 `MacMeow.app` 的遊戲資料夾與遊戲設定；覆寫設定的環境變數改名為 `MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`、`MACMEOW_HUD`、`MACMEOW_MAX_FPS`、`MACMEOW_AUTO_CLOSE`、`MACMEOW_HIDE_LAUNCHER_DOCK`
 - `MacMeow.app` 首頁的「Wine 設定」改名為「遊戲設定」
 - `MacMeow.app` 的「遊戲設定」新增「圖形後端」：預設改用 D3DMetal（需要 macOS 14 以上並安裝 CrossOver 或在 Cyder 設定安裝 GPTK），也可改選 DXMT（需要 macOS 15 以上）；無法使用時依 D3DMetal → DXMT → DXVK → wined3d 的順序自動改用第一個可用的，不再在 macOS 13、14 退回最慢的 wined3d

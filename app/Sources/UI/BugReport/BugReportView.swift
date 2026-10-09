@@ -44,11 +44,17 @@ struct BugReportView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Link(destination: AppPaths.knownIssues) {
-                Label("已知問題", systemImage: "magnifyingglass")
+            VStack(alignment: .trailing, spacing: 4) {
+                Link(destination: AppPaths.knownIssues) {
+                    Label("已知問題與解法", systemImage: "book")
+                }
+                .help("回報前先看看是不是已知問題，以及暫時的解法")
+                Link(destination: AppPaths.reportedIssues) {
+                    Label("已回報的問題", systemImage: "magnifyingglass")
+                }
+                .help("再看看是否已經有人回報過同樣的問題")
             }
             .font(.caption)
-            .help("回報前先看看是否已經有人回報過")
         }
     }
 

@@ -14,7 +14,10 @@ enum AppPaths {
     static let cyderDownload = URL(string: "https://github.com/dspp779/CyderBits/releases")!
     /// 與 scripts/lib/common.sh 的 MACMEOW_REPO 一致（update.sh 從該 repo 下載新版）。
     static let repo = URL(string: "https://github.com/xlanstar/mac-meow")!
-    static let knownIssues = URL(string: "https://github.com/xlanstar/mac-meow/issues?q=is%3Aissue")!
+    /// 已驗證的已知問題與暫時解法。連 main 而非版本 tag（解法會持續更新）；檔案不可改名或搬移，見 docs/architecture.md。
+    static let knownIssues = repo.appendingPathComponent("blob/main/docs/known-issues.md")
+    /// 使用者回報、尚未驗證的問題（open issue）。
+    static let reportedIssues = URL(string: repo.absoluteString + "/issues?q=is%3Aissue%20is%3Aopen")!
     /// 檢查更新：最新正式版（不含草稿與預先發行版）。
     static let latestRelease = URL(string: "https://api.github.com/repos/xlanstar/mac-meow/releases/latest")!
 

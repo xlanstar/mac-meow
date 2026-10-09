@@ -43,7 +43,8 @@ final class BugReporter: ObservableObject {
     }
 
     func openIssuePage() {
-        Workspace.open(draft.issueURL(repo: AppPaths.repo, version: appVersion) ?? AppPaths.knownIssues)
+        Workspace.open(
+            draft.issueURL(repo: AppPaths.repo, version: appVersion) ?? IssueDraft.blankIssueURL(repo: AppPaths.repo))
     }
 
     func copyReport() { Pasteboard.copy(draft.markdown(version: appVersion)) }

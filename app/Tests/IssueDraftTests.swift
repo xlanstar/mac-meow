@@ -35,6 +35,10 @@ func testIssueDraft() {
     expect(noDiagMarkdown.contains("### 重現步驟\n1. 開啟 App"))
     expect(!noDiagMarkdown.contains("### 環境") && !noDiagMarkdown.contains("第一行"))
 
+    expectEqual(
+        IssueDraft.blankIssueURL(repo: repo).absoluteString,
+        "https://github.com/xlanstar/mac-meow/issues/new?template=bug_report.yml")
+
     // issueURL：只保留 unreserved 字元，中文、&、+ 都編碼；空白欄位不放
     let url = draft.issueURL(repo: repo, version: "0.4.0")?.absoluteString ?? ""
     expect(url.hasPrefix("https://github.com/xlanstar/mac-meow/issues/new?template=bug_report.yml&title="))

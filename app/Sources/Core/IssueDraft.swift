@@ -62,6 +62,11 @@ struct IssueDraft: Equatable {
         return parts.joined(separator: "\n\n")
     }
 
+    /// 空白的 issue 表單網址；issueURL() 在後面接上預先填入的欄位。
+    static func blankIssueURL(repo: URL) -> URL {
+        URL(string: repo.absoluteString + "/issues/new?template=bug_report.yml")!
+    }
+
     /// 預先填好欄位的 issue 表單網址；參數名稱對應 bug_report.yml 各欄位的 id。
     /// GitHub 對過長的網址會回應錯誤：超過 `maxLength` 時先刪減記錄，再截短文字（完整內容可用「複製報告」）。
     func issueURL(repo: URL, version: String, maxLength: Int = 7000) -> URL? {
@@ -73,14 +78,14 @@ struct IssueDraft: Equatable {
 
         func build() -> String {
             var items = [
-                ("template", "bug_report.yml"), ("title", fullTitle), ("version", version),
+                ("title", fullTitle), ("version", version),
                 ("what", cut ? what + "\n\n…（內容過長已截短，完整內容請見診斷檔）" : what), ("steps", stepsText),
             ]
             if includeDiagnostics {
                 items += [("environment", environment ?? ""), ("log", logLines.joined(separator: "\n"))]
             }
-            let query = items.filter { !$0.1.isEmpty }.map { "\($0.0)=\(Self.percentEncode($0.1))" }
-            return repo.absoluteString + "/issues/new?" + query.joined(separator: "&")
+            let query = items.filter { !$0.1.isEmpty }.map { "&\($0.0)=\(Self.percentEncode($0.1))" }
+            return Self.blankIssueURL(repo: repo).absoluteString + query.joined()
         }
 
         while build().count > maxLength, !logLines.isEmpty {

@@ -16,7 +16,8 @@ struct AppCommands: Commands {
         }
         CommandGroup(replacing: .help) {
             Button("回報問題…") { model.reportBug() }
-            Button("已知問題") { Workspace.open(AppPaths.knownIssues) }
+            Button("已知問題與解法") { Workspace.open(AppPaths.knownIssues) }
+            Button("已回報的問題") { Workspace.open(AppPaths.reportedIssues) }
             Divider()
             Button("專案網頁") { Workspace.open(AppPaths.repo) }
         }
