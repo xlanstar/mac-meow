@@ -32,6 +32,11 @@ MACMEOW_TEAM_ID="LJJN3L2PS6"
 MACMEOW_REQUIREMENT="anchor apple generic and identifier \"$MACMEOW_BUNDLE_ID\" \
 and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists \
 and certificate leaf[subject.OU] = \"$MACMEOW_TEAM_ID\""
+# Homebrew cask（第三方 tap；cask 範本 packaging/homebrew/macmeow.rb，由 tools/release.sh tap 發佈）。
+# update.sh homebrew 以 <prefix>/Caskroom/<token> 判斷 App 是否由 Homebrew 安裝。
+MACMEOW_CASK="macmeow"
+MACMEOW_TAP_REPO="xlanstar/homebrew-tap" # brew 的 tap 名稱為 xlanstar/tap
+HOMEBREW_PREFIXES=(/opt/homebrew /usr/local)
 
 # ---------- 貓貓谷 ----------
 GAME_FILES=(認證器.exe HostShield.exe 貓貓TMS登入器.exe XCGUI.dll MapleStory.exe)

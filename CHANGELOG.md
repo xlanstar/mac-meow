@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- 修正 `MacMeow.app` 視窗內容（例如展開詳細記錄）比螢幕高時超出螢幕；現在視窗最高到螢幕可用高度，其餘內容可捲動
+- 可以用 Homebrew 安裝：`brew install --cask xlanstar/tap/macmeow`
 - 修正其他 Cyder bottle 或其他私服的 `MapleStory.exe` 執行中時，開始遊戲會誤判貓貓谷「已在執行中」而不啟動；現在只認遊戲資料夾內的程式
 - 修正從 `MacMeow.app` 產生的診斷檔中，程序清單缺少登入器與認證器
 - 修正開始遊戲時若只剩前一次的認證器或 HostShield 殘留，會連同 Cyder 內其他正在執行的遊戲一起關閉；現在只結束貓貓谷自己的程式

@@ -3,16 +3,18 @@
 #
 # 用法：bash tools/release.sh <指令> <X.Y.Z>
 #   check    只做發佈前檢查（乾淨工作目錄、在 main、Unreleased 有內容、版本號遞增、
-#            tag 不存在、bash -n、patches/bin/SHA256SUMS、簽章與公證設定）
+#            tag 不存在、bash -n、patches/bin/SHA256SUMS、Homebrew cask 範本、簽章與公證設定）
 #   prepare  check 後改寫 CHANGELOG.md 與 VERSION，commit「chore(release): X.Y.Z」並建立 annotated tag vX.Y.Z（不 push）
 #   publish  push main 與 tag；GitHub Actions（.github/workflows/release.yml）接著執行 ci，正式發佈 Release
-#   ci       CI 專用：確認 tag 在 origin/main 上、VERSION 與 CHANGELOG 一致，再執行 build、draft 與 release
+#   ci       CI 專用：確認 tag 在 origin/main 上、VERSION 與 CHANGELOG 一致，再執行 build、draft、release 與 tap
 #   build    從 tag vX.Y.Z 以 git archive 取出乾淨原始碼到 build/release/，執行 app/build-app.sh，
 #            產物放到 dist/release/X.Y.Z/：MacMeow-X.Y.Z.dmg、.sha256、release-notes.md
 #            需設定 MACMEOW_SIGN_ID 與 MACMEOW_NOTARY_PROFILE（環境變數或 .env；Developer ID 簽章＋公證）；
 #            MACMEOW_ALLOW_ADHOC=1 可改發未公證的 ad-hoc 版本
 #   draft    以 dist/release/X.Y.Z/ 的產物建立或更新 GitHub Release 草稿（需 gh 登入或 GH_TOKEN）
 #   release  下載草稿附件驗證 SHA-256、簽章、公證與版本後，正式發佈並標為 Latest（repo 首頁可見）
+#   tap      以已正式發佈的 vX.Y.Z 附件雜湊產生 Homebrew cask（packaging/homebrew/），推到 tap repo
+#            （MACMEOW_TAP_REPO）；CI 用 HOMEBREW_TAP_TOKEN，本機用 gh 的登入
 #
 # CI 會直接正式發佈，所以 publish 之前必須以本機 build 的產物手動冒煙測試（見 docs/development.md）。
 set -euo pipefail
@@ -65,6 +67,30 @@ signing_check() {
   ok "公證 profile ${MACMEOW_NOTARY_PROFILE}"
 }
 
+# Homebrew cask
+CASK_TEMPLATE="packaging/homebrew/$MACMEOW_CASK.rb"
+
+# render_cask <X.Y.Z> <sha256> <輸出檔>：以範本產生 cask
+render_cask() {
+  [[ "$2" =~ ^[0-9a-f]{64}$ ]] || die "SHA-256 格式不正確：$2"
+  sed -e "s/@VERSION@/$1/g" -e "s/@SHA256@/$2/g" "$ROOT/$CASK_TEMPLATE" >"$3"
+  if grep -n '@[A-Z0-9]*@' "$3"; then die "cask 範本有未取代的佔位符"; fi
+}
+
+# style_cask <cask 檔>：有 Homebrew 時以 brew style 檢查（cask 檔需位於 Casks/ 資料夾，才會套用 cask 規則）
+style_cask() {
+  local out
+  if ! command -v brew >/dev/null; then
+    echo "  ! 沒有 Homebrew，略過 brew style"
+    return
+  fi
+  out="$(brew style "$1" 2>&1)" || {
+    echo "$out" >&2
+    die "brew style 有警告：${CASK_TEMPLATE}"
+  }
+  ok "brew style（${CASK_TEMPLATE}）"
+}
+
 cmd_check() {
   local v="$1" cur branch n
   echo "發佈前檢查 ${v}："
@@ -98,6 +124,13 @@ cmd_check() {
 
   (cd patches/bin/x86_64-windows && shasum -a 256 -c ../SHA256SUMS >/dev/null) || die "patches/bin/SHA256SUMS 與 DLL 不符"
   ok "patches/bin/SHA256SUMS"
+
+  local tmp
+  tmp="$(mktemp -d)"
+  mkdir "$tmp/Casks"
+  render_cask "$v" "$(printf '%064d' 0)" "$tmp/Casks/$MACMEOW_CASK.rb"
+  style_cask "$tmp/Casks/$MACMEOW_CASK.rb"
+  rm -rf "$tmp"
 
   signing_check
 }
@@ -233,6 +266,9 @@ cmd_ci() {
   cmd_build "$v"
   cmd_draft "$v"
   cmd_release "$v"
+  # Release 已公開；tap 更新失敗時 CI 標為失敗，修正後在本機重跑 tap
+  echo "（Homebrew tap 更新失敗時 Release 已發佈：修正後執行 bash tools/release.sh tap ${v}）"
+  cmd_tap "$v"
 }
 
 cmd_draft() {
@@ -277,6 +313,55 @@ cmd_release() {
   echo "已正式發佈 v${v}（Latest）：$(gh release view "v$v" --json url --jq .url)"
 }
 
+# cmd_tap <X.Y.Z>：以正式版附件的 SHA-256 產生 cask，推到 tap repo（版本相同時不 commit；不降版）
+cmd_tap() {
+  local v="$1" tmp sha token header cask cur tap who=()
+  command -v gh >/dev/null || die "需要 gh（brew install gh）"
+  tap="${MACMEOW_TAP_REPO%%/*}/${MACMEOW_TAP_REPO#*/homebrew-}"
+  echo "更新 Homebrew tap ${tap}（${MACMEOW_TAP_REPO}）："
+  [[ "$(gh release view "v$v" --json isDraft --jq .isDraft 2>/dev/null)" == false ]] \
+    || die "v${v} 尚未正式發佈（cask 只指向正式版的附件）"
+  tmp="$(mktemp -d)"
+  # 雜湊取自使用者實際下載的附件，而非本機 dist/
+  gh release download "v$v" --pattern "MacMeow-$v.dmg.sha256" -D "$tmp"
+  sha="$(cut -d' ' -f1 "$tmp/MacMeow-$v.dmg.sha256")"
+  ok "MacMeow-${v}.dmg SHA-256 ${sha}"
+
+  token="${HOMEBREW_TAP_TOKEN:-}"
+  if [[ -z "$token" ]]; then
+    [[ -z "${GITHUB_ACTIONS:-}" ]] || die "CI 需要 Secret HOMEBREW_TAP_TOKEN（見 docs/development.md「GitHub Actions」）"
+    token="$(gh auth token)" || die "請先 gh auth login"
+  fi
+  # token 只放在這次 git 指令的 HTTP header，不寫進 clone 的 .git/config
+  header="http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$token" | base64 | tr -d '\n')"
+  git -c "$header" clone -q --depth 1 "https://github.com/$MACMEOW_TAP_REPO.git" "$tmp/tap" \
+    || die "無法 clone ${MACMEOW_TAP_REPO}（token 需要該 repo 的 Contents 讀寫權限）"
+  cask="$tmp/tap/Casks/$MACMEOW_CASK.rb"
+  mkdir -p "$tmp/tap/Casks"
+  if [[ -f "$cask" ]]; then
+    cur="$(sed -n 's/^  version "\(.*\)"$/\1/p' "$cask")"
+    if ver_valid "$cur" && ver_gt "$cur" "$v"; then die "tap 已是較新的版本 ${cur}"; fi
+  fi
+  render_cask "$v" "$sha" "$cask"
+  style_cask "$cask"
+
+  if [[ -z "$(git -C "$tmp/tap" status --porcelain)" ]]; then
+    echo "tap 已是 ${v}，不需更新"
+  else
+    # CI 以 github-actions[bot] commit；本機沿用本 repo 的作者設定（暫存 clone 沒有）
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+      who=(-c "user.name=github-actions[bot]" -c "user.email=41898282+github-actions[bot]@users.noreply.github.com")
+    else
+      who=(-c "user.name=$(git config user.name)" -c "user.email=$(git config user.email)")
+    fi
+    git -C "$tmp/tap" add Casks
+    git -C "$tmp/tap" ${who[@]+"${who[@]}"} commit -q -m "$MACMEOW_CASK $v"
+    git -C "$tmp/tap" -c "$header" push -q origin HEAD
+    echo "已更新 ${tap}/${MACMEOW_CASK} 為 ${v}"
+  fi
+  rm -rf "$tmp"
+}
+
 usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
 
 (($# == 2)) || {
@@ -292,5 +377,6 @@ case "$1" in
   ci) cmd_ci "$2" ;;
   draft) cmd_draft "$2" ;;
   release) cmd_release "$2" ;;
+  tap) cmd_tap "$2" ;;
   *) die "未知指令：$1" ;;
 esac

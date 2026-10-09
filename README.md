@@ -32,6 +32,7 @@
 
 1. 安裝 Cyder：下載後把 `Cyder.app` 拖到「應用程式」，開啟一次讓它建立 Windows 環境。
 2. 取得 `MacMeow.app`：
+   - 用 [Homebrew](https://brew.sh) 安裝：`brew install --cask xlanstar/tap/macmeow`，裝好後直接從「應用程式」開啟 `MacMeow.app`，不需要第 3 步；或
    - 從 [最新版 Release](https://github.com/xlanstar/mac-meow/releases/latest) 下載 `MacMeow-<版本>.dmg`；或
    - 自行建置（需要 Xcode 或 `xcode-select --install`）：`bash app/build-app.sh` → `dist/MacMeow-<版本>.dmg`
 3. 雙擊開啟 `.dmg`，在出現的視窗中把 `MacMeow.app` 拖到右邊的「應用程式」資料夾，再從「應用程式」開啟 `MacMeow.app`。
@@ -61,6 +62,8 @@ bash scripts/uninstall.sh
 ```
 
 會還原 Cyder engine 的修補與 Cyder 設定的原值、加回遊戲資料夾的下載隔離標記、移除本機網路位址與 LaunchDaemon（需要密碼），以及 App 的設定與記錄。遊戲、Cyder 與其設定不會被刪除。
+
+用 Homebrew 安裝的，執行上面的指令後再以 `brew uninstall --cask macmeow` 移除 App（加 `--zap` 會一併刪除 App 的設定、記錄與 LaunchDaemon，但不會還原 Cyder engine 的修補）。
 
 ## 已知問題
 

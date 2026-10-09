@@ -12,6 +12,7 @@
 - `app/`：SwiftUI App（`app/Sources/`，Swift 5 語言模式、最低 macOS 13），由 `app/build-app.sh` 以 `swiftc` 編譯，不需要 Xcode 專案。App 只負責 UI：需要新狀態就加到 `play.sh` 的 `porcelain()` 並同步 `app/Sources/Status.swift`；需要新進度就在腳本呼叫 `progress <id> <訊息>`，並在 `Step.fromProgress` 對應清單項目。
 - `tools/`：開發與診斷，可用 Xcode、Homebrew、`python3`。入口腳本放在 `tools/*.sh`，共用函式在 `tools/lib.sh`（建立在 `common.sh` 之上），原始碼在 `tools/src/<工具>/`，建置產物一律輸出到 `build/tools/`，診斷紀錄一律寫到 `debug/`。
 - 例外：`tools/sign-debug.sh` 會被 `scripts/uninstall.sh` 呼叫，因此只用 macOS 內建指令。
+- `packaging/homebrew/macmeow.rb`：Homebrew cask 範本（`@VERSION@`、`@SHA256@` 由 `release.sh tap` 填入），發佈到第三方 tap [`xlanstar/homebrew-tap`](https://github.com/xlanstar/homebrew-tap)（`common.sh` 的 `MACMEOW_TAP_REPO`）。tap 的 `Casks/` 只由 `release.sh tap` 產生，不直接修改。
 
 ## 建置與測試
 
@@ -126,20 +127,21 @@ App 本身只有一個 Mach-O，`scripts/` 與 Windows DLL 是資源檔，由 bu
 bash tools/release.sh check   X.Y.Z   # 只檢查，不修改
 bash tools/release.sh prepare X.Y.Z   # 改 CHANGELOG／VERSION，commit「chore(release): X.Y.Z」+ tag vX.Y.Z（不 push）
 bash tools/release.sh build   X.Y.Z   # 本機從 tag 建置 → dist/release/X.Y.Z/，push 前必須冒煙測試
-bash tools/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章、公證並正式發佈（Latest）
+bash tools/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章、公證、正式發佈（Latest）並更新 Homebrew tap
 gh run watch                          # 等 CI 完成
 ```
 
-- `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck`、`patches/bin/SHA256SUMS` 與 DLL 相符、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
+- `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck`、`patches/bin/SHA256SUMS` 與 DLL 相符、Homebrew cask 範本填入後通過 `brew style`（有安裝 Homebrew 時）、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
   - 例外：`MACMEOW_ALLOW_ADHOC=1` 跳過簽章檢查，`build` 產生 ad-hoc 版本，release notes 改為教使用者到「系統設定 → 隱私權與安全性」按「仍要打開」。只在無法公證時使用（CI 不使用）；舊版 App 的一鍵更新會拒絕 ad-hoc 版本，使用者需手動下載。
 - `prepare`：把 `## Unreleased` 下的項目移到 `## X.Y.Z — YYYY-MM-DD`，上方留一個空的 `## Unreleased`。
 - `build`：以 `git archive vX.Y.Z` 取出原始碼到 `build/release/X.Y.Z/` 再執行 `app/build-app.sh`，所以未提交的檔案不會進入產物。驗證 dmg 的簽章、公證票證與 Gatekeeper 評估（`spctl --type open --context context:primary-signature`），再掛載 dmg 驗證內含「應用程式」捷徑與視窗版面（`.DS_Store`、背景圖），以及 App 的 `codesign`、`CFBundleShortVersionString`、公證票證（`stapler validate`）與 Gatekeeper 評估（`spctl` 須為 `Notarized Developer ID`）、符合一鍵更新的簽章需求（`common.sh` 的 `MACMEOW_REQUIREMENT`，即官方 Team ID），並產生：
   - `MacMeow-X.Y.Z.dmg`、`MacMeow-X.Y.Z.dmg.sha256`
   - `release-notes.md`：CHANGELOG 該版內容 + 安裝方式 + dmg 的 SHA-256 + `patches/SOURCES.md` 的 LGPL 原始碼表（Release 內附修補版 Wine DLL，必須附上）。
 - `publish`：`git push --atomic origin main vX.Y.Z`。需要 `origin` remote。
-- `ci`（只在 CI 執行）：確認 tag 的 `VERSION` 為 X.Y.Z、`CHANGELOG.md` 有 `## X.Y.Z` 段落、tag 在 `origin/main` 上，再執行 `build`、`draft` 與 `release`，push tag 即正式發佈，不經人工審核草稿。
+- `ci`（只在 CI 執行）：確認 tag 的 `VERSION` 為 X.Y.Z、`CHANGELOG.md` 有 `## X.Y.Z` 段落、tag 在 `origin/main` 上，再執行 `build`、`draft`、`release` 與 `tap`，push tag 即正式發佈，不經人工審核草稿。`tap` 在 Release 公開後才執行，失敗時 CI 標為失敗但 Release 已發佈：修正後在本機執行 `tap X.Y.Z`。
 - `draft`：以 `dist/release/X.Y.Z/` 的產物建立 GitHub Release 草稿；草稿已存在時覆蓋附件與說明，已正式發佈則拒絕。CI 無法使用時可在本機 `build` 後執行（需 `gh auth login`）。
 - `release`：下載草稿的 dmg 與 `.sha256`，驗證 SHA-256、`codesign`、公證票證、Gatekeeper 與 App 版本後，以 `gh release edit --draft=false --latest` 正式發佈；CI 由 `ci` 呼叫，CI 無法使用時可在本機 `draft` 後執行。repo 首頁的 Releases 區塊與 README 的下載連結（`releases/latest`）即指向此版。已正式發佈時只印出網址。
+- `tap`：下載已正式發佈的 `MacMeow-X.Y.Z.dmg.sha256`，以 `packaging/homebrew/macmeow.rb` 產生 cask 並通過 `brew style`，推到 tap repo 的 `Casks/macmeow.rb`（commit「macmeow X.Y.Z」）。內容沒變時不 commit，tap 已是較新版本時拒絕。CI 以 `HOMEBREW_TAP_TOKEN`、本機以 `gh auth token` 存取 tap repo；token 只放在該次 git 指令的 HTTP header。本機 commit 沿用本 repo 的作者設定，CI 為 `github-actions[bot]`。cask 改了但版本不變時（例如改 `zap`）可直接重跑最新版的 `tap`。驗證：`brew audit --cask --online xlanstar/tap/macmeow`（`--new` 的知名度門檻只適用官方 repo，可忽略）。
 
 ### GitHub Actions
 
@@ -156,8 +158,11 @@ Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `
 | `APPLE_ID` | 公證用 Apple ID |
 | `APPLE_TEAM_ID` | Team ID（10 碼） |
 | `APPLE_APP_PASSWORD` | 公證用 App 專用密碼（建議 CI 專用一組，方便撤銷） |
+| `HOMEBREW_TAP_TOKEN` | 推送 Homebrew tap 用的 fine-grained PAT（`release.sh tap`；`setup-ci-secrets.sh` 不設定，見下方） |
 
 `tools/setup-ci-secrets.sh`：以 `security export` 匯出登入鑰匙圈的簽章身分（macOS 會要求輸入登入密碼允許匯出），只挑出 `MACMEOW_SIGN_ID` 指定的憑證與對應私鑰，以隨機密碼重新打包成 `.p12`；詢問 Apple ID 與 App 專用密碼並以 `notarytool history` 驗證；確認後以 `gh secret set` 寫入，Team ID 取自憑證。暫存檔結束時刪除，`.p12` 密碼不另外保存（需要時重跑即可）。`--dry-run` 只檢查匯出。憑證到期或更換、App 專用密碼撤銷時重跑一次。
+
+`HOMEBREW_TAP_TOKEN` 另外設定：在 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) 建立 token，Repository access 只選 `xlanstar/homebrew-tap`，Repository permissions 的 Contents 設為 Read and write（其餘不給），再執行 `gh secret set HOMEBREW_TAP_TOKEN` 貼上。Token 到期後重建並重設。
 
 ### 冒煙測試
 

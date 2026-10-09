@@ -84,7 +84,8 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
 - 私服更換連線位址：更新 `scripts/lib/common.sh` 的 `HOSTSHIELD_IPS`／`GAME_ALIAS_IP`；使用者需重新執行 `setup-loopback.sh install`。
 - Cyder engine 的 CrossOver 基底改變：`patch-cyder-dlls.sh` 會拒絕套用。以新基底重建 DLL，並更新 `REQUIRED_BASE`、`patches/SOURCES.md`、`patches/bin/SHA256SUMS`。
 - Cyder engine 的 `winemac.so` 改變（任何 engine 更新都可能）：`patch-cyder-winemac.sh` 不修改，登入器照常顯示在 Dock。以 `otool -tV` 找出新版 `transformProcessToForeground:` 的對應指令，重新計算 `KNOWN_SHA256`、偏移與 RIP 相對位移（[technical-notes.md](technical-notes.md) #10）。
-- Repo 改名或搬移：更新 `scripts/lib/common.sh` 的 `MACMEOW_REPO` 與 `app/Sources/Paths.swift` 的 `repo`、`knownIssues`、`latestRelease`；已發佈的舊版 App 仍查詢舊網址，仰賴 GitHub 的轉址。
+- Repo 改名或搬移：更新 `scripts/lib/common.sh` 的 `MACMEOW_REPO` 與 `app/Sources/Paths.swift` 的 `repo`、`knownIssues`、`latestRelease`，以及 Homebrew cask 範本 `packaging/homebrew/macmeow.rb` 的 `url`、`homepage`；已發佈的舊版 App 仍查詢舊網址，仰賴 GitHub 的轉址。
+- 路徑、bundle id 或 LaunchDaemon label 改變：同步 cask 範本的 `uninstall quit:` 與 `zap`（對應本文件「外部狀態」中 `uninstall.sh` 刪除的項目）。
 - 發佈附件命名、dmg 內容、bundle id 或簽章 Team ID 改變：舊版 App 的 `update.sh` 會拒絕更新；改變前先讓 `update.sh` 支援新格式並發佈一版。換 Team ID 時更新 `common.sh` 的 `MACMEOW_TEAM_ID`，使用者需手動下載一次。
 - 登入器改名：更新 `common.sh` 的 `LAUNCHER_EXE` 與 `launcher-dock.sh` 的 `REG_SECTION`（`user.reg` 以 `\x` 跳脫非 ASCII 字元）。
 - 伺服器要求的 `MapleStory.exe` 版本改變：更新 `README.md` 系統需求。
