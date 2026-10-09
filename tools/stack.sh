@@ -17,12 +17,14 @@ export SYMX86="$TOOLS_BIN/symx86" # symbolize.py 使用
 
 pids="$(maple_pids)"
 
+require_maple() { [[ -n "$pids" ]] || die "沒有執行中的 MapleStory.exe"; }
+
 # symbolize <raw> <out>：替 machstack 輸出補上 x86 符號；失敗時保留原始輸出。
 symbolize() {
   python3 "$SRC/symbolize.py" "$1" >"$2" 2>/dev/null || cp "$1" "$2"
 }
 
-mode_mach() {
+cmd_mach() {
   need_tool machstack symx86
   local targets="$pids $*" pid out
   [[ -n "${targets// /}" ]] || die "沒有執行中的 MapleStory.exe"
@@ -34,11 +36,11 @@ mode_mach() {
   done
 }
 
-mode_prof() {
+cmd_prof() {
   need_tool machstack symx86
   local n="${1:-20}" gap="${2:-0.5}" pid out i
+  require_maple
   pid="$(echo "$pids" | head -1)"
-  [[ -n "$pid" ]] || die "沒有執行中的 MapleStory.exe"
   out="$(out_dir machprof)"
   for i in $(seq -w 1 "$n"); do
     "$TOOLS_BIN/machstack" "$pid" >"$out/raw-$i.txt" 2>&1 || true
@@ -50,9 +52,9 @@ mode_prof() {
   echo "$out"
 }
 
-mode_lldb() {
+cmd_lldb() {
   local pid out
-  [[ -n "$pids" ]] || die "沒有執行中的 MapleStory.exe"
+  require_maple
   out="$(out_dir lldb)"
   for pid in $pids; do
     echo "LLDB 擷取 PID=${pid} ..."
@@ -64,9 +66,9 @@ mode_lldb() {
   echo "$out"
 }
 
-mode_sample() {
+cmd_sample() {
   local pid out rc status=0
-  [[ -n "$pids" ]] || die "沒有執行中的 MapleStory.exe"
+  require_maple
   out="$(out_dir sample)"
   for pid in $pids; do
     echo "取樣 MapleStory.exe PID=${pid}（3 秒，不會結束程序）"
@@ -87,9 +89,6 @@ mode_sample() {
 mode="${1:-mach}"
 shift || true
 case "$mode" in
-  mach | prof | lldb | sample) "mode_$mode" "$@" ;;
-  *)
-    echo "用法：$0 mach|prof|lldb|sample [參數]" >&2
-    exit 64
-    ;;
+  mach | prof | lldb | sample) "cmd_$mode" "$@" ;;
+  *) usage "mach|prof|lldb|sample [參數]" ;;
 esac

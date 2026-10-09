@@ -13,29 +13,20 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
 UPDATE_README=0
-if [ "${1:-}" = "--update-readme" ]; then
+if [[ "${1:-}" == --update-readme ]]; then
   UPDATE_README=1
   shift
 fi
-APP_WINDOW_SHOT="${1:-$ROOT/debug/app-shot.png}"
+APP_WINDOW_SHOT="${1:-$DEBUG_DIR/app-shot.png}"
 APP_ICON="$ROOT/build/app/AppIcon.iconset/icon_256x256@2x.png"
 TEMPLATES="$ROOT/tools/src/repo-images"
 OUT="$ROOT/build/repo-images"
 README_IMAGES="$ROOT/docs/images"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-[ -f "$APP_WINDOW_SHOT" ] || {
-  echo "找不到 App 視窗截圖：$APP_WINDOW_SHOT" >&2
-  exit 1
-}
-[ -f "$APP_ICON" ] || {
-  echo "找不到 App 圖示，先執行 bash app/build-app.sh" >&2
-  exit 1
-}
-[ -x "$CHROME" ] || {
-  echo "需要 Google Chrome" >&2
-  exit 1
-}
+[[ -f "$APP_WINDOW_SHOT" ]] || die "找不到 App 視窗截圖：${APP_WINDOW_SHOT}"
+[[ -f "$APP_ICON" ]] || die "找不到 App 圖示，先執行 bash app/build-app.sh"
+[[ -x "$CHROME" ]] || die "需要 Google Chrome"
 
 mkdir -p "$OUT"
 cp "$TEMPLATES"/*.html "$TEMPLATES"/*.css "$OUT/"
@@ -56,7 +47,7 @@ render social-preview.html social-preview
 render readme-hero.html readme-hero-light
 render "readme-hero.html?theme=dark" readme-hero-dark
 
-if [ "$UPDATE_README" = 1 ]; then
+if ((UPDATE_README)); then
   mkdir -p "$README_IMAGES"
   cp "$OUT/readme-hero-light.jpg" "$OUT/readme-hero-dark.jpg" "$README_IMAGES/"
   echo "已更新 $README_IMAGES/readme-hero-{light,dark}.jpg"

@@ -6,7 +6,7 @@
 #
 # 模式（第一個參數）：
 #   plain    （預設）無 trace，用於效能比較
-#   trace    記錄等待、例外、DLL 載入（只對 MapleStory.exe 開頻道），並每 0.5 秒記錄 MapleStory 執行緒數與 socket
+#   trace    記錄等待、例外、DLL 載入（程序／DLL 載入頻道對所有程序開，其餘只對 MapleStory.exe），並每 0.5 秒記錄 MapleStory 執行緒數與 socket
 #   relay    trace + MapleStory.exe 的 API 呼叫（找出各執行緒最後呼叫；量大、干擾時序）
 #   virtual  trace + 記憶體保護／配置（查 virtual_mutex 類鎖死）
 #   server   trace + 前景 wineserver -d1 協定紀錄（含 suspend_thread 等請求者；量大，只適合短時間重現）
@@ -31,8 +31,8 @@ OUT="$(out_dir run)"
 LOG="$OUT/wine.log"
 
 # ---------- 環境 ----------
-export WINEPREFIX="$SHARED_BOTTLE"
-export LANG=zh_TW.UTF-8 LC_ALL=zh_TW.UTF-8 LC_CTYPE=zh_TW.UTF-8
+export_wine_env # WINEPREFIX、語系；同步機制改依 MACMEOW_SYNC（本腳本自己啟動 wineserver）
+export LC_CTYPE=zh_TW.UTF-8
 unset WINEMSYNC WINEESYNC
 case "$MACMEOW_SYNC" in
   msync) export WINEMSYNC=1 ;;
@@ -101,15 +101,18 @@ trap stop INT TERM
 echo "執行中，紀錄：$OUT"
 echo "卡住時先在另一個終端機執行 bash tools/stack.sh，再按 Ctrl+C（會關閉此 bottle 的所有 Windows 程式）。"
 
-# trace 類模式：監看 MapleStory 執行緒數、CPU、狀態與 socket（comm 不含啟動參數）。
+# maple_status：MapleStory 執行緒數、CPU、狀態與 socket（comm 不含啟動參數）。
+maple_status() {
+  local pid
+  date +%T
+  for pid in $(maple_pids); do
+    echo "threads=$(/bin/ps -M -p "$pid" 2>/dev/null | /usr/bin/sed 1d | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+    /bin/ps -p "$pid" -o pid=,etime=,pcpu=,state=,comm= || true
+    LC_ALL=C /usr/sbin/lsof -nP -a -p "$pid" -iTCP -iUDP 2>/dev/null || true
+  done
+}
+
+# 等 Ctrl+C；trace 類模式每 0.5 秒記錄一次 maple_status。
 while sleep 0.5; do
-  [[ "$mode" == plain ]] && continue
-  {
-    date +%T
-    for pid in $(maple_pids); do
-      echo "threads=$(/bin/ps -M -p "$pid" 2>/dev/null | /usr/bin/sed 1d | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
-      /bin/ps -p "$pid" -o pid=,etime=,pcpu=,state=,comm= || true
-      LC_ALL=C /usr/sbin/lsof -nP -a -p "$pid" -iTCP -iUDP 2>/dev/null || true
-    done
-  } >>"$OUT/net.log"
+  [[ "$mode" == plain ]] || maple_status >>"$OUT/net.log"
 done

@@ -18,17 +18,10 @@
 #
 # CI 會直接正式發佈，所以 publish 之前必須以本機 build 的產物手動冒煙測試（見 docs/development.md）。
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib.sh
-source "$ROOT/tools/lib.sh"
+source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 load_env # MACMEOW_SIGN_ID／MACMEOW_NOTARY_PROFILE（.env）；build 從 tag 建置時以環境變數傳給 build-app.sh
 cd "$ROOT"
-
-die() {
-  echo "錯誤：$*" >&2
-  exit 1
-}
-ok() { echo "  ✓ $*"; }
 
 ver_valid() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
 # ver_gt a b：a > b
@@ -42,6 +35,12 @@ ver_gt() {
   done
   return 1
 }
+
+tag_exists() { git rev-parse -q --verify "refs/tags/v$1" >/dev/null; }
+need_gh() { need_cmd gh "brew install gh"; }
+# release_is_draft <X.Y.Z>：輸出 GitHub Release 的 isDraft（true／false）；沒有該 Release 時回傳非 0。
+release_is_draft() { gh release view "v$1" --json isDraft --jq .isDraft 2>/dev/null; }
+release_url() { gh release view "v$1" --json url --jq .url; }
 
 # changelog_section <標題>：輸出 CHANGELOG.md 中該 `## ` 標題下的內容（不含標題）
 changelog_section() {
@@ -91,9 +90,9 @@ style_cask() {
   ok "brew style（${CASK_TEMPLATE}）"
 }
 
-cmd_check() {
+# check_repo <X.Y.Z>：版本號遞增、在 main 且工作目錄乾淨、tag 不存在、Unreleased 有內容
+check_repo() {
   local v="$1" cur branch n
-  echo "發佈前檢查 ${v}："
   cur="$(cat VERSION)"
   ver_gt "$v" "$cur" || die "新版本 ${v} 必須大於目前的 VERSION ${cur}"
   ok "版本 ${cur} → ${v}"
@@ -103,13 +102,16 @@ cmd_check() {
   [[ -z "$(git status --porcelain)" ]] || die "工作目錄有未提交的變更"
   ok "main、工作目錄乾淨"
 
-  git rev-parse -q --verify "refs/tags/v$v" >/dev/null && die "tag v${v} 已存在"
+  tag_exists "$v" && die "tag v${v} 已存在"
   ok "tag v${v} 尚未存在"
 
   n="$(changelog_section Unreleased | grep -c '^- ' || true)"
   ((n > 0)) || die "CHANGELOG.md 的 ## Unreleased 沒有任何項目"
   ok "Unreleased 有 ${n} 項"
+}
 
+# check_sources：腳本語法與 shellcheck、App 編譯與 Core 單元測試、Wine DLL 雜湊
+check_sources() {
   local f bad=0
   while IFS= read -r f; do bash -n "$f" || bad=1; done < <(git ls-files '*.sh')
   ((bad == 0)) || die "bash -n 失敗"
@@ -127,14 +129,23 @@ cmd_check() {
 
   (cd patches/bin/x86_64-windows && shasum -a 256 -c ../SHA256SUMS >/dev/null) || die "patches/bin/SHA256SUMS 與 DLL 不符"
   ok "patches/bin/SHA256SUMS"
+}
 
+# check_cask <X.Y.Z>：cask 範本填入假雜湊後通過 brew style
+check_cask() {
   local tmp
   tmp="$(mktemp -d)"
   mkdir "$tmp/Casks"
-  render_cask "$v" "$(printf '%064d' 0)" "$tmp/Casks/$MACMEOW_CASK.rb"
+  render_cask "$1" "$(printf '%064d' 0)" "$tmp/Casks/$MACMEOW_CASK.rb"
   style_cask "$tmp/Casks/$MACMEOW_CASK.rb"
   rm -rf "$tmp"
+}
 
+cmd_check() {
+  echo "發佈前檢查 ${1}："
+  check_repo "$1"
+  check_sources
+  check_cask "$1"
   signing_check
 }
 
@@ -203,7 +214,7 @@ verify_dmg() {
 
 cmd_build() {
   local v="$1" src out dmg
-  git rev-parse -q --verify "refs/tags/v$v" >/dev/null || die "找不到 tag v${v}，請先執行 prepare"
+  tag_exists "$v" || die "找不到 tag v${v}，請先執行 prepare"
   src="$ROOT/build/release/$v"
   out="$ROOT/dist/release/$v"
   rm -rf "$src" "$out"
@@ -253,7 +264,7 @@ cmd_build() {
 
 cmd_publish() {
   local v="$1"
-  git rev-parse -q --verify "refs/tags/v$v" >/dev/null || die "找不到 tag v${v}，請先執行 prepare"
+  tag_exists "$v" || die "找不到 tag v${v}，請先執行 prepare"
   git remote get-url origin >/dev/null 2>&1 || die "尚未設定 git remote origin"
   [[ "$(git rev-parse "v$v^{commit}")" == "$(git rev-parse main)" ]] || echo "注意：tag v${v} 不是 main 的最新 commit"
   git push --atomic origin main "v$v" # 兩者同時成功或同時失敗
@@ -263,7 +274,7 @@ cmd_publish() {
 cmd_ci() {
   local v="$1"
   echo "CI 發佈 ${v}："
-  git rev-parse -q --verify "refs/tags/v$v" >/dev/null || die "找不到 tag v${v}"
+  tag_exists "$v" || die "找不到 tag v${v}"
   [[ "$(git show "v$v:VERSION")" == "$v" ]] || die "tag v${v} 的 VERSION 不是 ${v}"
   git show "v$v:CHANGELOG.md" | grep "^## $v " >/dev/null || die "tag v${v} 的 CHANGELOG.md 沒有 ## ${v} 段落"
   ok "VERSION 與 CHANGELOG"
@@ -282,8 +293,8 @@ cmd_draft() {
   local v="$1" out="$ROOT/dist/release/$1" state
   local assets=("$out/MacMeow-$v.dmg" "$out/MacMeow-$v.dmg.sha256")
   [[ -f "${assets[0]}" && -f "${assets[1]}" && -f "$out/release-notes.md" ]] || die "找不到 ${out} 的產物，請先執行 build"
-  command -v gh >/dev/null || die "需要 gh（brew install gh）"
-  if state="$(gh release view "v$v" --json isDraft --jq .isDraft 2>/dev/null)"; then
+  need_gh
+  if state="$(release_is_draft "$v")"; then
     [[ "$state" == true ]] || die "v${v} 已正式發佈，不覆蓋；請改發下一個 patch 版本"
     gh release upload "v$v" --clobber "${assets[@]}"
     gh release edit "v$v" --title "MacMeow $v" --notes-file "$out/release-notes.md"
@@ -298,12 +309,12 @@ cmd_draft() {
 
 cmd_release() {
   local v="$1" dmg="MacMeow-$1.dmg" state tmp
-  command -v gh >/dev/null || die "需要 gh（brew install gh）"
+  need_gh
   echo "正式發佈 ${v}："
-  state="$(gh release view "v$v" --json isDraft --jq .isDraft 2>/dev/null)" \
+  state="$(release_is_draft "$v")" \
     || die "GitHub 上沒有 v${v} 的 Release，請先 publish（CI 建立草稿）或 draft"
   if [[ "$state" != true ]]; then
-    echo "v${v} 已正式發佈：$(gh release view "v$v" --json url --jq .url)"
+    echo "v${v} 已正式發佈：$(release_url "$v")"
     return
   fi
   ok "草稿 v${v} 存在"
@@ -317,16 +328,16 @@ cmd_release() {
   rm -rf "$tmp"
 
   gh release edit "v$v" --draft=false --latest >/dev/null
-  echo "已正式發佈 v${v}（Latest）：$(gh release view "v$v" --json url --jq .url)"
+  echo "已正式發佈 v${v}（Latest）：$(release_url "$v")"
 }
 
 # cmd_tap <X.Y.Z>：以正式版附件的 SHA-256 產生 cask，推到 tap repo（版本相同時不 commit；不降版）
 cmd_tap() {
   local v="$1" tmp sha token header cask cur tap who=()
-  command -v gh >/dev/null || die "需要 gh（brew install gh）"
+  need_gh
   tap="${MACMEOW_TAP_REPO%%/*}/${MACMEOW_TAP_REPO#*/homebrew-}"
   echo "更新 Homebrew tap ${tap}（${MACMEOW_TAP_REPO}）："
-  [[ "$(gh release view "v$v" --json isDraft --jq .isDraft 2>/dev/null)" == false ]] \
+  [[ "$(release_is_draft "$v")" == false ]] \
     || die "v${v} 尚未正式發佈（cask 只指向正式版的附件）"
   tmp="$(mktemp -d)"
   # 雜湊取自使用者實際下載的附件，而非本機 dist/
@@ -369,21 +380,9 @@ cmd_tap() {
   rm -rf "$tmp"
 }
 
-usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
-
-(($# == 2)) || {
-  usage
-  exit 2
-}
+(($# == 2)) || usage_doc
 ver_valid "$2" || die "版本格式需為 X.Y.Z：$2"
 case "$1" in
-  check) cmd_check "$2" ;;
-  prepare) cmd_prepare "$2" ;;
-  build) cmd_build "$2" ;;
-  publish) cmd_publish "$2" ;;
-  ci) cmd_ci "$2" ;;
-  draft) cmd_draft "$2" ;;
-  release) cmd_release "$2" ;;
-  tap) cmd_tap "$2" ;;
+  check | prepare | build | publish | ci | draft | release | tap) "cmd_$1" "$2" ;;
   *) die "未知指令：$1" ;;
 esac

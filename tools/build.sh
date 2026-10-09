@@ -15,15 +15,16 @@ set -uo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
 SRC="$ROOT/tools/src"
-OUT="$TOOLS_BIN"
-OBJ="$OUT/obj"
+OBJ="$TOOLS_BIN/obj"
 ALL=(machstack callchain memdump symx86 smctest smctest2 smctest3 wthreads.exe reloadtest.exe wgui.exe recvcheck.exe)
+# wthreads、reloadtest 與 wincrt/crt0.c 用到的 msvcrt 匯出（puts：clang 會把不帶參數的 printf("...\n") 改成 puts）
 MSVCRT="msvcrt:printf puts strtoul _flushall __getmainargs exit"
 
-mac_tool() { # mac_tool <名稱> <來源目錄> [clang 參數...]
+# mac_tool <名稱> <來源目錄> [clang 參數...]
+mac_tool() {
   local name="$1" dir="$2"
   shift 2
-  /usr/bin/clang -O1 "$@" -o "$OUT/$name" "$SRC/$dir/$name.c"
+  /usr/bin/clang -O1 "$@" -o "$TOOLS_BIN/$name" "$SRC/$dir/$name.c"
 }
 
 # nosdk_exe <名稱> <dll:匯出 匯出...>...：clang-cl 編譯 src/<名稱>/<名稱>.c + wincrt/crt0.c，
@@ -45,7 +46,7 @@ nosdk_exe() {
     libs+=("$o/$dll.lib")
   done
   "$LLVM_BIN/clang-cl" --target=x86_64-pc-windows-msvc /O1 /GS- /c "/Fo$o/" -- "$SRC/$name/$name.c" "$SRC/wincrt/crt0.c" || return 1
-  "$LLD_BIN/lld-link" /subsystem:console /entry:mainCRTStartup /nodefaultlib "/out:$OUT/$name.exe" \
+  "$LLD_BIN/lld-link" /subsystem:console /entry:mainCRTStartup /nodefaultlib "/out:$TOOLS_BIN/$name.exe" \
     "$o/$name.obj" "$o/crt0.obj" "${libs[@]}"
 }
 
@@ -63,7 +64,7 @@ winetree_exe() {
   # shellcheck disable=SC2086  # ldflags 需分詞
   PATH="$LLD_BIN:$PATH" "$LLVM_BIN/clang" --target=x86_64-windows -fuse-ld=lld -nostdlib -nostdinc \
     -I"$wobj/include" -I"$wsrc/include" -I"$wsrc/include/msvcrt" -D__WINESRC__ -O1 \
-    -o "$OUT/$name.exe" "$SRC/$name/$name.c" $ldflags "${libs[@]}"
+    -o "$TOOLS_BIN/$name.exe" "$SRC/$name/$name.c" $ldflags "${libs[@]}"
 }
 
 build_one() {
@@ -89,7 +90,7 @@ build_one() {
 }
 
 (($#)) || set -- "${ALL[@]}"
-mkdir -p "$OUT"
+mkdir -p "$TOOLS_BIN"
 failed=()
 for t in "$@"; do
   if build_one "$t"; then echo "完成：build/tools/$t"; else failed+=("$t"); fi

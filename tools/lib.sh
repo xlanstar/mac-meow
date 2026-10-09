@@ -1,8 +1,9 @@
 # shellcheck shell=bash
-# 開發工具共用設定。tools/*.sh 以 `source "$(dirname "$0")/lib.sh"` 載入。
-# 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作），另外提供：
-#   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、out_dir、maple_pids、need_tool、in_terminal、run_wine、llvm_paths（LLVM 路徑）、
-#   APP_SWIFT_TARGET / app_sources（App 原始碼）
+# 開發工具共用設定。tools/*.sh 以 `source "$(cd "$(dirname "$0")" && pwd)/lib.sh"` 載入。
+# 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
+#   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、ok、usage_doc、need_cmd、out_dir、maple_pids、need_tool、in_terminal、
+#   run_wine、llvm_paths（LLVM 路徑）、APP_SWIFT_TARGET / app_sources（App 原始碼）
+# 載入時只用 macOS 內建指令（tools/sign-debug.sh 由 uninstall.sh 呼叫）。
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
 MACMEOW_TOOLS_LOADED=1
 
@@ -35,6 +36,18 @@ load_env() {
     export "$key=$val"
   done <"$f"
 }
+
+# ok <訊息>：檢查通過的項目。
+ok() { echo "  ✓ $*"; }
+
+# usage_doc：印出呼叫端腳本開頭的註解（第 2 行起，到第一個非註解行為止）並以 64（EX_USAGE）結束。
+usage_doc() {
+  /usr/bin/awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
+  exit 64
+}
+
+# need_cmd <指令> <安裝方式>：缺少指令就結束。
+need_cmd() { command -v "$1" >/dev/null || die "需要 ${1}（${2}）"; }
 
 # out_dir <prefix>：建立 debug/<prefix>-<時間> 並輸出路徑（權限只限本人）。
 out_dir() {

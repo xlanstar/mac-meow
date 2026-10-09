@@ -11,7 +11,7 @@
 - `scripts/`：使用者流程，會打包進 `MacMeow.app`，只能用 macOS 內建指令。共用路徑、常數與函式在 `scripts/lib/common.sh`（遊戲檔案清單、迴路位址、Cyder 路徑、`wine_running`、`wineserver_kill` 等），新增腳本請 source 它，不要重複定義；子指令與用法錯誤依 `docs/architecture.md` 的「子指令慣例」。
 - `app/`：SwiftUI App（`app/Sources/`，Swift 5 語言模式、最低 macOS 13），由 `app/build-app.sh` 以 `swiftc` 編譯，不需要 Xcode 專案。App 只負責 UI：需要新狀態就加到 `play.sh` 的 `porcelain()` 並同步 `app/Sources/Core/EnvStatus.swift`；需要新進度就在腳本呼叫 `progress <id> <訊息>`，並在同一檔案的 `Step(progressID:)` 對應清單項目（`@@STEP`／`@@PROGRESS`／`@@WAIT` 標記只在 `Core/ScriptEvent.swift` 解析）；新的腳本呼叫加在 `Services/Scripts.swift`。
 - `tools/`：開發與診斷，可用 Xcode、Homebrew、`python3`。入口腳本放在 `tools/*.sh`，共用函式在 `tools/lib.sh`（建立在 `common.sh` 之上），原始碼在 `tools/src/<工具>/`，建置產物一律輸出到 `build/tools/`，診斷紀錄一律寫到 `debug/`。
-- 例外：`tools/sign-debug.sh` 會被 `scripts/uninstall.sh` 呼叫（只在 repo 內執行時；App 不打包 `tools/`），因此只用 macOS 內建指令。
+- 例外：`tools/sign-debug.sh` 會被 `scripts/uninstall.sh` 呼叫（只在 repo 內執行時；App 不打包 `tools/`），因此只用 macOS 內建指令；它 source 的 `tools/lib.sh` 載入時也只能用內建指令（需要其他工具的函式只在呼叫時執行）。
 - `packaging/homebrew/macmeow.rb`：Homebrew cask 範本（`@VERSION@`、`@SHA256@` 由 `release.sh tap` 填入），發佈到第三方 tap [`xlanstar/homebrew-tap`](https://github.com/xlanstar/homebrew-tap)（`common.sh` 的 `MACMEOW_TAP_REPO`）。tap 的 `Casks/` 只由 `release.sh tap` 產生，不直接修改。
 
 ### App 原始碼分層
@@ -56,7 +56,7 @@ prek run -a             # 對所有檔案執行
 prek update             # 更新 hook 版本（改寫 prek.toml 的 rev）
 ```
 
-設定在 `prek.toml`；各工具的設定檔：`.editorconfig`（shfmt）、`.shellcheckrc`、`.swift-format`（工具鏈內建的 `swift format`）、`ruff.toml`、`_typos.toml`、`committed.toml`（commit 訊息格式）。除了 AGENTS.md 的 Hard rules（遊戲檔、`login.txt`、`.env`）、bash 3.2 相容與 `patches/bin/SHA256SUMS`，也檢查 commit 訊息必須有 body（`tools/check-commit-body.sh`）。shfmt、`swift format`、ruff 會直接改寫檔案，改完重新 `git add` 再提交。
+設定在 `prek.toml`；各工具的設定檔：`.editorconfig`（shfmt）、`.shellcheckrc`、`.swift-format`（工具鏈內建的 `swift format`）、`ruff.toml`、`_typos.toml`、`committed.toml`（commit 訊息格式）。除了 AGENTS.md 的 Hard rules（遊戲檔、`login.txt`、`.env`）、bash 3.2 相容與 `patches/bin/SHA256SUMS`，也檢查 commit 訊息必須有 body（`tools/check-commit-body.sh`；不檢查 `fixup!`／`squash!`／`amend!`／Merge／Revert）。shfmt、`swift format`、ruff 會直接改寫檔案，改完重新 `git add` 再提交。
 
 ## 重建 Wine DLL
 
@@ -80,21 +80,24 @@ bash tools/build-wine-dlls.sh
 
 啟動與操作（GUI 類 Wine 程式需在 Terminal.app 內執行）：
 
-- `tools/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程。`plain` 無 trace（效能比較）；其餘模式只對 `MapleStory.exe` 開 Wine 頻道並記錄執行緒數與 socket。`MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`（另可為 `dxvk|wined3d`；無法使用時與 `play.sh` 一樣退回可用的後端；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`MACMEOW_HUD=1`（Metal FPS HUD）（未設定時沿用 App 的設定）、`WZCACHE`、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
+- `tools/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程；需要有效的 `GAME_DIR`，紀錄在 `debug/run-<時間>/`。啟動時與 Ctrl+C 時會關閉 shared bottle 內所有 Windows 程式。`plain` 無 trace（效能比較）；trace 類模式對所有程序開 `+timestamp,+pid,+tid,+process,+loaddll`，其餘頻道只對 `MapleStory.exe` 開，並記錄其執行緒數與 socket；`server` 另跑前景 `wineserver -d1`（所有程序，寫入 `server.log`）。`MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`（另可為 `dxvk|wined3d`；無法使用時與 `play.sh` 一樣退回可用的後端；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`MACMEOW_HUD=1`（Metal FPS HUD）（未設定時沿用 App 的設定）、`WZCACHE`、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
 - `tools/wgui.sh list|click|sclick|shot|fg|key`：在 bottle 內列出 Wine 視窗、點擊、按鍵、截圖。預設經 Terminal.app 執行並取回輸出，已在 Terminal.app 內可加 `--here`。
-- `tools/auto-start.sh`：等登入器視窗出現後以 `SendInput` 點「開始遊戲」，直到 `MapleStory.exe` 啟動。
+- `tools/auto-start.sh [--here]`：等登入器視窗出現後以 `SendInput` 點「開始遊戲」，直到 `MapleStory.exe` 啟動。整個腳本只經 Terminal.app 執行一次，已在 Terminal.app 內可加 `--here`。
 - `tools/shot-game.sh [輸出檔] [視窗標題]`：擷取遊戲視窗（被遮住也可，螢幕鎖定時不行）。
 
 堆疊與效能：
 
-- `tools/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack／LLDB 需要），用完執行 `restore`。
-- `tools/stack.sh mach|prof|lldb|sample`：擷取執行中 `MapleStory.exe` 的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`sample` 為 macOS `sample`。
-- `build/tools/callchain`、`memdump`、`tools/src/machstack/pesym.py`：呼叫鏈取樣、讀記憶體字串、Wine PE 位址轉函式名。
+- `tools/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack、callchain、memdump、LLDB 需要），用完執行 `restore`。
+- `tools/stack.sh mach|prof|lldb|sample`：擷取執行中 `MapleStory.exe` 的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`sample` 為 macOS `sample`。`mach`、`prof` 需要 `python3`。
+- `build/tools/symx86`（x86_64，在 Rosetta 下以 `dladdr` 解析 shared cache 符號）、`tools/src/machstack/symbolize.py`（替 machstack 輸出補符號）、`machprof.py`（`prof` 的統計）：由 `stack.sh` 呼叫。
+- `build/tools/callchain <pid> <次數>`：只取樣 CPU 最高的執行緒，只輸出可信的返回位址；無入口腳本。
+- `build/tools/memdump <pid> <addr-hex> <len>`：讀記憶體字串。
+- `tools/src/machstack/pesym.py <區段檔> <addr...>`：Wine PE 位址轉函式名；區段檔取自 vmmap（每行「起點 路徑」），需要 LLVM（`LLVM_BIN`）。
 
 重現與驗證：
 
 - `smctest`、`smctest2`、`smctest3`：Rosetta 同頁寫入（SMC）成本。
-- `wthreads.exe`、`reloadtest.exe`、`recvcheck.exe`：Wine 執行緒狀態、rsaenh 重載、recv 修補。在 bottle 內執行：`bash -c 'source tools/lib.sh && run_wine build/tools/wthreads.exe <pid-hex>'`。
+- `wthreads.exe`、`reloadtest.exe`、`recvcheck.exe`：Wine 執行緒狀態、rsaenh 重載、recv 修補。在 bottle 內執行：`bash -c 'source tools/lib.sh && run_wine build/tools/wthreads.exe <pid-hex> [n] [tid-hex]'`；`<pid-hex>` 是 Wine 內的 Windows PID；`n` 只查 suspend count、不暫停執行緒；`tid-hex` 只查該執行緒。
 
 ## Rosetta 除錯要點
 
@@ -155,7 +158,7 @@ gh run watch                          # 等 CI 完成
 - `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck` 與 Core 單元測試（`tools/test-app.sh`）、`patches/bin/SHA256SUMS` 與 DLL 相符、Homebrew cask 範本填入後通過 `brew style`（有安裝 Homebrew 時）、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
   - 例外：`MACMEOW_ALLOW_ADHOC=1` 跳過簽章檢查，`build` 產生 ad-hoc 版本，release notes 改為教使用者到「系統設定 → 隱私權與安全性」按「仍要打開」。只在無法公證時使用（CI 不使用）；舊版 App 的一鍵更新會拒絕 ad-hoc 版本，使用者需手動下載。
 - `prepare`：把 `## Unreleased` 下的項目移到 `## X.Y.Z — YYYY-MM-DD`，上方留一個空的 `## Unreleased`。
-- `build`：以 `git archive vX.Y.Z` 取出原始碼到 `build/release/X.Y.Z/` 再執行 `app/build-app.sh`，所以未提交的檔案不會進入產物。驗證 dmg 的簽章、公證票證與 Gatekeeper 評估（`spctl --type open --context context:primary-signature`），再掛載 dmg 驗證內含「應用程式」捷徑與視窗版面（`.DS_Store`、背景圖），以及 App 的 `codesign`、`CFBundleShortVersionString`、公證票證（`stapler validate`）與 Gatekeeper 評估（`spctl` 須為 `Notarized Developer ID`）、符合一鍵更新的簽章需求（`common.sh` 的 `MACMEOW_REQUIREMENT`，即官方 Team ID），並產生：
+- `build`：以 `git archive vX.Y.Z` 取出原始碼到 `build/release/X.Y.Z/` 再執行 `app/build-app.sh`，所以未提交的檔案不會進入產物。驗證 dmg 的簽章、公證票證與 Gatekeeper 評估（`spctl --type open --context context:primary-signature`），再掛載 dmg 驗證內含「應用程式」捷徑與視窗版面（`.DS_Store`、背景圖），以及 App 的 `codesign`、`CFBundleShortVersionString`、公證票證（`stapler validate`）與 Gatekeeper 評估（`spctl` 須為 `Notarized Developer ID`）、符合一鍵更新的簽章需求（`common.sh` 的 `MACMEOW_REQUIREMENT`，即官方 Team ID）、App 內有可執行的 `Contents/Resources/scripts/uninstall.sh`（cask 依賴），並產生：
   - `MacMeow-X.Y.Z.dmg`、`MacMeow-X.Y.Z.dmg.sha256`
   - `release-notes.md`：CHANGELOG 該版內容 + 安裝方式 + dmg 的 SHA-256 + `patches/SOURCES.md` 的 LGPL 原始碼表（Release 內附修補版 Wine DLL，必須附上）。
 - `publish`：`git push --atomic origin main vX.Y.Z`。需要 `origin` remote。
@@ -181,7 +184,7 @@ Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `
 | `APPLE_APP_PASSWORD` | 公證用 App 專用密碼（建議 CI 專用一組，方便撤銷） |
 | `HOMEBREW_TAP_TOKEN` | 推送 Homebrew tap 用的 fine-grained PAT（`release.sh tap`；`setup-ci-secrets.sh` 不設定，見下方） |
 
-`tools/setup-ci-secrets.sh`：以 `security export` 匯出登入鑰匙圈的簽章身分（macOS 會要求輸入登入密碼允許匯出），只挑出 `MACMEOW_SIGN_ID` 指定的憑證與對應私鑰，以隨機密碼重新打包成 `.p12`；詢問 Apple ID 與 App 專用密碼並以 `notarytool history` 驗證；確認後以 `gh secret set` 寫入，Team ID 取自憑證。暫存檔結束時刪除，`.p12` 密碼不另外保存（需要時重跑即可）。`--dry-run` 只檢查匯出。憑證到期或更換、App 專用密碼撤銷時重跑一次。
+`tools/setup-ci-secrets.sh`：以 `security export` 匯出登入鑰匙圈的簽章身分（macOS 會要求輸入登入密碼允許匯出），只挑出 `MACMEOW_SIGN_ID` 指定的憑證（未設定且只有一張 Developer ID 憑證時直接使用）與對應私鑰，以隨機密碼重新打包成 `.p12`；詢問 Apple ID 與 App 專用密碼並以 `notarytool history` 驗證；確認後以 `gh secret set` 寫入，Team ID 取自憑證。暫存檔結束時刪除，`.p12` 密碼不另外保存（需要時重跑即可）。`--dry-run` 只檢查匯出。憑證到期或更換、App 專用密碼撤銷時重跑一次。
 
 `HOMEBREW_TAP_TOKEN` 另外設定：在 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) 建立 token，Repository access 只選 `xlanstar/homebrew-tap`，Repository permissions 的 Contents 設為 Read and write（其餘不給），再執行 `gh secret set HOMEBREW_TAP_TOKEN` 貼上。Token 到期後重建並重設。
 

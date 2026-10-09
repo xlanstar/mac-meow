@@ -6,11 +6,11 @@
 #
 # 用法：bash tools/setup-ci-secrets.sh [--dry-run]
 #   --dry-run  只匯出並檢查 .p12，不詢問 Apple 帳密、不寫入 GitHub
-# 需要：在終端機執行、gh auth login、repo 已設定 GitHub origin、.env 的 MACMEOW_SIGN_ID。
+# 需要：在終端機執行、gh auth login、repo 已設定 GitHub origin、.env 的 MACMEOW_SIGN_ID（鑰匙圈只有一張 Developer ID 憑證時可省略）。
 # macOS 會跳出視窗詢問是否允許匯出鑰匙圈項目：輸入登入密碼並按「允許」（每個簽章身分一次）。
 set -euo pipefail
 # shellcheck source=lib.sh
-source "$(dirname "$0")/lib.sh"
+source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 load_env
 
 OPENSSL=/usr/bin/openssl # 系統 LibreSSL：讀得懂 security export 的格式，產生的 .p12 也能被 security import 匯入
@@ -18,22 +18,17 @@ DRY_RUN=0
 case "${1:-}" in
   "") ;;
   --dry-run) DRY_RUN=1 ;;
-  *)
-    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
-    exit 2
-    ;;
+  *) usage_doc ;;
 esac
 SIGN_ID="${MACMEOW_SIGN_ID:-}"
 # 測試用：從其他鑰匙圈匯出
 KEYCHAIN="${MACMEOW_EXPORT_KEYCHAIN:-$(security login-keychain | sed 's/^[[:space:]]*"//; s/"[[:space:]]*$//')}"
 
-ok() { echo "  ✓ $*"; }
-
 # ---- 1. 先檢查 GitHub 端，避免匯出私鑰後才失敗
 repo=""
 if ((! DRY_RUN)); then
   [[ -t 0 ]] || die "請在終端機執行（需要輸入 Apple 帳密）"
-  command -v gh >/dev/null || die "需要 gh（brew install gh）"
+  need_cmd gh "brew install gh"
   gh auth status >/dev/null 2>&1 || die "請先 gh auth login"
   repo="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)" \
     || die "找不到 GitHub repo：請先建立 repo 並設定 origin（例如 gh repo create <名稱> --private --source .）"
@@ -128,4 +123,4 @@ set_secret DEVELOPER_ID_P12_PASSWORD "$p12_pw"
 set_secret APPLE_ID "$apple_id"
 set_secret APPLE_TEAM_ID "$team"
 set_secret APPLE_APP_PASSWORD "$app_pw"
-echo "完成。之後 bash tools/release.sh publish X.Y.Z 即由 GitHub Actions 建置並建立 Release 草稿。"
+echo "完成。之後 bash tools/release.sh publish X.Y.Z 即由 GitHub Actions 建置、公證並正式發佈。"

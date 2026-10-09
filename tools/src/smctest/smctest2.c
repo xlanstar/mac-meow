@@ -8,24 +8,87 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <unistd.h>
-static double bench(uint8_t *page, const char *label) {
-    volatile uint64_t *var = (uint64_t *)(page + 0x6a0);
-    static const uint8_t code[] = { 0x48, 0x89, 0xf8, 0xc3 };
-    memcpy(page + 0xc80, code, sizeof code);
-    uint64_t (*fn)(uint64_t) = (void *)(page + 0xc80);
-    struct timespec s, n; clock_gettime(CLOCK_MONOTONIC, &s); uint64_t it = 0, acc = 0; double t;
-    do { for (int i = 0; i < 200; i++) { *var = 1; acc += fn(i); *var = 0; } it += 200;
-         clock_gettime(CLOCK_MONOTONIC, &n); t = (n.tv_sec - s.tv_sec) + (n.tv_nsec - s.tv_nsec) / 1e9; } while (t < 1 && it < 2000000);
-    printf("%-28s %12.0f calls/s\n", label, it / t); return it / t;
+
+#define PAGE_SIZE_RWX 0x4000
+#define CODE_OFFSET 0xc80
+#define VAR_OFFSET 0x6a0
+#define BATCH 200
+#define MAX_ITERS 2000000
+
+/* mov rax, rdi; ret */
+static const uint8_t code[] = { 0x48, 0x89, 0xf8, 0xc3 };
+static const int RWX = PROT_READ | PROT_WRITE | PROT_EXEC;
+
+static double elapsed(const struct timespec *start) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (now.tv_sec - start->tv_sec) + (now.tv_nsec - start->tv_nsec) / 1e9;
 }
-int main(int argc,char**argv) {
-    uint8_t *p; setvbuf(stdout,0,_IONBF,0);
-    if (argc < 2) { fprintf(stderr, "usage: %s 0|1|2\n", argv[0]); return 2; }
-    int m=atoi(argv[1]);
-    if(m==0){p = mmap(0, 0x4000, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANON, -1, 0); bench(p, "anon RWX (no MAP_JIT)");}
-    if(m==1){int fd = shm_open("/smctest", O_CREAT|O_RDWR, 0600); shm_unlink("/smctest"); ftruncate(fd, 0x4000);
-    p = mmap(0, 0x4000, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_SHARED, fd, 0); bench(p, "shared RWX");}
-    if(m==2){char tmpl[] = "/tmp/smcXXXXXX"; int f2 = mkstemp(tmpl); unlink(tmpl); ftruncate(f2, 0x4000);
-    p = mmap(0, 0x4000, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE, f2, 0); bench(p, "file private RWX");}
+
+/* 至少 1 秒或 MAX_ITERS 次呼叫 */
+static void bench(uint8_t *page, const char *label) {
+    volatile uint64_t *var = (uint64_t *)(page + VAR_OFFSET);
+    memcpy(page + CODE_OFFSET, code, sizeof code);
+    uint64_t (*fn)(uint64_t) = (void *)(page + CODE_OFFSET);
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    uint64_t iters = 0;
+    double t;
+    do {
+        for (int i = 0; i < BATCH; i++) {
+            *var = 1;
+            fn(i);
+            *var = 0;
+        }
+        iters += BATCH;
+        t = elapsed(&start);
+    } while (t < 1 && iters < MAX_ITERS);
+    printf("%-28s %12.0f calls/s\n", label, iters / t);
+}
+
+static uint8_t *map_shared(void) {
+    int fd = shm_open("/smctest", O_CREAT | O_RDWR, 0600);
+    if (fd < 0) return MAP_FAILED;
+    shm_unlink("/smctest");
+    ftruncate(fd, PAGE_SIZE_RWX);
+    return mmap(0, PAGE_SIZE_RWX, RWX, MAP_SHARED, fd, 0);
+}
+
+static uint8_t *map_file(void) {
+    char path[] = "/tmp/smcXXXXXX";
+    int fd = mkstemp(path);
+    if (fd < 0) return MAP_FAILED;
+    unlink(path);
+    ftruncate(fd, PAGE_SIZE_RWX);
+    return mmap(0, PAGE_SIZE_RWX, RWX, MAP_PRIVATE, fd, 0);
+}
+
+int main(int argc, char **argv) {
+    static const char *labels[] = { "anon RWX (no MAP_JIT)", "shared RWX", "file private RWX" };
+    setvbuf(stdout, 0, _IONBF, 0);
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s 0|1|2\n", argv[0]);
+        return 2;
+    }
+    int mode = atoi(argv[1]);
+    uint8_t *page;
+    switch (mode) {
+    case 0:
+        page = mmap(0, PAGE_SIZE_RWX, RWX, MAP_PRIVATE | MAP_ANON, -1, 0);
+        break;
+    case 1:
+        page = map_shared();
+        break;
+    case 2:
+        page = map_file();
+        break;
+    default:
+        return 0;
+    }
+    if (page == MAP_FAILED) {
+        perror("mmap");
+        return 1;
+    }
+    bench(page, labels[mode]);
     return 0;
 }

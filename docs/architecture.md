@@ -65,7 +65,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
 
 格式：位置：變更內容 → 還原方式。
 
-- Cyder engine `~/.cyder/runtime/Engines/wine-x86_64`：wineserver 與 DLL 被修補，開發時 `bin/wine` 可能被重新簽章；原檔備份為 `*.macmeow-orig`，DLL 另有 `*.macmeow-applied` 標記 → `patch-cyder-*.sh restore`、`tools/sign-debug.sh restore`（還原後刪除備份）。
+- Cyder engine `~/.cyder/runtime/Engines/wine-x86_64`：wineserver 與 DLL 被修補，開發時 `bin/wine` 與 `lib/wine/x86_64-unix/wine` 可能被重新簽章（ad-hoc + `get-task-allow`，移除 hardened runtime）；原檔備份為 `*.macmeow-orig`，DLL 另有 `*.macmeow-applied` 標記 → `patch-cyder-*.sh restore`、`tools/sign-debug.sh restore`（還原後刪除備份）。
 - Cyder bottle `~/Library/Application Support/Cyder/bottles/shared`：安裝 `vb6run` → 保留。
 - Cyder engine `lib/wine/x86_64-unix/winemac.so`：兩段指令被修補並重新 ad-hoc 簽章；原檔備份為 `winemac.so.macmeow-orig` → `patch-cyder-winemac.sh restore`。
 - Cyder shared bottle 登錄（`user.reg`）：`HKCU\Software\Wine\AppDefaults\貓貓TMS登入器.exe\Mac Driver` 的 `CaptureDisplaysForFullscreen="y"` → `launcher-dock.sh restore`（`uninstall.sh` 呼叫；`MACMEOW_HIDE_LAUNCHER_DOCK` 不是 `1` 時 `play.sh` 也會呼叫）。
