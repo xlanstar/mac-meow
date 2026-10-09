@@ -43,6 +43,7 @@ cask "macmeow" do
       https://github.com/dspp779/CyderBits/releases
 
     brew uninstall --cask macmeow 會還原 Cyder engine 的修補與 Cyder 設定、
-    移除本機網路位址（需要密碼），以及 App 的設定與記錄。
+    加回遊戲資料夾的下載隔離標記、移除本機網路位址（需要密碼），
+    以及 App 的設定與記錄。
   EOS
 end
