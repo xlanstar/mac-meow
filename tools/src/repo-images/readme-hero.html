@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- README 頂部主圖（1280×640）：只有 App 視窗，不放文字（README 標題已說明）。
+     加上 ?theme=dark 產生 GitHub 深色模式用的版本。 -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<script>
+  if (new URLSearchParams(location.search).get("theme") === "dark") {
+    document.documentElement.classList.add("dark");
+  }
+</script>
+<style>
+  html, body { width: 1280px; height: 640px; }
+  .glow { left: 50%; top: 50%; width: 1100px; height: 1100px; transform: translate(-50%, -42%); }
+  /* 視窗刻意超出底邊，讓上半部（狀態卡與環境檢查）夠大 */
+  .app-window { left: 50%; top: 64px; width: 560px; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <img class="app-window" src="app-window.png" alt="">
+</body>
+</html>

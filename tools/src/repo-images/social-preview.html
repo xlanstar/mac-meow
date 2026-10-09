@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- GitHub 社群預覽圖（連結卡片，1280×640）：大標語 + App 視窗。只上傳到 repo Settings，不放進 repo。 -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+  html, body { width: 1280px; height: 640px; }
+  .glow { right: -120px; top: -40px; width: 820px; height: 820px; }
+  .copy { position: absolute; left: 96px; top: 0; bottom: 0; width: 640px;
+    display: flex; flex-direction: column; justify-content: center; }
+  .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 34px; }
+  .brand img { width: 64px; height: 64px; margin: -6px; }
+  .brand span { font-size: 22px; font-weight: 700; letter-spacing: .2px; }
+  h1 { font-size: 76px; line-height: 1.12; font-weight: 800; letter-spacing: -1px; }
+  h1 em { font-style: normal;
+    background: linear-gradient(100deg, #ffaa55, var(--orange) 45%, var(--pink));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tagline { margin-top: 24px; font-size: 25px; line-height: 1.5; color: var(--muted); font-weight: 500; }
+  .facts { margin-top: 36px; display: flex; gap: 26px; font-size: 19px; font-weight: 600; }
+  .facts li { list-style: none; display: flex; align-items: center; gap: 8px; }
+  .facts li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
+  .app-window { right: 96px; top: 64px; width: 420px; }
+  .repo-url { position: absolute; left: 96px; bottom: 40px; font-size: 16px; color: var(--faint);
+    font-weight: 500; letter-spacing: .3px; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="copy">
+    <div class="brand"><img src="app-icon.png" alt=""><span>MacMeow</span></div>
+    <h1>在 <em>Mac</em> 上<br>玩貓貓谷</h1>
+    <p class="tagline">Apple Silicon 一鍵啟動原版登入流程</p>
+    <ul class="facts">
+      <li>免虛擬機</li>
+      <li>不修改遊戲檔</li>
+      <li>可完整還原</li>
+    </ul>
+  </div>
+  <img class="app-window" src="app-window.png" alt="">
+  <div class="repo-url">github.com/xlanstar/mac-meow</div>
+</body>
+</html>

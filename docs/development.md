@@ -166,3 +166,14 @@ Agent shell 無法啟動 GUI Wine 程式；這一步需在 Terminal.app 或 Find
 4. 若本版改了修補或外部狀態：`bash scripts/uninstall.sh` 後各 `check` 回報未修補，再以 App 重新套用一次。
 
 測試失敗且尚未 push：`git tag -d vX.Y.Z && git reset --hard HEAD~1` 撤回「chore(release): X.Y.Z」，修正並 commit 後從 `prepare` 重來。已 push：tag 不移動、不重用，修正後改發下一個 patch 版本（已發佈的壞版本可在說明中標註或刪除）。CI 失敗但產物沒問題（例如 Secret 設錯）：修正後在 Actions 頁面 Re-run；若停在草稿，`draft` 會覆蓋同一個草稿，`release` 再正式發佈。
+
+### Repo 圖片
+
+`bash tools/repo-images.sh [--update-readme] [App 視窗截圖.png]` 以 `tools/src/repo-images/` 的 HTML 範本與 App 視窗截圖（預設 `debug/app-shot.png`，⌘⇧4 → 空白鍵擷取）產生 2560×1280 JPEG 到 `build/repo-images/`。需先 `bash app/build-app.sh` 產生圖示，並安裝 Google Chrome。
+
+| 圖片 | 範本 | 用途 |
+|---|---|---|
+| `social-preview.jpg` | `social-preview.html` | 連結卡片：大標語 + App 視窗。在 repo「Settings → General → Social preview」上傳（上限 1 MB），不放進 repo。 |
+| `readme-hero-light.jpg`、`readme-hero-dark.jpg` | `readme-hero.html`（`?theme=dark` 為深色版） | README 頂部主圖：只有 App 視窗，以 `<picture>` 依 GitHub 淺色／深色模式切換。 |
+
+App 介面改變後重新擷取截圖並執行 `--update-readme`，把 README 主圖複製到 `docs/images/` 後提交；社群預覽圖要另外到 Settings 重新上傳。

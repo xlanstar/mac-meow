@@ -1,5 +1,10 @@
 # mac-meow：在 Apple Silicon Mac 上玩貓貓谷
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-hero-dark.jpg">
+  <img src="docs/images/readme-hero-light.jpg" alt="MacMeow 主視窗：連線通道與環境檢查全部就緒">
+</picture>
+
 [![最新版本](https://img.shields.io/github/v/release/xlanstar/mac-meow?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/xlanstar/mac-meow/releases/latest)
 
 **[⬇ 下載最新版 MacMeow.app](https://github.com/xlanstar/mac-meow/releases/latest)**（在頁面下方「Assets」點 `MacMeow-<版本>.dmg`）
