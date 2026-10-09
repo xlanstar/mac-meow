@@ -89,6 +89,20 @@
 - 修補：`session.sh` 在背景監看本專案的程式（以命令列開頭是遊戲資料夾的 Windows 路徑，或 `HostShield.exe`／`認證器.exe` 來判斷）。遊戲關閉，或登入器關閉且遊戲沒在執行，連續 3 次檢查（約 6 秒）都成立就結束這些程式。Patcher 這類其他程式執行中時不收尾。只結束本專案的程式，Wine 會自行關閉，其他 Cyder 遊戲不受影響；有其他 Windows 程式時不等待 Wine 結束；Wine 沒有自行結束、也沒有其他 Windows 程式時，才執行 `wineserver -k`。`play.sh` 啟動時若只剩 `認證器.exe`／`HostShield.exe` 殘留，也以同樣方式收尾（`session.sh close`，會先停止舊的監看程序，以免它沿用上一次的狀態），不再對整個 shared bottle 執行 `wineserver -k`。Wine 結束後再結束 fifo 已刪除或監督程序已結束（PPID 1）的 sentinel。
 - 結果：關閉登入器後，4 秒內 HostShield、`conhost` 與所有 Wine 系統程式都結束；當時殘留的 11 組 sentinel 也一併清除。
 
+## 12. 更換遊戲字型（Wine 端無效，未採用）
+
+- 目標：不修改遊戲檔，從 Wine 端把遊戲文字換成其他字型（例如微軟正黑體）。
+- 已試，遊戲文字都沒有變：
+  - Wine 的 `HKCU\Software\Wine\Fonts\Replacements` 把細明體、新細明體、MingLiU、PMingLiU 與韓服 UI 沿用的 Dotum／돋움／Gulim／굴림 對應到新字型。Wine 只在要求的字型不存在時才套用替換（`win32u/font.c` 的 `add_family_replacement`），使用者裝了 `mingliu.ttc` 時無效。
+  - `HKLM\…\FontSubstitutes` 寫入相同名稱。Wine 11 的 `find_matching_face_by_name` 也是先找原名稱，找不到才用替代名稱，結果同上。
+  - 暫時移走 `mingliu.ttc`：遊戲程序改為映射 `simsun.ttc`，字形仍是明體。
+  - `FontLink\SystemLink` 把 `MSJH.TTC,Microsoft JhengHei UI` 移到 Tahoma、Microsoft Sans Serif、Lucida Sans Unicode、MS UI Gothic 的第一順位：遊戲程序改為映射 `msjh.ttc`／`msjhbd.ttc`、不再映射 `mingliu.ttc`，但遊戲畫面上的文字仍然沒變。
+- 證據：以 `lsof -p <MapleStory.exe>` 看 Wine 映射的字型檔。原本 CJK 來自 Tahoma 的 SystemLink（第一順位 MINGLIU.TTC，其次 SIMSUN.TTC），所以 Wine 端設定確實生效，只是不影響主要的遊戲文字。
+- 遊戲端：`Gr2D_DX11.dll` 內含 FreeType；WZ 有內嵌字型（`FONT_DATA`，Etc 下的 `NANUMGOTHIC*.img`、`SEOULNAMSAN*.img`、`YUNGOTHIC250.img` 等韓文字型），UI 節點以 `font` 指定字型名稱（Nanum Gothic、Dotum、Arial 等）。
+- 可能原因（未證實）：遊戲要求一個 bottle 內沒有的字型名稱，Wine 再以 `find_any_face` 依序挑第一個支援該字集的家族（每次都映射的 `AppleLiSung-Light.ttf` 是明體，與畫面一致）；或主要文字使用遊戲自己的字型資料。
+- 下一步（若要繼續）：以 `tools/run-game.sh` 搭配 `EXTRA_DEBUG=MapleStory.exe:+font` 記錄遊戲要求的字型名稱與實際選到的字型。若是不存在的名稱，可用 Replacements 指定；若是遊戲自帶的字型資料，不改遊戲檔就無法更換。
+- 附帶發現：Wine 依 locale 決定字碼頁，與 bottle 的 `Fonts\Codepages` 不同時，任何 Wine 程式啟動都會改寫語系相依的字型設定（`Codepages`、FontSubstitutes 的 `MS Shell Dlg`／`Tms Rmn`、FontLink）。從 `LANG=C` 的 shell 執行 `reg` 曾把 shared bottle 從 950 改成 1252，所以 `export_wine_env` 固定使用 `zh_TW.UTF-8`（與 Cyder 的 `wineLocale=zh_TW` 相同）。
+
 ## 其他觀察
 
 - 官方 `Patcher.exe` 曾被觸發一次，把 `MapleStory.exe` 換成官方 6.282.5.0，伺服器回報「不正確的版本」。觸發者未查明，之後未再發生。
