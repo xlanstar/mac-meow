@@ -110,6 +110,7 @@
 - 同程序也映射 Wine 內建的 `d3d9.dll`、`wined3d.dll`、`opengl32` 與 MoltenVK，推測是 `NxOverlay_x64.dll` 偵測或 hook 時載入，不是主要繪圖路徑（未以 `+loaddll` 確認載入者）。
 - 其他後端：Cyder 也支援 `d3dmetal`（Apple GPTK 的 D3DMetal，支援 D3D11／12；需要 macOS 14 以上與使用者自行安裝的 GPTK 或 CrossOver，不能隨本專案散布）、`dxvk`（D3D11 → Vulkan → MoltenVK → Metal）與 `wined3d`（OpenGL）。Cyder 對楓之谷的自動選擇是 macOS 15 以上用 DXMT，否則 DXVK，不會自動選 D3DMetal。
 - 本專案現在預設 D3DMetal（`MAPLE_GFX=d3dmetal`，App 可改選 DXMT）。Cyder 遇到無法使用的 `graphicsBackend=d3dmetal`（macOS 14 以下或找不到 GPTK）不會退回 DXMT，而是改用 default 且停用楓之谷的自動選擇，結果是 Wine 內建的 wined3d；所以 `cyder-settings.sh` 以與 Cyder 相同的條件（`d3dmetal_available`）檢查，無法使用時寫入 `dxmt`。Cyder 以 `dxvkFrameRate`（預設 60）設定 DXMT 的 `d3d11.preferredMaxFrameRate`，所以 DXMT 下 FPS 預設上限 60；Cyder 不替 D3DMetal 設定 FPS 上限（`cyder_apply_graphics_runtime_preferences`）。效能 HUD 用 `graphicsHud=metal`（Cyder 匯出 `MTL_HUD_ENABLED=1`），DXMT 與 D3DMetal 都經 Metal 繪圖，兩者都適用。
+- D3DMetal 的 FPS 上限：`D3DMetal.framework` 讀取環境變數 `D3DM_MAX_FPS`（未公開文件）。以 `GFX=d3dmetal HUD=1 tools/run-game.sh` 在登入畫面實測（M4 Max、120Hz 螢幕）：`EXTRA_ENV="D3DM_MAX_FPS=30"` 時 HUD 為 30.00 FPS／33.33 ms；不設時約 117 FPS／8.5 ms，即預設只受螢幕更新率限制。HUD 同時確認 D3DMetal（Game Porting Toolkit 4.0b2）已接手 D3D11。本專案的啟動流程（`open -a Cyder` 開 `認證器.exe`）目前無法傳入這個變數。
 - 未比較 DXMT 與 D3DMetal 的效能。遊戲是 2D，已知的效能問題都在 CPU 端（#7–#9），預期更換圖形後端的效果有限。要實測時以 `GFX=dxmt|d3dmetal HUD=1 bash tools/run-game.sh` 在同一張地圖比較 FPS 與 CPU。
 
 ## 其他觀察
