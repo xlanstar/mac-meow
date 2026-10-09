@@ -37,7 +37,7 @@ bash scripts/patch-cyder-dlls.sh check             # 各修補也都有 check
 bash scripts/session.sh status                     # 遊戲階段監看；記錄在 ~/Library/Logs/MacMeow/session.log
 ```
 
-測試 `uninstall.sh` 時不要直接執行：除了 `brew-command` 以外的子指令都會真的還原修補、移除本機網路位址並刪除 App 設定。複製到暫存資料夾、把有副作用的函式換成 echo 後再跑；`cask` 的判斷可以放在假的 brew 程序底下驗證（perl 改 `$0` 模擬 `brew.rb <子指令>` 的命令列）：
+測試 `uninstall.sh` 時不要直接執行：除了 `brew-command` 以外的子指令都會真的還原修補、移除本機網路位址並刪除 App 設定。複製到暫存資料夾（與 cask 從 Caskroom 執行時相同，`scripts/` 單獨存在、沒有 App）、把有副作用的函式換成 echo 後再跑；`cask` 的判斷可以放在假的 brew 程序底下驗證（perl 改 `$0` 模擬 `brew.rb <子指令>` 的命令列）：
 
 ```sh
 T="$(mktemp -d)" && mkdir -p "$T/scripts" && cp -R scripts/lib "$T/scripts/"

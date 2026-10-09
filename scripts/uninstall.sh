@@ -5,7 +5,8 @@
 #   2. 還原 Cyder 全域設定的原值，加回遊戲資料夾的下載隔離標記
 #   3. 移除 lo0 位址與 LaunchDaemon（需要管理員密碼；只有這一步以 root 執行 setup-loopback.sh）
 #   4. 刪除 MacMeow.app 的設定與記錄
-# 只用 macOS 內建指令（打包進 MacMeow.app，App 的「解除安裝⋯」與 Homebrew cask 都呼叫打包的這一份）。
+# 只用 macOS 內建指令；還原只用到 scripts/ 內的檔案（tools/sign-debug.sh 只在 repo 內）。打包進 MacMeow.app：
+# App 的「解除安裝⋯」執行 App 內這一份，Homebrew cask 執行安裝時複製到 Caskroom 的 scripts/（App 被刪除後仍可移除）。
 #
 # 用法：
 #   bash scripts/uninstall.sh                  # 1–3，全部成功才 4

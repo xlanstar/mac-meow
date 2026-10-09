@@ -20,11 +20,17 @@ cask "macmeow" do
 
   app "MacMeow.app"
 
+  # App 移到 appdir 之前，把 App 內的 scripts 複製到 Caskroom（staged_path）。uninstall 區塊執行這一份，
+  # 使用者自行刪除 App 後 brew uninstall 仍能還原修補與設定。
+  preflight_steps do
+    copy "MacMeow.app/Contents/Resources/scripts", "scripts", recursive: true
+  end
+
   # quit 先於 script：App 結束後才刪除它的設定。brew upgrade／reinstall 也會執行這個區塊，
-  # 這時 uninstall.sh cask 什麼都不做（見 scripts/uninstall.sh）。
+  # 這時 uninstall.sh cask 什麼都不做（見 scripts/uninstall.sh）。相對路徑以 staged_path 解析。
   uninstall quit:   "tw.macmeow.launcher",
             script: {
-              executable: "#{appdir}/MacMeow.app/Contents/Resources/scripts/uninstall.sh",
+              executable: "scripts/uninstall.sh",
               args:       ["cask"],
             }
 

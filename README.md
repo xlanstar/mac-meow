@@ -79,7 +79,7 @@ App 會自動檢查新版本，有新版時主視窗頂端會出現提示；也�
 - **macOS 28 以後可能無法執行**：在本專案確認相容之前，先不要升級。
 - **出現「Intel 架構的 App 未來將無法執行」通知**：在 macOS 27 以前不影響遊戲，直接關閉即可。
 - **Cyder 更新後無法啟動**：請回報 issue，或等待本專案更新。
-- **手動刪除 App 後 `brew uninstall`／`brew upgrade` 失敗**：先 `brew reinstall --cask macmeow`，再 `brew uninstall --cask macmeow`。
+- **手動刪除 App 後 `brew upgrade` 失敗**：改用 `brew reinstall --cask macmeow`。
 
 ## 回報問題
 

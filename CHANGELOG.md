@@ -13,6 +13,7 @@ List each change under `## Unreleased` as it lands
 - `MacMeow.app` 的「遊戲設定」新增「FPS 上限」：60、120、144 或不限制（預設），D3DMetal、DXMT 與 DXVK 都適用
 - `MacMeow.app` 的「遊戲設定」新增「顯示效能 HUD」：在遊戲畫面顯示 FPS
 - 修正 `MacMeow.app` 選擇遊戲資料夾後立刻按「開始遊戲」，偶爾會改回原本的資料夾
+- 用 Homebrew 安裝時，手動刪除 `MacMeow.app` 後 `brew uninstall --cask macmeow` 不再失敗，且仍會還原修補與設定
 - 修正 `MacMeow.app` 暫時讀不到環境狀態時，按「開始遊戲」會誤報「需要先安裝 Cyder」
 - 修正 `MacMeow.app` 啟動途中仍可從選單執行「全部關閉」、選擇遊戲資料夾或設定本機網路位址
 - 修正 `MacMeow.app` 詳細記錄超過 1000 行後不再自動捲到最新一行，以及磁碟已滿時寫入記錄會讓 App 閃退
