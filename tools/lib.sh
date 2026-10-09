@@ -58,7 +58,7 @@ need_tool() {
 
 # dmg_attach [--readonly] [--nobrowse] [--mountpoint <路徑>] <映像>：掛載磁碟映像，輸出格式同 hdiutil attach
 # （裝置<TAB>內容<TAB>掛載點）。macOS 26 起 hdiutil attach 已棄用（會印警告），改用 diskutil image attach；
-# 舊系統（例如 CI 的 macOS 15）沒有 diskutil image，退回 hdiutil。
+# 沒有 diskutil image 的舊系統退回 hdiutil。diskutil 不會自動建立 --mountPoint 目錄（hdiutil 會），所以先建好。
 # diskutil image attach 的文字輸出會把非 ASCII 掛載點以 MacRoman 重複編碼（與 locale 無關），
 # 所以改讀 --plist 輸出再轉成 hdiutil 的格式。
 dmg_attach() {
@@ -69,6 +69,7 @@ dmg_attach() {
       --nobrowse) d+=(--nobrowse) h+=(-nobrowse) ;;
       --mountpoint)
         d+=(--mountPoint "$2") h+=(-mountpoint "$2")
+        mkdir -p "$2" || return
         shift
         ;;
       *)

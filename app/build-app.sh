@@ -178,7 +178,9 @@ OSA
   ) &
   watchdog=$!
   wait "$pid" || rc=$?
+  # 收掉看門狗；wait 吃掉 bash 的「Terminated: 15」工作通知
   kill "$watchdog" 2>/dev/null || true
+  wait "$watchdog" 2>/dev/null || true
   ((rc == 0)) || return 1
   # Finder 非同步寫入 .DS_Store
   for _ in $(seq 20); do
