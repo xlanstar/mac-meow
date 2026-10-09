@@ -19,7 +19,6 @@ DIST="$ROOT/dist"
 APP="$DIST/MacMeow.app"
 RES="$APP/Contents/Resources"
 WORK="$ROOT/build/app"
-TARGET="arm64-apple-macos13.0" # 與 Info.plist 的 LSMinimumSystemVersion 一致
 
 command -v swiftc >/dev/null 2>&1 && xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1 \
   || {
@@ -40,10 +39,11 @@ NOTARY_AUTH=(--keychain-profile "$NOTARY_PROFILE")
 rm -rf "$APP" "$WORK"
 mkdir -p "$APP/Contents/MacOS" "$RES/scripts/lib" "$RES/patches/bin" "$RES/zh-Hant.lproj" "$WORK"
 
-# SwiftUI 主程式（app/Sources）
+# SwiftUI 主程式（app/Sources，含子資料夾）
+app_sources
 swiftc -O -swift-version 5 -parse-as-library -module-name MacMeow \
-  -sdk "$SDK" -target "$TARGET" \
-  -o "$APP/Contents/MacOS/MacMeow" "$ROOT"/app/Sources/*.swift
+  -sdk "$SDK" -target "$APP_SWIFT_TARGET" \
+  -o "$APP/Contents/MacOS/MacMeow" "${APP_SOURCES[@]}"
 
 # App 圖示（app/make-icon.swift 繪製）
 swiftc -O -sdk "$SDK" -o "$WORK/make-icon" "$ROOT/app/make-icon.swift"

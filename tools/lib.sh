@@ -1,7 +1,8 @@
 # shellcheck shell=bash
 # 開發工具共用設定。tools/*.sh 以 `source "$(dirname "$0")/lib.sh"` 載入。
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作），另外提供：
-#   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、out_dir、maple_pids、need_tool、in_aqua_terminal、run_wine、llvm 路徑
+#   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、out_dir、maple_pids、need_tool、in_aqua_terminal、run_wine、llvm 路徑、
+#   APP_SWIFT_TARGET / app_sources（App 原始碼）
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
 MACMEOW_TOOLS_LOADED=1
 
@@ -11,6 +12,8 @@ source "$ROOT/scripts/lib/common.sh"
 
 TOOLS_BIN="$ROOT/build/tools" # tools/build.sh 的產物
 DEBUG_DIR="$ROOT/debug"       # 所有診斷輸出（.gitignore）
+# shellcheck disable=SC2034  # build-app.sh、release.sh 使用
+APP_SWIFT_TARGET="arm64-apple-macos13.0" # App 的 swiftc target；與 Info.plist 的 LSMinimumSystemVersion 一致
 
 # load_env：載入 repo 根目錄的 .env（本機設定，不提交；範本見 .env.example）。
 # 格式為每行 KEY=VALUE（可加 export、引號、# 註解）；已存在的環境變數優先，不會被覆蓋。
@@ -103,4 +106,13 @@ in_terminal() {
 run_wine() {
   export_wine_env
   WINEDEBUG="${WINEDEBUG:--all}" /usr/bin/arch -x86_64 "$WINE_BIN" "$@"
+}
+
+# app_sources [子資料夾...]：把 app/Sources（或其下的子資料夾）內所有 .swift（含子資料夾，排序）讀進 APP_SOURCES 陣列。
+app_sources() {
+  local dir f
+  APP_SOURCES=()
+  for dir in "${@:-.}"; do
+    while IFS= read -r f; do APP_SOURCES+=("$f"); done < <(find "$ROOT/app/Sources/$dir" -name '*.swift' | sort)
+  done
 }

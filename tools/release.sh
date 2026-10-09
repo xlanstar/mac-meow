@@ -118,8 +118,9 @@ cmd_check() {
     git ls-files 'scripts/*.sh' 'app/*.sh' | xargs shellcheck -x -S warning || die "shellcheck 有警告"
     ok "shellcheck（scripts/、app/）"
   fi
-  swiftc -typecheck -swift-version 5 -parse-as-library -target arm64-apple-macos13.0 \
-    -sdk "$(xcrun --sdk macosx --show-sdk-path)" app/Sources/*.swift || die "app/Sources 無法編譯"
+  app_sources
+  swiftc -typecheck -swift-version 5 -parse-as-library -target "$APP_SWIFT_TARGET" \
+    -sdk "$(xcrun --sdk macosx --show-sdk-path)" "${APP_SOURCES[@]}" || die "app/Sources 無法編譯"
   ok "swiftc -typecheck（app/Sources）"
 
   (cd patches/bin/x86_64-windows && shasum -a 256 -c ../SHA256SUMS >/dev/null) || die "patches/bin/SHA256SUMS 與 DLL 不符"
