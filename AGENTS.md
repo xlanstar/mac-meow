@@ -14,6 +14,7 @@ Each fact lives in exactly one file. Link to it; do not copy it.
 - `docs/architecture.md`: launch chain, what each file does, external state touched, env vars, what to update when upstream changes.
 - `docs/development.md`: build and test commands, Wine DLL rebuild, diagnostic tools, Rosetta debugging, release.
 - `docs/technical-notes.md`: root cause and evidence for each fix.
+- `docs/known-issues.md`: details of each known issue (symptom, workaround, cause, status); `README.md` keeps only a one-line user-visible summary per issue.
 - `patches/SOURCES.md`: Wine source and LGPL info for prebuilt DLLs.
 - `CHANGELOG.md`, `VERSION`: user-visible changes and release version.
 

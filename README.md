@@ -53,11 +53,14 @@ bash scripts/uninstall.sh
 
 ## 已知問題
 
-- **人多的地方很卡**（例如頻道 1 的城鎮）：遊戲的防護機制在 Rosetta 2 上效能很差，畫面上的玩家／特效越多越卡；人少的頻道與地圖順暢。減輕方式：避開人多的頻道與地圖、在遊戲設定中減少其他玩家特效。
-- **「不正確的版本」**：若官方 `Patcher.exe` 被觸發，`MapleStory.exe` 會被更新成官方最新版，伺服器就會拒絕。請把私服要求版本的 `MapleStory.exe` 放回遊戲資料夾。
-- **macOS 28 以後可能無法執行**：Cyder 的 Wine 是 Intel（x86_64）版本，必須透過 Rosetta 2 執行。Apple 已[公告](https://support.apple.com/zh-tw/102527) macOS 27 是最後一個完整支援 Rosetta 2 的版本，macOS 28 起只保留給部分舊遊戲，目前不確定 Cyder 能不能繼續使用。在本專案確認相容之前，建議先不要升級到 macOS 28。
-- **出現「Intel 架構的 App 未來將無法執行」通知**：macOS 26.4 以後啟動 Cyder 的遊戲時可能會出現這個通知，原因同上；在 macOS 27 以前不影響遊戲，可以直接關閉。
-- **Cyder 更新後無法啟動**：App 每次啟動都會重新套用修補；若新版 Cyder 的 Wine 版本差太多，修補會拒絕套用並顯示訊息，請回報 issue 或等待本專案更新。
+原因和暫時解法見 [docs/known-issues.md](docs/known-issues.md)。
+
+- **人多的地方很卡**：避開人多的頻道和地圖。
+- **按住 Command 再按 A／Z／X／C／V 會變成 Ctrl**：按住 Command 時不要按這五個鍵。
+- **「不正確的版本」**：把私服要求版本的 `MapleStory.exe` 放回遊戲資料夾。
+- **macOS 28 以後可能無法執行**：在本專案確認相容之前，先不要升級。
+- **出現「Intel 架構的 App 未來將無法執行」通知**：在 macOS 27 以前不影響遊戲，直接關閉即可。
+- **Cyder 更新後無法啟動**：請回報 issue，或等待本專案更新。
 
 ## 回報問題
 
