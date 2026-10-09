@@ -18,10 +18,13 @@ line=""
 wait_until 180 find_login_window || die "登入器視窗未出現"
 # wgui list 的格式：... rect=(left,top)-(right,bottom) ...
 read -r left top <<<"$(sed -E 's/.*rect=\((-?[0-9]+),(-?[0-9]+)\).*/\1 \2/' <<<"$line")"
-sleep 3   # 等登入器畫面繪製完成
+sleep 3 # 等登入器畫面繪製完成
 
 for _ in 1 2 3; do
   bash "$ROOT/tools/wgui.sh" sclick $((left + BUTTON_X)) $((top + BUTTON_Y)) >/dev/null
-  if wait_until 30 maple_started; then echo "MapleStory 已啟動"; exit 0; fi
+  if wait_until 30 maple_started; then
+    echo "MapleStory 已啟動"
+    exit 0
+  fi
 done
 die "點擊後 MapleStory 未啟動"

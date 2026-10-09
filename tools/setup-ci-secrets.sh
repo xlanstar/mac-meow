@@ -13,12 +13,15 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 load_env
 
-OPENSSL=/usr/bin/openssl   # 系統 LibreSSL：讀得懂 security export 的格式，產生的 .p12 也能被 security import 匯入
+OPENSSL=/usr/bin/openssl # 系統 LibreSSL：讀得懂 security export 的格式，產生的 .p12 也能被 security import 匯入
 DRY_RUN=0
 case "${1:-}" in
   "") ;;
   --dry-run) DRY_RUN=1 ;;
-  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *)
+    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
 esac
 SIGN_ID="${MACMEOW_SIGN_ID:-}"
 # 測試用：從其他鑰匙圈匯出
@@ -28,7 +31,7 @@ ok() { echo "  ✓ $*"; }
 
 # ---- 1. 先檢查 GitHub 端，避免匯出私鑰後才失敗
 repo=""
-if (( ! DRY_RUN )); then
+if ((! DRY_RUN)); then
   [[ -t 0 ]] || die "請在終端機執行（需要輸入 Apple 帳密）"
   command -v gh >/dev/null || die "需要 gh（brew install gh）"
   gh auth status >/dev/null 2>&1 || die "請先 gh auth login"
@@ -72,7 +75,10 @@ pub="$($OPENSSL x509 -in "$cert" -noout -pubkey)"
 key=""
 for b in "$tmp"/b*.pem; do
   grep -q -- 'PRIVATE KEY-----' "$b" || continue
-  [[ "$($OPENSSL pkey -in "$b" -pubout 2>/dev/null)" == "$pub" ]] && { key="$b"; break; }
+  [[ "$($OPENSSL pkey -in "$b" -pubout 2>/dev/null)" == "$pub" ]] && {
+    key="$b"
+    break
+  }
 done
 [[ -n "$key" ]] || die "找不到 ${cn} 的私鑰（憑證必須和私鑰在同一個鑰匙圈）"
 
@@ -91,7 +97,7 @@ n="$($OPENSSL pkcs12 -in "$tmp/devid.p12" -passin "pass:$p12_pw" -nodes 2>/dev/n
 [[ "$n" == 2 ]] || die ".p12 內容不正確（預期 1 張憑證＋1 把私鑰，實際 ${n} 個項目）"
 ok ".p12 只含這張憑證與私鑰（$(wc -c <"$tmp/devid.p12" | tr -d ' ') bytes）"
 
-if (( DRY_RUN )); then
+if ((DRY_RUN)); then
   echo "dry-run：未寫入 GitHub。"
   exit 0
 fi
@@ -101,7 +107,8 @@ echo
 echo "公證用的 Apple 帳號（App 專用密碼在 https://account.apple.com →「登入與安全性」→「App 專用密碼」建立）："
 read -r -p "  Apple ID：" apple_id
 [[ -n "$apple_id" ]] || die "Apple ID 不能是空的"
-read -r -s -p "  App 專用密碼（輸入時不顯示）：" app_pw; echo
+read -r -s -p "  App 專用密碼（輸入時不顯示）：" app_pw
+echo
 [[ -n "$app_pw" ]] || die "App 專用密碼不能是空的"
 echo "驗證 Apple 帳密⋯"
 xcrun notarytool history --apple-id "$apple_id" --team-id "$team" --password "$app_pw" >/dev/null 2>&1 \
@@ -112,7 +119,10 @@ ok "Apple 帳密可登入公證服務"
 echo
 read -r -p "寫入 ${repo} 的 Actions Secrets（同名者會被覆蓋），繼續？[y/N] " yn
 [[ "$yn" == [yY] ]] || die "已取消，未寫入任何 Secret"
-set_secret() { printf '%s' "$2" | gh secret set "$1" --repo "$repo" >/dev/null; ok "$1"; }
+set_secret() {
+  printf '%s' "$2" | gh secret set "$1" --repo "$repo" >/dev/null
+  ok "$1"
+}
 set_secret DEVELOPER_ID_P12_BASE64 "$(base64 -i "$tmp/devid.p12")"
 set_secret DEVELOPER_ID_P12_PASSWORD "$p12_pw"
 set_secret APPLE_ID "$apple_id"

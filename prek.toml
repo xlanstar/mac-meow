@@ -1,0 +1,102 @@
+# prek（https://prek.j178.dev）設定。安裝：brew install prek && prek install
+# 更新 hook 版本：prek update
+#:schema https://www.schemastore.org/prek.json
+
+default_install_hook_types = ["pre-commit", "commit-msg"]
+default_stages = ["pre-commit", "pre-merge-commit", "pre-push", "manual"]
+
+# ---------- 通用檢查（prek 內建，Rust 實作） ----------
+[[repos]]
+repo = "builtin"
+hooks = [
+  # .patch 是 diff，行尾空白有意義；patches/bin 是預建 DLL
+  { id = "trailing-whitespace", exclude = '^patches/' },
+  { id = "end-of-file-fixer", exclude = '^patches/' },
+  { id = "mixed-line-ending", args = ["--fix=lf"], exclude = '^patches/' },
+  { id = "fix-byte-order-marker" },
+  { id = "check-merge-conflict" },
+  { id = "check-case-conflict" },
+  { id = "check-symlinks" },
+  { id = "check-yaml" },
+  { id = "check-json" },
+  { id = "check-toml" },
+  { id = "check-executables-have-shebangs" },
+  { id = "check-shebang-scripts-are-executable" },
+  { id = "check-added-large-files", args = ["--maxkb=1024"] },
+  { id = "forbid-new-submodules" },
+  { id = "detect-private-key" },
+  # AGENTS.md Hard rules 1–3：遊戲／登入器檔案、login.txt、.env、診斷與建置輸出
+  { id = "deny-filename-pattern", name = "forbid game and private files", args = [
+    '(?i)(\.exe$|\.wz$|(^|/)xcgui\.dll$|(^|/)login\.txt$|(^|/)\.env$|^(debug|build|dist)/)',
+  ] },
+  # macOS /bin/bash 3.2：沒有關聯陣列、mapfile/readarray、${var,,}/${var^^}
+  { id = "deny-pattern", alias = "bash32-compat", name = "bash 3.2 compatibility", files = '\.(sh|bash)$', args = [
+    '(declare|local|typeset)\s+-[a-zA-Z]*A|\b(mapfile|readarray)\b|\$\{[A-Za-z_][A-Za-z0-9_]*(,,?|\^\^?)\}',
+  ] },
+  # $name 緊接全形字元時 zh_TW locale 會把它當成變數名稱的一部分，要寫成 ${name}
+  { id = "deny-pattern", alias = "bash-brace-cjk", name = "brace variables before CJK text", files = '\.(sh|bash)$', args = [
+    '\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]',
+  ] },
+]
+
+# ---------- Shell ----------
+[[repos]]
+repo = "https://github.com/shellcheck-py/shellcheck-py"
+rev = "v0.11.0.1"
+hooks = [{ id = "shellcheck", args = ["--severity=warning"] }] # 與 tools/release.sh check 一致；-x 由 .shellcheckrc 開啟
+
+[[repos]]
+repo = "https://github.com/scop/pre-commit-shfmt"
+rev = "v3.14.1-1"
+hooks = [{ id = "shfmt" }] # 選項讀 .editorconfig
+
+# ---------- Python（tools/src 診斷工具） ----------
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.16.10"
+hooks = [
+  { id = "ruff-check", args = ["--fix"] },
+  { id = "ruff-format", types_or = ["python", "pyi"] },
+]
+
+# ---------- GitHub Actions ----------
+[[repos]]
+repo = "https://github.com/rhysd/actionlint"
+rev = "v1.7.12"
+hooks = [{ id = "actionlint" }]
+
+[[repos]]
+repo = "https://github.com/zizmorcore/zizmor-pre-commit"
+rev = "v1.30.1"
+hooks = [{ id = "zizmor" }]
+
+# ---------- 拼字、機密 ----------
+[[repos]]
+repo = "https://github.com/crate-ci/typos"
+rev = "v1.51.1"
+hooks = [{ id = "typos", args = ["--force-exclude"] }] # 只回報不自動改：誤判的自動修正會改壞指令參數
+
+[[repos]]
+repo = "https://github.com/gitleaks/gitleaks"
+rev = "v8.30.1"
+hooks = [{ id = "gitleaks" }]
+
+# ---------- Commit 訊息（AGENTS.md「Commits」） ----------
+[[repos]]
+repo = "https://github.com/crate-ci/committed"
+rev = "v1.1.11"
+hooks = [{ id = "committed" }] # 規則在 committed.toml
+
+# ---------- 本機 ----------
+[[repos]]
+repo = "local"
+hooks = [
+  # Definition of done #1：以 macOS 內建 bash 3.2 檢查語法
+  { id = "bash32-syntax", name = "bash 3.2 syntax check", language = "system", entry = "/bin/bash -n", types = ["shell"] },
+  # Swift：工具鏈內建的 swift-format，設定在 .swift-format
+  { id = "swift-format", name = "swift format", language = "system", entry = "swift format format --in-place --parallel", types = ["swift"] },
+  { id = "swift-format-lint", name = "swift format lint", language = "system", entry = "swift format lint --strict --parallel", types = ["swift"] },
+  # AGENTS.md Hard rule 6：預建 DLL 必須與 SHA256SUMS 一致
+  { id = "dll-sha256", name = "verify patches/bin SHA256SUMS", language = "system", entry = "bash -c 'cd patches/bin/x86_64-windows && shasum -a 256 -c --quiet ../SHA256SUMS'", files = '^patches/bin/', pass_filenames = false },
+  { id = "commit-body", name = "require commit message body", language = "system", entry = "bash tools/check-commit-body.sh", stages = ["commit-msg"] },
+]

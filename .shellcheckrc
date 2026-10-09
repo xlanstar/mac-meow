@@ -1,0 +1,3 @@
+# scripts/*.sh 會 source scripts/lib/common.sh、tools/lib.sh
+external-sources=true
+source-path=SCRIPTDIR

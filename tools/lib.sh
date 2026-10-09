@@ -9,8 +9,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=../scripts/lib/common.sh
 source "$ROOT/scripts/lib/common.sh"
 
-TOOLS_BIN="$ROOT/build/tools"   # tools/build.sh 的產物
-DEBUG_DIR="$ROOT/debug"         # 所有診斷輸出（.gitignore）
+TOOLS_BIN="$ROOT/build/tools" # tools/build.sh 的產物
+DEBUG_DIR="$ROOT/debug"       # 所有診斷輸出（.gitignore）
 
 # load_env：載入 repo 根目錄的 .env（本機設定，不提交；範本見 .env.example）。
 # 格式為每行 KEY=VALUE（可加 export、引號、# 註解）；已存在的環境變數優先，不會被覆蓋。
@@ -20,12 +20,13 @@ load_env() {
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%$'\r'}"
     [[ "$line" =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
-    key="${BASH_REMATCH[2]}"; val="${BASH_REMATCH[3]}"
+    key="${BASH_REMATCH[2]}"
+    val="${BASH_REMATCH[3]}"
     if [[ "$val" =~ ^\"([^\"]*)\"[[:space:]]*(#.*)?$ || "$val" =~ ^\'([^\']*)\'[[:space:]]*(#.*)?$ ]]; then
       val="${BASH_REMATCH[1]}"
     else
-      val="${val%%[[:space:]]#*}"                      # 去掉未加引號值後的註解
-      val="${val%"${val##*[![:space:]]}"}"              # 去掉結尾空白
+      val="${val%%[[:space:]]#*}"          # 去掉未加引號值後的註解
+      val="${val%"${val##*[![:space:]]}"}" # 去掉結尾空白
     fi
     [[ -n "${!key+x}" ]] && continue
     export "$key=$val"
@@ -36,7 +37,10 @@ load_env() {
 out_dir() {
   local d
   d="$DEBUG_DIR/$1-$(date +%Y%m%d-%H%M%S)"
-  ( umask 077; mkdir -p "$d" )
+  (
+    umask 077
+    mkdir -p "$d"
+  )
   echo "$d"
 }
 
@@ -49,7 +53,7 @@ maple_pids() {
 need_tool() {
   local t missing=()
   for t in "$@"; do [[ -x "$TOOLS_BIN/$t" ]] || missing+=("$t"); done
-  (( ${#missing[@]} == 0 )) || bash "$ROOT/tools/build.sh" "${missing[@]}"
+  ((${#missing[@]} == 0)) || bash "$ROOT/tools/build.sh" "${missing[@]}"
 }
 
 # 設定 LLVM_BIN／LLD_BIN／BISON_BIN（Homebrew：brew install llvm lld bison）；缺少時回傳 1。
@@ -60,7 +64,10 @@ llvm_paths() {
   LLD_BIN="${LLD_BIN:-$brew/opt/lld/bin}"
   # shellcheck disable=SC2034  # build-wine-dlls.sh 使用
   BISON_BIN="$brew/opt/bison/bin"
-  [[ -x "$LLVM_BIN/clang" && -x "$LLD_BIN/lld-link" ]] || { echo "缺少 Homebrew LLVM／lld（brew install llvm lld bison）" >&2; return 1; }
+  [[ -x "$LLVM_BIN/clang" && -x "$LLD_BIN/lld-link" ]] || {
+    echo "缺少 Homebrew LLVM／lld（brew install llvm lld bison）" >&2
+    return 1
+  }
   export LLVM_BIN LLD_BIN
 }
 
@@ -68,19 +75,27 @@ llvm_paths() {
 # GUI 類 Wine 程式從 agent shell／SSH 啟動會卡在 Cocoa 初始化；Terminal.app 是可靠的 Aqua 工作階段。
 # （launchctl managername、TERM_PROGRAM 在 agent shell 內也可能顯示 Aqua，無法用來判斷。）
 in_terminal() {
-  local timeout="$1"; shift
+  local timeout="$1"
+  shift
   local tmp rc
-  tmp="$(mktemp -d /tmp/macmeow-term.XXXXXX)"   # 路徑只含 ASCII，可直接放進 AppleScript 字串
+  tmp="$(mktemp -d /tmp/macmeow-term.XXXXXX)" # 路徑只含 ASCII，可直接放進 AppleScript 字串
   # 指令寫成腳本檔交給 bash 執行，避免參數經過 AppleScript 與 Terminal 預設 shell（zsh）兩層跳脫。
   {
     echo '#!/bin/bash'
-    printf '%q ' "$@"; echo '>"$(dirname "$0")/out" 2>&1'
+    printf '%q ' "$@"
+    echo '>"$(dirname "$0")/out" 2>&1'
     echo 'echo $? >"$(dirname "$0")/rc"'
   } >"$tmp/run.sh"
   /usr/bin/osascript -e "tell application \"Terminal\" to do script \"/bin/bash $tmp/run.sh; exit\"" >/dev/null
-  wait_until "$timeout" test -f "$tmp/rc" || { echo "Terminal 內的指令 ${timeout} 秒內未完成：$*" >&2; rm -rf "$tmp"; return 124; }
+  wait_until "$timeout" test -f "$tmp/rc" || {
+    echo "Terminal 內的指令 ${timeout} 秒內未完成：$*" >&2
+    rm -rf "$tmp"
+    return 124
+  }
   sleep 0.2
-  cat "$tmp/out"; rc="$(cat "$tmp/rc")"; rm -rf "$tmp"
+  cat "$tmp/out"
+  rc="$(cat "$tmp/rc")"
+  rm -rf "$tmp"
   return "${rc:-1}"
 }
 

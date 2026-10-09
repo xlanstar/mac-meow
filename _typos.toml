@@ -1,0 +1,7 @@
+[files]
+extend-exclude = ["patches/*.patch", "patches/bin/"]
+
+[default.extend-words]
+Fo = "Fo"         # clang-cl /Fo<輸出目錄>
+seh = "seh"       # Wine debug channel（WINEDEBUG=+seh）
+passin = "passin" # openssl -passin

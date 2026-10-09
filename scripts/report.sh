@@ -23,8 +23,10 @@ redact() {
 }
 
 app_version() {
-  if [[ -n "${MACMEOW_VERSION:-}" ]]; then echo "$MACMEOW_VERSION"
-  elif [[ -f "$SCRIPT_DIR/../VERSION" ]]; then echo "$(cat "$SCRIPT_DIR/../VERSION")（原始碼）"
+  if [[ -n "${MACMEOW_VERSION:-}" ]]; then
+    echo "$MACMEOW_VERSION"
+  elif [[ -f "$SCRIPT_DIR/../VERSION" ]]; then
+    echo "$(cat "$SCRIPT_DIR/../VERSION")（原始碼）"
   else echo "未知"; fi
 }
 
@@ -34,7 +36,7 @@ summary() {
   local cyder engine_manifest="$CYDER_ENGINE/engine-manifest.json" mem missing exe
   echo "- MacMeow：$(app_version)"
   echo "- macOS：$(/usr/bin/sw_vers -productVersion)（$(/usr/bin/sw_vers -buildVersion)）"
-  mem=$(( $(/usr/sbin/sysctl -n hw.memsize) / 1073741824 ))
+  mem=$(($(/usr/sbin/sysctl -n hw.memsize) / 1073741824))
   echo "- 晶片：$(/usr/sbin/sysctl -n machdep.cpu.brand_string)，記憶體 ${mem} GB"
   if [[ -e /Library/Apple/usr/share/rosetta/rosetta ]]; then echo "- Rosetta 2：已安裝"; else echo "- Rosetta 2：未安裝"; fi
   if cyder="$(find_cyder)"; then
@@ -55,14 +57,20 @@ summary() {
     exe="$GAME_DIR/MapleStory.exe"
     echo "- MapleStory.exe：$(/usr/bin/stat -f %z "$exe") bytes，sha256 $(sha256 "$exe" | /usr/bin/cut -c1-16)"
   fi
-  echo "- 修補：$( { bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check; bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check; } 2>&1 \
+  echo "- 修補：$({
+    bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check
+    bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check
+  } 2>&1 \
     | /usr/bin/paste -sd '|' - | /usr/bin/sed 's/|/，/g')"
   echo "- 狀態：$(bash "$SCRIPT_DIR/play.sh" status --porcelain 2>/dev/null \
     | /usr/bin/grep -vE '^(cyder|game_dir|missing_file)=' | /usr/bin/paste -sd ' ' -)"
 }
 
 log_tail() {
-  [[ -f "$1" ]] || { echo "（沒有記錄檔）"; return 0; }
+  [[ -f "$1" ]] || {
+    echo "（沒有記錄檔）"
+    return 0
+  }
   /usr/bin/tail -n "${2:-40}" "$1"
 }
 
@@ -89,7 +97,16 @@ bundle() {
 
 case "${1:-}" in
   "") summary | redact ;;
-  log) [[ $# -ge 2 ]] || die "用法：$0 log <記錄檔> [行數]"; log_tail "$2" "${3:-40}" | redact ;;
-  bundle) [[ $# -ge 2 ]] || die "用法：$0 bundle <輸出.zip> [記錄檔]"; bundle "$2" "${3:-}" ;;
-  *) echo "用法：$0 [log <記錄檔> [行數]|bundle <輸出.zip> [記錄檔]]" >&2; exit 64 ;;
+  log)
+    [[ $# -ge 2 ]] || die "用法：$0 log <記錄檔> [行數]"
+    log_tail "$2" "${3:-40}" | redact
+    ;;
+  bundle)
+    [[ $# -ge 2 ]] || die "用法：$0 bundle <輸出.zip> [記錄檔]"
+    bundle "$2" "${3:-}"
+    ;;
+  *)
+    echo "用法：$0 [log <記錄檔> [行數]|bundle <輸出.zip> [記錄檔]]" >&2
+    exit 64
+    ;;
 esac

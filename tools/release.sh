@@ -19,20 +19,24 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib.sh
 source "$ROOT/tools/lib.sh"
-load_env   # MACMEOW_SIGN_ID／MACMEOW_NOTARY_PROFILE（.env）；build 從 tag 建置時以環境變數傳給 build-app.sh
+load_env # MACMEOW_SIGN_ID／MACMEOW_NOTARY_PROFILE（.env）；build 從 tag 建置時以環境變數傳給 build-app.sh
 cd "$ROOT"
 
-die() { echo "錯誤：$*" >&2; exit 1; }
-ok()  { echo "  ✓ $*"; }
+die() {
+  echo "錯誤：$*" >&2
+  exit 1
+}
+ok() { echo "  ✓ $*"; }
 
 ver_valid() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
 # ver_gt a b：a > b
 ver_gt() {
   local IFS=. a b i
-  read -r -a a <<<"$1"; read -r -a b <<<"$2"
+  read -r -a a <<<"$1"
+  read -r -a b <<<"$2"
   for i in 0 1 2; do
-    (( a[i] > b[i] )) && return 0
-    (( a[i] < b[i] )) && return 1
+    ((a[i] > b[i])) && return 0
+    ((a[i] < b[i])) && return 1
   done
   return 1
 }
@@ -77,12 +81,12 @@ cmd_check() {
   ok "tag v${v} 尚未存在"
 
   n="$(changelog_section Unreleased | grep -c '^- ' || true)"
-  (( n > 0 )) || die "CHANGELOG.md 的 ## Unreleased 沒有任何項目"
+  ((n > 0)) || die "CHANGELOG.md 的 ## Unreleased 沒有任何項目"
   ok "Unreleased 有 ${n} 項"
 
   local f bad=0
   while IFS= read -r f; do bash -n "$f" || bad=1; done < <(git ls-files '*.sh')
-  (( bad == 0 )) || die "bash -n 失敗"
+  ((bad == 0)) || die "bash -n 失敗"
   ok "bash -n（$(git ls-files '*.sh' | wc -l | tr -d ' ') 個腳本）"
   if command -v shellcheck >/dev/null; then
     git ls-files 'scripts/*.sh' 'app/*.sh' | xargs shellcheck -x -S warning || die "shellcheck 有警告"
@@ -92,7 +96,7 @@ cmd_check() {
     -sdk "$(xcrun --sdk macosx --show-sdk-path)" app/Sources/*.swift || die "app/Sources 無法編譯"
   ok "swiftc -typecheck（app/Sources）"
 
-  ( cd patches/bin/x86_64-windows && shasum -a 256 -c ../SHA256SUMS >/dev/null ) || die "patches/bin/SHA256SUMS 與 DLL 不符"
+  (cd patches/bin/x86_64-windows && shasum -a 256 -c ../SHA256SUMS >/dev/null) || die "patches/bin/SHA256SUMS 與 DLL 不符"
   ok "patches/bin/SHA256SUMS"
 
   signing_check
@@ -126,11 +130,15 @@ verify_dmg() {
       || die "Gatekeeper 未認可 dmg（spctl --assess --type open --context context:primary-signature -vv）"
     ok "dmg：Notarized Developer ID"
   fi
-  chk="$(mktemp -d)"; mnt="$chk/mnt"
+  chk="$(mktemp -d)"
+  mnt="$chk/mnt"
   hdiutil attach -nobrowse -readonly -noautoopen -quiet -mountpoint "$mnt" "$dmg" || die "無法掛載 ${dmg}"
   ditto "$mnt/MacMeow.app" "$chk/MacMeow.app"
   [[ -L "$mnt/應用程式" && -f "$mnt/.DS_Store" && -f "$mnt/.background/background.tiff" ]] \
-    || { hdiutil detach -quiet "$mnt"; die "dmg 內缺少「應用程式」捷徑或視窗版面（.DS_Store、背景圖）"; }
+    || {
+      hdiutil detach -quiet "$mnt"
+      die "dmg 內缺少「應用程式」捷徑或視窗版面（.DS_Store、背景圖）"
+    }
   hdiutil detach -quiet "$mnt" || die "無法卸載 ${mnt}"
   codesign --verify --deep --strict "$chk/MacMeow.app" || die "dmg 內 App 簽章驗證失敗"
   ok "codesign"
@@ -151,7 +159,8 @@ cmd_build() {
   git rev-parse -q --verify "refs/tags/v$v" >/dev/null || die "找不到 tag v${v}，請先執行 prepare"
   src="$ROOT/build/release/$v"
   out="$ROOT/dist/release/$v"
-  rm -rf "$src" "$out"; mkdir -p "$src" "$out"
+  rm -rf "$src" "$out"
+  mkdir -p "$src" "$out"
 
   # 只用 tag 內已提交的檔案建置，避免工作目錄的未追蹤檔混入
   git archive "v$v" | tar -x -C "$src"
@@ -165,12 +174,12 @@ cmd_build() {
 
   dmg="MacMeow-$v.dmg"
   cp "$src/dist/$dmg" "$out/"
-  ( cd "$out" && shasum -a 256 "$dmg" >"$dmg.sha256" )
+  (cd "$out" && shasum -a 256 "$dmg" >"$dmg.sha256")
 
   verify_dmg "$out/$dmg" "$v"
 
   {
-    changelog_section "$v" | awk 'NF{for(;b>0;b--)print ""; s=1; print; next} s{b++}'   # 去掉頭尾空行
+    changelog_section "$v" | awk 'NF{for(;b>0;b--)print ""; s=1; print; next} s{b++}' # 去掉頭尾空行
     echo
     echo "## 安裝"
     echo
@@ -200,7 +209,7 @@ cmd_publish() {
   git rev-parse -q --verify "refs/tags/v$v" >/dev/null || die "找不到 tag v${v}，請先執行 prepare"
   git remote get-url origin >/dev/null 2>&1 || die "尚未設定 git remote origin"
   [[ "$(git rev-parse "v$v^{commit}")" == "$(git rev-parse main)" ]] || echo "注意：tag v${v} 不是 main 的最新 commit"
-  git push --atomic origin main "v$v"   # 兩者同時成功或同時失敗
+  git push --atomic origin main "v$v" # 兩者同時成功或同時失敗
   echo "已 push。GitHub Actions 會建置、簽章、公證並正式發佈 Release（gh run watch 或 repo 的 Actions 頁面）。"
 }
 
@@ -252,7 +261,7 @@ cmd_release() {
   # 驗證的是使用者實際會下載的附件，而非本機 dist/
   tmp="$(mktemp -d)"
   gh release download "v$v" --pattern "$dmg" --pattern "$dmg.sha256" -D "$tmp"
-  ( cd "$tmp" && shasum -a 256 -c "$dmg.sha256" >/dev/null ) || die "${dmg} 與 ${dmg}.sha256 不符"
+  (cd "$tmp" && shasum -a 256 -c "$dmg.sha256" >/dev/null) || die "${dmg} 與 ${dmg}.sha256 不符"
   ok "SHA-256"
   verify_dmg "$tmp/$dmg" "$v"
   rm -rf "$tmp"
@@ -263,15 +272,18 @@ cmd_release() {
 
 usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
 
-(( $# == 2 )) || { usage; exit 2; }
+(($# == 2)) || {
+  usage
+  exit 2
+}
 ver_valid "$2" || die "版本格式需為 X.Y.Z：$2"
 case "$1" in
-  check)   cmd_check "$2" ;;
+  check) cmd_check "$2" ;;
   prepare) cmd_prepare "$2" ;;
-  build)   cmd_build "$2" ;;
+  build) cmd_build "$2" ;;
   publish) cmd_publish "$2" ;;
-  ci)      cmd_ci "$2" ;;
-  draft)   cmd_draft "$2" ;;
+  ci) cmd_ci "$2" ;;
+  draft) cmd_draft "$2" ;;
   release) cmd_release "$2" ;;
   *) die "未知指令：$1" ;;
 esac

@@ -64,7 +64,8 @@ export WINEDEBUG="${WINEDEBUG:-$default_debug}${EXTRA_DEBUG:+,$EXTRA_DEBUG}"
 } | tee "$OUT/env.txt"
 
 # ---------- 啟動 ----------
-wineserver_kill; sleep 2
+wineserver_kill
+sleep 2
 cd "$GAME_DIR"
 if [[ "$mode" == server ]]; then
   /usr/bin/arch -x86_64 "$WINESERVER_BIN" -f -d1 2>"$OUT/server.log" &
@@ -75,7 +76,8 @@ fi
 stop() {
   trap '' INT TERM
   /usr/bin/arch -x86_64 "$WINESERVER_BIN" -k 2>/dev/null || true
-  echo; echo "已停止。紀錄：$OUT"
+  echo
+  echo "已停止。紀錄：$OUT"
   exit 0
 }
 trap stop INT TERM

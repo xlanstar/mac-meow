@@ -24,6 +24,17 @@ bash scripts/play.sh status                        # 通道／程序狀態
 bash scripts/patch-cyder-dlls.sh check             # 各修補也都有 check
 ```
 
+## 提交前檢查（prek）
+
+```sh
+brew install prek
+prek install            # 安裝 pre-commit 與 commit-msg hook
+prek run -a             # 對所有檔案執行
+prek update             # 更新 hook 版本（改寫 prek.toml 的 rev）
+```
+
+設定在 `prek.toml`；各工具的設定檔：`.editorconfig`（shfmt）、`.shellcheckrc`、`.swift-format`（工具鏈內建的 `swift format`）、`ruff.toml`、`_typos.toml`、`committed.toml`（commit 訊息格式）。除了 AGENTS.md 的 Hard rules（遊戲檔、`login.txt`、`.env`）、bash 3.2 相容與 `patches/bin/SHA256SUMS`，也檢查 commit 訊息必須有 body（`tools/check-commit-body.sh`）。shfmt、`swift format`、ruff 會直接改寫檔案，改完重新 `git add` 再提交。
+
 ## 重建 Wine DLL
 
 ```sh

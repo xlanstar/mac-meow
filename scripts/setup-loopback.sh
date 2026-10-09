@@ -26,7 +26,10 @@ has_alias() { [[ "$(/sbin/ifconfig lo0)" == *"inet $1 "* ]]; }
 cmd_status() {
   local ip missing=0
   for ip in "${LOOPBACK_IPS[@]}"; do
-    if has_alias "$ip"; then echo "OK      $ip"; else echo "MISSING $ip"; missing=1; fi
+    if has_alias "$ip"; then echo "OK      $ip"; else
+      echo "MISSING $ip"
+      missing=1
+    fi
   done
   if [[ -f "$PLIST" ]]; then echo "LaunchDaemon：已安裝（${PLIST}）"; else echo "LaunchDaemon：未安裝"; fi
   return $missing
@@ -50,7 +53,8 @@ cmd_install() {
 </dict>
 </plist>
 EOF
-  chown root:wheel "$PLIST"; chmod 644 "$PLIST"
+  chown root:wheel "$PLIST"
+  chmod 644 "$PLIST"
   launchctl bootout system "$PLIST" 2>/dev/null || true
   launchctl bootstrap system "$PLIST"
   for ip in "${LOOPBACK_IPS[@]}"; do
@@ -70,5 +74,8 @@ cmd_uninstall() {
 
 case "${1:-}" in
   install | uninstall | status) "cmd_$1" ;;
-  *) echo "用法：$0 install|uninstall|status" >&2; exit 64 ;;
+  *)
+    echo "用法：$0 install|uninstall|status" >&2
+    exit 64
+    ;;
 esac

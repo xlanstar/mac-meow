@@ -95,9 +95,13 @@ final class Launcher: ObservableObject {
 
         // 3. 已在執行
         if s.running {
-            let choice = await Dialog.ask("貓貓谷已經在執行中", "登入器或遊戲視窗仍開著。",
-                                          buttons: ["好", "全部關閉後重新啟動"])
-            guard choice == 1 else { phase = .idle; return }
+            let choice = await Dialog.ask(
+                "貓貓谷已經在執行中", "登入器或遊戲視窗仍開著。",
+                buttons: ["好", "全部關閉後重新啟動"])
+            guard choice == 1 else {
+                phase = .idle
+                return
+            }
             guard await stopAll(confirm: false) else { return }
         }
 
@@ -131,7 +135,7 @@ final class Launcher: ObservableObject {
         var exitCode: Int32 = -1
         for await event in Shell.script("play.sh", env: env) {
             switch event {
-            case let .line(line, isError):
+            case .line(let line, let isError):
                 if line.hasPrefix("@@STEP ") {
                     let parts = line.dropFirst(7).split(separator: " ", maxSplits: 1)
                     let message = parts.count > 1 ? String(parts[1]) : ""
@@ -142,7 +146,7 @@ final class Launcher: ObservableObject {
                     record(isError ? "! \(line)" : line)
                     if isError, !line.trimmingCharacters(in: .whitespaces).isEmpty { lastError = line }
                 }
-            case let .exit(code):
+            case .exit(let code):
                 exitCode = code
             }
         }
@@ -202,12 +206,16 @@ final class Launcher: ObservableObject {
         failedStep = nil
         phase = .working("正在設定本機網路位址…")
         record("設定本機網路位址（管理員權限）")
-        let result = await run(Shell.stream("/usr/bin/osascript", [
-            "-e", "on run argv",
-            "-e", "do shell script \"/bin/bash \" & quoted form of (item 1 of argv) & \" install\" with administrator privileges",
-            "-e", "end run",
-            AppPaths.script("setup-loopback.sh"),
-        ]))
+        let result = await run(
+            Shell.stream(
+                "/usr/bin/osascript",
+                [
+                    "-e", "on run argv",
+                    "-e",
+                    "do shell script \"/bin/bash \" & quoted form of (item 1 of argv) & \" install\" with administrator privileges",
+                    "-e", "end run",
+                    AppPaths.script("setup-loopback.sh"),
+                ]))
         let s = await refresh()
         activeStep = nil
         guard s.loopback else {
@@ -247,12 +255,14 @@ final class Launcher: ObservableObject {
 
     func promptInstallCyder(inDownloads: Bool) async {
         if inDownloads {
-            await Dialog.ask("請把 Cyder 移到「應用程式」",
-                             "Cyder.app 目前在「下載項目」資料夾，macOS 會把它放到隔離位置執行，路徑不穩定。\n\n請把 Cyder.app 拖到「應用程式」資料夾，再按一次「開始遊戲」。")
+            await Dialog.ask(
+                "請把 Cyder 移到「應用程式」",
+                "Cyder.app 目前在「下載項目」資料夾，macOS 會把它放到隔離位置執行，路徑不穩定。\n\n請把 Cyder.app 拖到「應用程式」資料夾，再按一次「開始遊戲」。")
         } else {
-            let choice = await Dialog.ask("需要先安裝 Cyder",
-                                          "Cyder 是免費的 Wine 執行環境。請下載後把 Cyder.app 拖到「應用程式」資料夾，開啟一次讓它建立 Windows 環境，再回來按「開始遊戲」。",
-                                          buttons: ["開啟下載頁", "取消"])
+            let choice = await Dialog.ask(
+                "需要先安裝 Cyder",
+                "Cyder 是免費的 Wine 執行環境。請下載後把 Cyder.app 拖到「應用程式」資料夾，開啟一次讓它建立 Windows 環境，再回來按「開始遊戲」。",
+                buttons: ["開啟下載頁", "取消"])
             if choice == 0 { NSWorkspace.shared.open(AppPaths.cyderDownload) }
         }
     }
@@ -262,9 +272,10 @@ final class Launcher: ObservableObject {
     }
 
     private func openApp(_ path: String) {
-        NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path),
-                                           configuration: NSWorkspace.OpenConfiguration(),
-                                           completionHandler: nil)
+        NSWorkspace.shared.openApplication(
+            at: URL(fileURLWithPath: path),
+            configuration: NSWorkspace.OpenConfiguration(),
+            completionHandler: nil)
     }
 
     // MARK: - 記錄
@@ -284,7 +295,7 @@ final class Launcher: ObservableObject {
 
     /// 從啟動失敗畫面回報：帶入失敗的步驟與錯誤訊息。
     func reportFailure() {
-        guard case let .failed(message) = phase else { return reportBug() }
+        guard case .failed(let message) = phase else { return reportBug() }
         let step = failedStep.map { "在「\($0.title)」步驟" } ?? ""
         bugReport = BugReportContext(category: .launch, details: "啟動\(step)失敗，App 顯示：\n\(message)\n\n")
     }
@@ -312,10 +323,10 @@ final class Launcher: ObservableObject {
         var result = ShellResult()
         for await event in events {
             switch event {
-            case let .line(line, isError):
+            case .line(let line, let isError):
                 record(isError ? "! \(line)" : line)
                 if isError { result.errors.append(line) } else { result.lines.append(line) }
-            case let .exit(code):
+            case .exit(let code):
                 result.status = code
             }
         }
@@ -327,13 +338,15 @@ final class Launcher: ObservableObject {
 @MainActor
 enum Dialog {
     @discardableResult
-    static func ask(_ title: String, _ message: String, buttons: [String] = ["好"],
-                    style: NSAlert.Style = .informational, destructive: Bool = false) async -> Int {
+    static func ask(
+        _ title: String, _ message: String, buttons: [String] = ["好"],
+        style: NSAlert.Style = .informational, destructive: Bool = false
+    ) async -> Int {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = style
-        buttons.forEach { alert.addButton(withTitle: $0) }
+        for title in buttons { alert.addButton(withTitle: title) }
         if destructive { alert.buttons.first?.hasDestructiveAction = true }
         let response: NSApplication.ModalResponse
         if let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey }) {

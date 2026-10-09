@@ -13,7 +13,7 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
 SRC="$ROOT/tools/src/machstack"
-export SYMX86="$TOOLS_BIN/symx86"   # symbolize.py 使用
+export SYMX86="$TOOLS_BIN/symx86" # symbolize.py 使用
 
 pids="$(maple_pids)"
 
@@ -72,9 +72,9 @@ mode_sample() {
     echo "取樣 MapleStory.exe PID=${pid}（3 秒，不會結束程序）"
     rc=0
     /usr/bin/sample "$pid" 3 10 -file "$out/sample-$pid.txt" >"$out/sample-$pid-status.txt" 2>&1 || rc=$?
-    (( rc == 0 )) && continue
+    ((rc == 0)) && continue
     status=1
-    if (( rc > 128 )); then
+    if ((rc > 128)); then
       echo "sample 被 signal $((rc - 128)) 結束（工具本身失敗，不代表遊戲崩潰；見 ~/Library/Logs/DiagnosticReports/sample-*.ips）。改用 tools/stack.sh mach。" >&2
     else
       echo "sample 失敗（exit ${rc}，程序可能已退出），詳見 ${out}/sample-${pid}-status.txt" >&2
@@ -84,8 +84,12 @@ mode_sample() {
   return $status
 }
 
-mode="${1:-mach}"; shift || true
+mode="${1:-mach}"
+shift || true
 case "$mode" in
   mach | prof | lldb | sample) "mode_$mode" "$@" ;;
-  *) echo "用法：$0 mach|prof|lldb|sample [參數]" >&2; exit 64 ;;
+  *)
+    echo "用法：$0 mach|prof|lldb|sample [參數]" >&2
+    exit 64
+    ;;
 esac

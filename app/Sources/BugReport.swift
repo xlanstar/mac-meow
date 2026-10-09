@@ -164,7 +164,8 @@ final class BugReporter: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let out = AppPaths.reportsDir.appendingPathComponent("MacMeow-report-\(formatter.string(from: Date())).zip")
-        let result = await Shell.collect(Shell.script("report.sh", ["bundle", out.path, AppPaths.logFile.path], env: env))
+        let result = await Shell.collect(
+            Shell.script("report.sh", ["bundle", out.path, AppPaths.logFile.path], env: env))
         return result.ok ? out : nil
     }
 }
@@ -194,7 +195,7 @@ struct BugReportView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 14)
             Divider()
-            if case let .done(zip) = reporter.stage {
+            if case .done(let zip) = reporter.stage {
                 DoneView(reporter: reporter, zip: zip) { dismiss() }
             } else {
                 ScrollView { form.padding(22) }
@@ -247,12 +248,14 @@ struct BugReportView: View {
                     .modifier(FieldBox())
             }
             FieldSection("發生了什麼") {
-                PlaceholderEditor(text: $reporter.details,
-                                  placeholder: "看到什麼畫面或錯誤訊息？預期應該發生什麼？", height: 96)
+                PlaceholderEditor(
+                    text: $reporter.details,
+                    placeholder: "看到什麼畫面或錯誤訊息？預期應該發生什麼？", height: 96)
             }
             FieldSection("重現步驟", optional: true) {
-                PlaceholderEditor(text: $reporter.steps,
-                                  placeholder: "1. 開啟 App\n2. 按「開始遊戲」\n3. …", height: 64)
+                PlaceholderEditor(
+                    text: $reporter.steps,
+                    placeholder: "1. 開啟 App\n2. 按「開始遊戲」\n3. …", height: 64)
             }
             diagnostics
         }
@@ -302,7 +305,9 @@ struct BugReportView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Button { reporter.copyReport() } label: {
+            Button {
+                reporter.copyReport()
+            } label: {
                 Label("複製報告", systemImage: "doc.on.doc")
             }
             .help("沒有 GitHub 帳號時，可以複製後貼給協助你的人")
@@ -310,7 +315,9 @@ struct BugReportView: View {
             Spacer()
             Button("取消") { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Button { Task { await reporter.submit() } } label: {
+            Button {
+                Task { await reporter.submit() }
+            } label: {
                 HStack(spacing: 6) {
                     if reporter.stage == .submitting {
                         ProgressView().controlSize(.small).colorScheme(.dark)
@@ -444,8 +451,10 @@ private struct FieldBox: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(8)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.6),
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(
+                Color(nsColor: .textBackgroundColor).opacity(0.6),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.primary.opacity(0.1)))
     }
 }

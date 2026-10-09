@@ -1,0 +1,9 @@
+# Commit 訊息規則（AGENTS.md「Commits」），由 prek 的 commit-msg hook 執行。
+style = "conventional"
+allowed_types = ["feat", "fix", "perf", "refactor", "docs", "build", "test", "chore"]
+subject_length = 72
+line_length = 72
+subject_capitalized = false
+subject_not_punctuated = true
+imperative_subject = true
+merge_commit = false

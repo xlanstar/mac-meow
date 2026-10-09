@@ -7,8 +7,11 @@ import CoreText
 import Foundation
 import ImageIO
 
-let W: CGFloat = 640, H: CGFloat = 400
-let appX: CGFloat = 170, linkX: CGFloat = 470, iconY: CGFloat = 205   // 圖示中心（與 build-app.sh 相同）
+let canvasWidth: CGFloat = 640
+let canvasHeight: CGFloat = 400
+let appX: CGFloat = 170
+let linkX: CGFloat = 470
+let iconY: CGFloat = 205  // 圖示中心（與 build-app.sh 相同）
 
 let output = URL(fileURLWithPath: CommandLine.arguments[1])
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
@@ -19,17 +22,18 @@ func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor 
 }
 
 /// 以 y 從上往下的座標轉成 CoreGraphics（原點左下）。
-func p(_ x: CGFloat, _ yTop: CGFloat) -> CGPoint { CGPoint(x: x, y: H - yTop) }
+func p(_ x: CGFloat, _ yTop: CGFloat) -> CGPoint { CGPoint(x: x, y: canvasHeight - yTop) }
 
 /// 置中繪製一行文字；yTop 是基線位置。
 func text(_ ctx: CGContext, _ s: String, size: CGFloat, weight: String, alpha: CGFloat, yTop: CGFloat) {
     let font = CTFontCreateWithName("PingFangTC-\(weight)" as CFString, size, nil)
     let attrs: [CFString: Any] = [kCTFontAttributeName: font, kCTForegroundColorAttributeName: rgb(1, 1, 1, alpha)]
-    let line = CTLineCreateWithAttributedString(NSAttributedString(string: s, attributes: attrs as [NSAttributedString.Key: Any]))
+    let line = CTLineCreateWithAttributedString(
+        NSAttributedString(string: s, attributes: attrs as [NSAttributedString.Key: Any]))
     let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -1), blur: 3, color: rgb(0.25, 0.05, 0.2, 0.35))
-    ctx.textPosition = p((W - width) / 2, yTop)
+    ctx.textPosition = p((canvasWidth - width) / 2, yTop)
     CTLineDraw(line, ctx)
     ctx.restoreGState()
 }
@@ -51,13 +55,18 @@ func paw(_ ctx: CGContext, center c: CGPoint, size: CGFloat, deg: CGFloat) {
 
 func draw(_ ctx: CGContext) {
     // 底色：App 圖示的橘粉色延伸到梅紫；中段亮度讓 Finder 的淺色／深色模式標籤文字都看得清楚
-    let bg = CGGradient(colorsSpace: sRGB,
-                        colors: [rgb(0.98, 0.62, 0.42), rgb(0.86, 0.40, 0.48), rgb(0.50, 0.30, 0.60)] as CFArray,
-                        locations: [0, 0.5, 1])!
-    ctx.drawLinearGradient(bg, start: p(0, 0), end: p(W * 0.35, H), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
-    let glow = CGGradient(colorsSpace: sRGB, colors: [rgb(1, 1, 1, 0.25), rgb(1, 1, 1, 0)] as CFArray, locations: [0, 1])!
-    ctx.drawRadialGradient(glow, startCenter: p(W / 2, iconY), startRadius: 0,
-                           endCenter: p(W / 2, iconY), endRadius: 300, options: [])
+    let bg = CGGradient(
+        colorsSpace: sRGB,
+        colors: [rgb(0.98, 0.62, 0.42), rgb(0.86, 0.40, 0.48), rgb(0.50, 0.30, 0.60)] as CFArray,
+        locations: [0, 0.5, 1])!
+    ctx.drawLinearGradient(
+        bg, start: p(0, 0), end: p(canvasWidth * 0.35, canvasHeight),
+        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+    let glow = CGGradient(
+        colorsSpace: sRGB, colors: [rgb(1, 1, 1, 0.25), rgb(1, 1, 1, 0)] as CFArray, locations: [0, 1])!
+    ctx.drawRadialGradient(
+        glow, startCenter: p(canvasWidth / 2, iconY), startRadius: 0,
+        endCenter: p(canvasWidth / 2, iconY), endRadius: 300, options: [])
 
     // 淡淡的大貓掌點綴
     ctx.setFillColor(rgb(1, 1, 1, 0.06))
@@ -85,8 +94,10 @@ func draw(_ ctx: CGContext) {
 }
 
 for (name, scale) in [("background.png", 1), ("background@2x.png", 2)] {
-    let ctx = CGContext(data: nil, width: Int(W) * scale, height: Int(H) * scale, bitsPerComponent: 8, bytesPerRow: 0,
-                        space: sRGB, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    let ctx = CGContext(
+        data: nil, width: Int(canvasWidth) * scale, height: Int(canvasHeight) * scale, bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: sRGB, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
     ctx.interpolationQuality = .high
     ctx.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
     draw(ctx)
@@ -95,7 +106,8 @@ for (name, scale) in [("background.png", 1), ("background@2x.png", 2)] {
         fatalError("無法寫入 \(url.path)")
     }
     let dpi = 72 * scale
-    CGImageDestinationAddImage(dest, ctx.makeImage()!,
-                               [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary)
+    CGImageDestinationAddImage(
+        dest, ctx.makeImage()!,
+        [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary)
     guard CGImageDestinationFinalize(dest) else { fatalError("無法寫入 \(url.path)") }
 }

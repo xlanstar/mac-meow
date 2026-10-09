@@ -1,0 +1,8 @@
+# tools/src 診斷工具的 Python 設定（macOS 內建 python3 為 3.9）。
+target-version = "py39"
+line-length = 100
+
+[lint]
+extend-select = ["I", "N", "RUF", "PTH", "C4", "RET"]
+# 註解與訊息使用繁體中文（AGENTS.md），全形標點是刻意的
+ignore = ["RUF001", "RUF002", "RUF003"]

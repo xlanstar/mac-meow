@@ -45,23 +45,26 @@ enum Shell {
         var result = ShellResult()
         for await event in events {
             switch event {
-            case let .line(line, isError):
+            case .line(let line, let isError):
                 if isError { result.errors.append(line) } else { result.lines.append(line) }
-            case let .exit(status):
+            case .exit(let status):
                 result.status = status
             }
         }
         return result
     }
 
-    private static func runBlocking(_ executable: String, _ args: [String], env: [String: String],
-                                    onLine: @escaping (String, Bool) -> Void) -> Int32 {
+    private static func runBlocking(
+        _ executable: String, _ args: [String], env: [String: String],
+        onLine: @escaping (String, Bool) -> Void
+    ) -> Int32 {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = args
         process.environment = ProcessInfo.processInfo.environment.merging(env) { _, new in new }
         process.standardInput = FileHandle.nullDevice
-        let out = Pipe(), err = Pipe()
+        let out = Pipe()
+        let err = Pipe()
         process.standardOutput = out
         process.standardError = err
 
@@ -73,10 +76,10 @@ enum Shell {
                 let data = handle.availableData
                 if data.isEmpty {
                     handle.readabilityHandler = nil
-                    buffer.flush().forEach { onLine($0, isError) }
+                    for line in buffer.flush() { onLine(line, isError) }
                     group.leave()
                 } else {
-                    buffer.append(data).forEach { onLine($0, isError) }
+                    for line in buffer.append(data) { onLine(line, isError) }
                 }
             }
         }

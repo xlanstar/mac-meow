@@ -10,7 +10,8 @@ name="${2:-MapleStory}"
 mkdir -p "$(dirname "$out")"
 
 # 取標題相符的 wine 視窗中面積最大者；標題以 argv 傳入，避免字串拼接進 JavaScript。
-id="$(/usr/bin/osascript -l JavaScript - "$name" <<'JS'
+id="$(
+  /usr/bin/osascript -l JavaScript - "$name" <<'JS'
 ObjC.import('CoreGraphics');
 function run(argv) {
   var list = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(0, 0)));

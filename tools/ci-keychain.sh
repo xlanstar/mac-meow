@@ -10,7 +10,10 @@
 #   cleanup  刪除暫時鑰匙圈（同時從搜尋清單移除）
 set -euo pipefail
 
-die() { echo "錯誤：$*" >&2; exit 1; }
+die() {
+  echo "錯誤：$*" >&2
+  exit 1
+}
 [[ "${GITHUB_ACTIONS:-}" == true ]] || die "只能在 GitHub Actions 執行"
 [[ -n "${RUNNER_TEMP:-}" && -n "${GITHUB_ENV:-}" ]] || die "缺少 RUNNER_TEMP／GITHUB_ENV"
 
@@ -28,11 +31,14 @@ setup() {
   kc_pw="$(openssl rand -hex 24)"
   echo "::add-mask::$kc_pw"
   security create-keychain -p "$kc_pw" "$KC"
-  security set-keychain-settings -lut 21600 "$KC"   # 6 小時後自動上鎖
+  security set-keychain-settings -lut 21600 "$KC" # 6 小時後自動上鎖
   security unlock-keychain -p "$kc_pw" "$KC"
 
   p12="$RUNNER_TEMP/devid.p12"
-  ( umask 077; printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 -D >"$p12" )
+  (
+    umask 077
+    printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 -D >"$p12"
+  )
   security import "$p12" -k "$KC" -f pkcs12 -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign >/dev/null
   rm -f "$p12"
   g2="$RUNNER_TEMP/DeveloperIDG2CA.cer"
@@ -45,7 +51,9 @@ setup() {
   # 加到搜尋清單最前面（保留原有鑰匙圈），codesign 才找得到身分
   local list=("$KC")
   while IFS= read -r k; do
-    k="${k#"${k%%[![:space:]]*}"}"; k="${k#\"}"; k="${k%\"}"
+    k="${k#"${k%%[![:space:]]*}"}"
+    k="${k#\"}"
+    k="${k%\"}"
     [[ -n "$k" && "$k" != "$KC" ]] && list+=("$k")
   done < <(security list-keychains -d user)
   security list-keychains -d user -s "${list[@]}"
@@ -72,7 +80,10 @@ cleanup() {
 }
 
 case "${1:-}" in
-  setup)   setup ;;
+  setup) setup ;;
   cleanup) cleanup ;;
-  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *)
+    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
 esac

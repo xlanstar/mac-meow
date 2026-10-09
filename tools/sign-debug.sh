@@ -54,12 +54,16 @@ cmd_restore() {
     else
       echo "${f#"$CYDER_ENGINE"/}：目前不是除錯簽章版（engine 已更新？），只刪除過期備份"
     fi
-    rm -f "$f.macmeow-orig"; done=1
+    rm -f "$f.macmeow-orig"
+    done=1
   done
-  if (( done )); then echo "已還原原廠簽章"; else echo "除錯簽章：無備份"; fi
+  if ((done)); then echo "已還原原廠簽章"; else echo "除錯簽章：無備份"; fi
 }
 
 case "${1:-}" in
   status | apply | restore) "cmd_$1" ;;
-  *) echo "用法：$0 status|apply|restore" >&2; exit 64 ;;
+  *)
+    echo "用法：$0 status|apply|restore" >&2
+    exit 64
+    ;;
 esac

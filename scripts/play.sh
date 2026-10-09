@@ -15,7 +15,10 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 LAUNCHER_RE='貓貓TMS登入器\.exe|MapleStory\.exe'
 HELPER_RE='認證器\.exe|HostShield\.exe'
-SHIELD_RE="^($(IFS='|'; echo "${HOSTSHIELD_IPS[*]}" | /usr/bin/sed 's/\./\\./g')):"
+SHIELD_RE="^($(
+  IFS='|'
+  echo "${HOSTSHIELD_IPS[*]}" | /usr/bin/sed 's/\./\\./g'
+)):"
 
 proc_running() { /usr/bin/pgrep -f "$1" >/dev/null 2>&1; }
 
@@ -64,15 +67,20 @@ porcelain() {
 case "${1:-}" in
   status)
     if [[ "${2:-}" == --porcelain ]]; then porcelain; else status; fi
-    exit 0 ;;
+    exit 0
+    ;;
   stop)
     echo "關閉 Cyder 內所有 Windows 程式 ..."
     wineserver_kill
     wine_stopped || die "Wine 仍在執行，請稍後再試或在 Cyder 中結束。"
     echo "已全部關閉"
-    exit 0 ;;
+    exit 0
+    ;;
   "") ;;
-  *) echo "用法：$0 [status [--porcelain]|stop]" >&2; exit 64 ;;
+  *)
+    echo "用法：$0 [status [--porcelain]|stop]" >&2
+    exit 64
+    ;;
 esac
 
 # 1. 前置條件
@@ -89,7 +97,8 @@ cyder_ready || die "Cyder prefix 尚未初始化，請先開啟一次 Cyder"
 
 # 2. 前一次留下的程序：登入器或遊戲還在就不重複啟動；只剩 認證器／HostShield 殘留時，關閉整個 bottle。
 if proc_running "$LAUNCHER_RE"; then
-  echo "貓貓谷已在執行中（登入器或遊戲視窗仍開著）"; exit 0
+  echo "貓貓谷已在執行中（登入器或遊戲視窗仍開著）"
+  exit 0
 fi
 if proc_running "$HELPER_RE"; then
   progress cleanup "關閉前一次殘留的 認證器／HostShield ..."
@@ -123,7 +132,7 @@ case "${MAPLE_SYNC:-msync}" in
 esac
 progress settings "檢查 Cyder 設定 ..."
 [[ -f "$CYDER_SETTINGS" ]] || echo '{"schemaVersion":1}' >"$CYDER_SETTINGS"
-set_setting() {  # set_setting <key> <type> <value>
+set_setting() { # set_setting <key> <type> <value>
   [[ "$(cyder_setting "$1")" == "$3" ]] && return 0
   /usr/bin/plutil -replace "$1" "-$2" "$3" "$CYDER_SETTINGS"
   echo "已設定 Cyder：$1=$3"
@@ -143,7 +152,9 @@ progress launch "啟動 認證器.exe ..."
 /usr/bin/open -n -a "$CYDER" "$GAME_DIR/認證器.exe"
 progress tunnels "等待 HostShield 通道建立（最多 60 秒）..."
 if wait_until 60 tunnels_up; then
-  echo "通道已建立："; status; exit 0
+  echo "通道已建立："
+  status
+  exit 0
 fi
 echo "60 秒內沒看到全部通道監聽，請執行 bash scripts/play.sh status 檢查" >&2
 status

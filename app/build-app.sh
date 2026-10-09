@@ -15,18 +15,25 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/tools/lib.sh"
 load_env
 VERSION="$(cat "$ROOT/VERSION")"
-DIST="$ROOT/dist"; APP="$DIST/MacMeow.app"
+DIST="$ROOT/dist"
+APP="$DIST/MacMeow.app"
 RES="$APP/Contents/Resources"
 WORK="$ROOT/build/app"
-TARGET="arm64-apple-macos13.0"   # 與 Info.plist 的 LSMinimumSystemVersion 一致
+TARGET="arm64-apple-macos13.0" # 與 Info.plist 的 LSMinimumSystemVersion 一致
 
 command -v swiftc >/dev/null 2>&1 && xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1 \
-  || { echo "需要 Xcode 或 Command Line Tools：xcode-select --install" >&2; exit 1; }
+  || {
+    echo "需要 Xcode 或 Command Line Tools：xcode-select --install" >&2
+    exit 1
+  }
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 SIGN_ID="${MACMEOW_SIGN_ID:-}"
 NOTARY_PROFILE="${MACMEOW_NOTARY_PROFILE:-}"
 [[ -z "$NOTARY_PROFILE" || -n "$SIGN_ID" ]] \
-  || { echo "MACMEOW_NOTARY_PROFILE 需要搭配 MACMEOW_SIGN_ID（Developer ID Application 憑證）" >&2; exit 1; }
+  || {
+    echo "MACMEOW_NOTARY_PROFILE 需要搭配 MACMEOW_SIGN_ID（Developer ID Application 憑證）" >&2
+    exit 1
+  }
 NOTARY_AUTH=(--keychain-profile "$NOTARY_PROFILE")
 [[ -z "${MACMEOW_NOTARY_KEYCHAIN:-}" ]] || NOTARY_AUTH+=(--keychain "$MACMEOW_NOTARY_KEYCHAIN")
 
@@ -109,10 +116,14 @@ fi
 
 # retry <次數> <指令...>：hdiutil 偶爾回報 Resource busy（CI 常見），失敗時稍候重試
 retry() {
-  local n="$1" i; shift
-  for (( i = 1; ; i++ )); do
+  local n="$1" i
+  shift
+  for ((i = 1; ; i++)); do
     "$@" && return
-    (( i < n )) || { echo "失敗（已試 ${n} 次）：$*" >&2; return 1; }
+    ((i < n)) || {
+      echo "失敗（已試 ${n} 次）：$*" >&2
+      return 1
+    }
     sleep 3
   done
 }
@@ -160,12 +171,19 @@ on run argv
 end run
 OSA
   pid=$!
-  ( sleep 90; kill "$pid" 2>/dev/null ) & watchdog=$!
+  (
+    sleep 90
+    kill "$pid" 2>/dev/null
+  ) &
+  watchdog=$!
   wait "$pid" || rc=$?
   kill "$watchdog" 2>/dev/null || true
-  (( rc == 0 )) || return 1
+  ((rc == 0)) || return 1
   # Finder 非同步寫入 .DS_Store
-  for _ in $(seq 20); do [[ -f "$mnt/.DS_Store" ]] && return; sleep 0.5; done
+  for _ in $(seq 20); do
+    [[ -f "$mnt/.DS_Store" ]] && return
+    sleep 0.5
+  done
   return 1
 }
 
@@ -175,8 +193,12 @@ VOLNAME="貓貓谷 for Mac"
 LINK="應用程式"
 STAGE="$WORK/dmg"
 # 同名磁碟已掛載時 Finder 無法分辨要排版哪一個
-[[ ! -e "/Volumes/$VOLNAME" ]] || { echo "請先退出已掛載的「${VOLNAME}」磁碟" >&2; exit 1; }
-rm -rf "$STAGE" "$DMG"; mkdir -p "$STAGE/.background"
+[[ ! -e "/Volumes/$VOLNAME" ]] || {
+  echo "請先退出已掛載的「${VOLNAME}」磁碟" >&2
+  exit 1
+}
+rm -rf "$STAGE" "$DMG"
+mkdir -p "$STAGE/.background"
 ditto "$APP" "$STAGE/MacMeow.app"
 ln -s /Applications "$STAGE/$LINK"
 swiftc -O -sdk "$SDK" -o "$WORK/make-dmg-background" "$ROOT/app/make-dmg-background.swift"
@@ -186,10 +208,13 @@ tiffutil -cathidpicheck "$WORK/dmg-bg/background.png" "$WORK/dmg-bg/background@2
 
 RW="$WORK/MacMeow-rw.dmg"
 retry 3 hdiutil create -volname "$VOLNAME" -srcfolder "$STAGE" -fs HFS+ -format UDRW \
-  -size "$(( $(du -sm "$STAGE" | cut -f1) + 20 ))m" -ov -quiet "$RW"
+  -size "$(($(du -sm "$STAGE" | cut -f1) + 20))m" -ov -quiet "$RW"
 # 不指定 -mountpoint（/Volumes 只有 root 可寫），由系統掛載後讀回路徑
 MNT="$(retry 3 hdiutil attach "$RW" -readwrite -noverify -noautoopen | awk -F'\t' '$NF ~ /^\/Volumes\// {print $NF}')"
-[[ "$MNT" == "/Volumes/$VOLNAME" ]] || { echo "dmg 掛載位置不符：${MNT:-（無）}" >&2; exit 1; }
+[[ "$MNT" == "/Volumes/$VOLNAME" ]] || {
+  echo "dmg 掛載位置不符：${MNT:-（無）}" >&2
+  exit 1
+}
 if ! layout_dmg "$MNT"; then
   echo "警告：Finder 無法設定 dmg 視窗版面（需允許終端機控制 Finder：系統設定 → 隱私權與安全性 → 自動化），改用預設版面" >&2
 fi
@@ -212,8 +237,10 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   xcrun stapler validate "$DMG"
 fi
 
-if [[ -n "$NOTARY_PROFILE" ]]; then sig="Developer ID＋公證"
-elif [[ -n "$SIGN_ID" ]]; then sig="憑證簽章（未公證）"
+if [[ -n "$NOTARY_PROFILE" ]]; then
+  sig="Developer ID＋公證"
+elif [[ -n "$SIGN_ID" ]]; then
+  sig="憑證簽章（未公證）"
 else sig="ad-hoc（只適合自己用）"; fi
 echo "完成：${APP}（簽章：${sig}）"
 echo "      $DMG"

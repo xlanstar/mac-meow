@@ -10,7 +10,7 @@ MACMEOW_COMMON_LOADED=1
 # ---------- 路徑（可用環境變數覆寫） ----------
 GAME_DIR="${GAME_DIR:-$HOME/Games/MapleStory}"
 CYDER_ENGINE="${CYDER_ENGINE:-$HOME/.cyder/runtime/Engines/wine-x86_64}"
-CYDER_ENGINE="${CYDER_ENGINE%/}"   # wine_running 以最後一段目錄名比對，不能有結尾斜線
+CYDER_ENGINE="${CYDER_ENGINE%/}" # wine_running 以最後一段目錄名比對，不能有結尾斜線
 CYDER_SUPPORT="$HOME/Library/Application Support/Cyder"
 CYDER_SETTINGS="$CYDER_SUPPORT/settings.json"
 CYDER_PREFIX="$CYDER_SUPPORT/bottles/shared"
@@ -27,13 +27,19 @@ GAME_ALIAS_IP="202.80.104.28"
 LOOPBACK_IPS=("${HOSTSHIELD_IPS[@]}" "$GAME_ALIAS_IP")
 
 # ---------- 共用函式 ----------
-die() { echo "$*" >&2; exit 1; }
+die() {
+  echo "$*" >&2
+  exit 1
+}
 
 # 依序尋找 Cyder.app；找到則輸出路徑。
 find_cyder() {
   local c
   for c in /Applications/Cyder.app "$HOME/Applications/Cyder.app" "$HOME/Downloads/Cyder.app"; do
-    [[ -d "$c" ]] && { echo "$c"; return 0; }
+    [[ -d "$c" ]] && {
+      echo "$c"
+      return 0
+    }
   done
   return 1
 }
@@ -47,7 +53,10 @@ game_dir_valid() {
 # missing_game_file <dir>：輸出第一個缺少的檔名。
 missing_game_file() {
   local f
-  for f in "${GAME_FILES[@]}"; do [[ -f "$1/$f" ]] || { echo "$f"; return 0; }; done
+  for f in "${GAME_FILES[@]}"; do [[ -f "$1/$f" ]] || {
+    echo "$f"
+    return 0
+  }; done
   return 1
 }
 
@@ -64,7 +73,8 @@ vb6_installed() { [[ -f "$CYDER_PREFIX/drive_c/windows/syswow64/msvbvm60.dll" ]]
 
 # progress <id> <訊息>：顯示步驟訊息。MACMEOW_PROGRESS=1（MacMeow.app）時改輸出「@@STEP <id> <訊息>」供 App 解析。
 progress() {
-  local id="$1"; shift
+  local id="$1"
+  shift
   if [[ -n "${MACMEOW_PROGRESS:-}" ]]; then echo "@@STEP $id $*"; else echo "$*"; fi
 }
 
@@ -93,17 +103,21 @@ export_wine_env() {
 
 # 關閉 Cyder shared bottle 內所有 Windows 程式，並等 wineserver 結束（最多 15 秒；之後才能修改 engine）。
 wineserver_kill() {
-  ( export_wine_env; /usr/bin/arch -x86_64 "$WINESERVER_BIN" -k ) >/dev/null 2>&1 || true
+  (
+    export_wine_env
+    /usr/bin/arch -x86_64 "$WINESERVER_BIN" -k
+  ) >/dev/null 2>&1 || true
   wait_until 15 wine_stopped || true
 }
 
 # wait_until <秒數> <指令...>：約每秒檢查一次，直到指令成功（回傳 0）或超過秒數（回傳 1）。
 # 以經過時間計算，指令本身耗時也算在內。
 wait_until() {
-  local end=$((SECONDS + $1)); shift
+  local end=$((SECONDS + $1))
+  shift
   while :; do
     "$@" && return 0
-    (( SECONDS < end )) || return 1
+    ((SECONDS < end)) || return 1
     sleep 1
   done
 }

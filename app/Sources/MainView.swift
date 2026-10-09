@@ -35,8 +35,9 @@ private struct Backdrop: View {
     var body: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)
-            LinearGradient(colors: [Theme.orange.opacity(0.30), Theme.pink.opacity(0.12), .clear],
-                           startPoint: .topLeading, endPoint: UnitPoint(x: 0.7, y: 0.6))
+            LinearGradient(
+                colors: [Theme.orange.opacity(0.30), Theme.pink.opacity(0.12), .clear],
+                startPoint: .topLeading, endPoint: UnitPoint(x: 0.7, y: 0.6))
         }
         .ignoresSafeArea()
     }
@@ -105,9 +106,13 @@ private struct HeaderView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button { launcher.reportBug() } label: { HeaderIcon(symbol: "ladybug.fill") }
-                .buttonStyle(.plain)
-                .help("回報問題")
+            Button {
+                launcher.reportBug()
+            } label: {
+                HeaderIcon(symbol: "ladybug.fill")
+            }
+            .buttonStyle(.plain)
+            .help("回報問題")
             SettingsButton()
         }
     }
@@ -130,8 +135,12 @@ private struct SettingsButton: View {
         if #available(macOS 14, *) {
             SettingsLink { icon }.buttonStyle(.plain).help("設定")
         } else {
-            Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: { icon }
-                .buttonStyle(.plain).help("設定")
+            Button {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            } label: {
+                icon
+            }
+            .buttonStyle(.plain).help("設定")
         }
     }
     private var icon: some View { HeaderIcon(symbol: "gearshape.fill") }
@@ -149,26 +158,29 @@ private struct Hero {
 
 extension Launcher {
     fileprivate var hero: Hero {
-        if case let .working(message) = phase {
+        if case .working(let message) = phase {
             return Hero(title: "處理中", detail: message, busy: true)
         }
         if !status.loaded {
             return Hero(title: "檢查環境中", detail: "正在讀取 Cyder 與遊戲狀態…", busy: true)
         }
         if status.game {
-            return Hero(title: "遊戲執行中", detail: "祝你玩得愉快！關閉遊戲後可以從這裡再次啟動。",
-                        symbol: "gamecontroller.fill", tint: Theme.ok)
+            return Hero(
+                title: "遊戲執行中", detail: "祝你玩得愉快！關閉遊戲後可以從這裡再次啟動。",
+                symbol: "gamecontroller.fill", tint: Theme.ok)
         }
         if status.launcher {
-            return Hero(title: "登入器已開啟", detail: "在貓貓谷登入器按「開始遊戲」即可進入遊戲。",
-                        symbol: "checkmark.seal.fill", tint: Theme.ok)
+            return Hero(
+                title: "登入器已開啟", detail: "在貓貓谷登入器按「開始遊戲」即可進入遊戲。",
+                symbol: "checkmark.seal.fill", tint: Theme.ok)
         }
-        if case let .failed(message) = phase {
+        if case .failed(let message) = phase {
             return Hero(title: "啟動沒有完成", detail: message, symbol: "exclamationmark.triangle.fill", tint: .red)
         }
         if Step.checklist.contains(where: { row($0).state == .action }) {
-            return Hero(title: "需要設定", detail: "完成下方標示的項目，或直接按「開始遊戲」由程式一步步引導。",
-                        symbol: "wrench.and.screwdriver.fill")
+            return Hero(
+                title: "需要設定", detail: "完成下方標示的項目，或直接按「開始遊戲」由程式一步步引導。",
+                symbol: "wrench.and.screwdriver.fill")
         }
         return Hero(title: "準備就緒", detail: "按「開始遊戲」開啟貓貓谷登入器。")
     }
@@ -227,17 +239,23 @@ private struct HeroCard: View {
     @ViewBuilder private var actions: some View {
         if launcher.status.running && !launcher.isWorking {
             HStack(spacing: 10) {
-                Button { Task { await launcher.stopAll() } } label: {
+                Button {
+                    Task { await launcher.stopAll() }
+                } label: {
                     Label("全部關閉", systemImage: "stop.fill")
                 }
                 .buttonStyle(SecondaryButtonStyle(tint: .red))
-                Button { Task { await launcher.restart() } } label: {
+                Button {
+                    Task { await launcher.restart() }
+                } label: {
                     Label("重新啟動", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(SecondaryButtonStyle())
             }
         } else {
-            Button { Task { await launcher.start() } } label: {
+            Button {
+                Task { await launcher.start() }
+            } label: {
                 HStack(spacing: 8) {
                     if launcher.isWorking {
                         ProgressView().controlSize(.small).colorScheme(.dark)
@@ -297,21 +315,28 @@ extension Launcher {
         switch step {
         case .cyder:
             if s.cyderPath == nil {
-                result = (.action, "尚未安裝（免費的 Wine 執行環境）",
-                          RowAction(title: "下載") { NSWorkspace.shared.open(AppPaths.cyderDownload) })
+                result = (
+                    .action, "尚未安裝（免費的 Wine 執行環境）",
+                    RowAction(title: "下載") { NSWorkspace.shared.open(AppPaths.cyderDownload) }
+                )
             } else if s.cyderInDownloads {
-                result = (.action, "請移到「應用程式」資料夾",
-                          RowAction(title: "顯示") {
-                              NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: s.cyderPath!)])
-                          })
+                result = (
+                    .action, "請移到「應用程式」資料夾",
+                    RowAction(title: "顯示") {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: s.cyderPath!)])
+                    }
+                )
             } else {
                 result = (.ok, abbreviate(s.cyderPath!), nil)
             }
         case .prefix:
-            result = s.cyderReady
+            result =
+                s.cyderReady
                 ? (.ok, "已建立", nil)
-                : (.todo, "第一次啟動時由 Cyder 建立（約 1–3 分鐘）",
-                   s.cyderUsable ? RowAction(title: "開啟 Cyder") { [weak self] in self?.openCyder() } : nil)
+                : (
+                    .todo, "第一次啟動時由 Cyder 建立（約 1–3 分鐘）",
+                    s.cyderUsable ? RowAction(title: "開啟 Cyder") { [weak self] in self?.openCyder() } : nil
+                )
         case .gameDir:
             let choose = RowAction(title: s.gameDirValid ? "更改…" : "選擇…") { [weak self] in
                 Task { await self?.chooseGameDir() }
@@ -324,17 +349,22 @@ extension Launcher {
                 result = (.action, "缺少 \(s.missingFile ?? "必要檔案")", choose)
             }
         case .loopback:
-            result = s.loopback
+            result =
+                s.loopback
                 ? (.ok, "已設定，開機自動套用", nil)
-                : (.action, "需要管理員權限（只需一次）",
-                   RowAction(title: "設定…") { [weak self] in Task { await self?.setupLoopback() } })
+                : (
+                    .action, "需要管理員權限（只需一次）",
+                    RowAction(title: "設定…") { [weak self] in Task { await self?.setupLoopback() } }
+                )
         case .patch:
             result = s.patched ? (.ok, "已套用", nil) : (.todo, "啟動時自動套用", nil)
         case .vb6:
             result = s.vb6 ? (.ok, "已安裝", nil) : (.todo, "啟動時自動安裝（約 1–2 分鐘）", nil)
         case .tunnels:
-            result = s.tunnels >= s.tunnelsTotal ? (.ok, "\(s.tunnels)/\(s.tunnelsTotal)", nil)
-                                                 : (.todo, "\(s.tunnels)/\(s.tunnelsTotal)", nil)
+            result =
+                s.tunnels >= s.tunnelsTotal
+                ? (.ok, "\(s.tunnels)/\(s.tunnelsTotal)", nil)
+                : (.todo, "\(s.tunnels)/\(s.tunnelsTotal)", nil)
         }
         if !s.loaded { result.state = .unknown }
         if activeStep == step { result.state = .working }

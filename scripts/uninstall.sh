@@ -25,7 +25,7 @@ rm -rf "$HOME/Library/Application Support/MacMeow" "$HOME/Library/Logs/MacMeow" 
 /usr/bin/defaults delete tw.macmeow.launcher >/dev/null 2>&1 || true
 echo "已刪除 MacMeow.app 的設定與記錄"
 
-if (( rc )); then
+if ((rc)); then
   echo "部分步驟失敗，請檢查上方訊息後重新執行。" >&2
 else
   echo "完成。Cyder 的全域設定（wineLocale、graphicsBackend、msync、esync）保留；如需還原請在 Cyder 設定中調整。"
