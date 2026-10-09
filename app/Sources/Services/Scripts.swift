@@ -65,10 +65,10 @@ enum Scripts {
 
     // MARK: - update.sh
 
-    /// App 由 Homebrew 安裝時，更新用的 brew 指令；否則 nil。
+    /// `update.sh brew-command`：App 由 Homebrew 安裝時，更新用的 brew 指令；否則 nil。
     @MainActor
     static func homebrewUpdateCommand(app: String) async -> String? {
-        let result = await run("update.sh", ["homebrew", app]).collect()
+        let result = await run("update.sh", ["brew-command", app]).collect()
         return result.ok ? result.lastLine : nil
     }
 

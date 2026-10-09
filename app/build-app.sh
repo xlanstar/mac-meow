@@ -55,7 +55,9 @@ for s in play.sh report.sh setup-loopback.sh patch-cyder-loopback.sh patch-cyder
   cyder-settings.sh quarantine.sh launcher-dock.sh session.sh update.sh uninstall.sh; do
   install -m 755 "$ROOT/scripts/$s" "$RES/scripts/$s"
 done
-install -m 644 "$ROOT/scripts/lib/common.sh" "$RES/scripts/lib/common.sh"
+for f in "$ROOT"/scripts/lib/*.sh; do
+  install -m 644 "$f" "$RES/scripts/lib/${f##*/}"
+done
 cp -R "$ROOT/patches/bin/x86_64-windows" "$ROOT/patches/bin/SHA256SUMS" "$RES/patches/bin/"
 
 cat >"$APP/Contents/Info.plist" <<PLIST

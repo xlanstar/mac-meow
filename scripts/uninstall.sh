@@ -17,16 +17,12 @@
 #   uninstall.sh purge [<App PID>]             # 4；有 PID 時先等該程序結束（App 結束時會再寫入偏好設定）
 #   uninstall.sh brew-command <目前的 .app>    # App 由 Homebrew 安裝時輸出移除指令並回傳 0，否則回傳 1
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/common.sh
-source "$ROOT/scripts/lib/common.sh"
+source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
 
 STAGE_PREFIX="macmeow-uninstall."
 
-usage() { die "用法：uninstall.sh [cask|system|stage|purge [<App PID>]|brew-command <目前的 .app>]"; }
-
-# shellcheck disable=SC2329  # 由 wait_until 呼叫
-pid_gone() { ! kill -0 "$1" 2>/dev/null; }
+USAGE="[cask|system|stage|purge [<App PID>]|brew-command <目前的 .app>]"
 
 # 在終端機前景執行（sudo 才能讀密碼；背景 process group 讀 tty 會被 SIGTTIN 停住）。
 in_terminal_foreground() {
@@ -39,7 +35,7 @@ in_terminal_foreground() {
 # 以 root 執行 setup-loopback.sh uninstall。終端機前景用 sudo；其他情況（App、Homebrew 的子程序不在前景
 # process group、背景執行）改用系統的密碼對話框。
 remove_loopback() {
-  local script="$ROOT/scripts/setup-loopback.sh" state
+  local script="$MACMEOW_SCRIPTS/setup-loopback.sh" state
   state="$(bash "$script" installed)" || state=""
   case "$state" in
     no)
@@ -69,17 +65,17 @@ remove_loopback() {
 cmd_system() {
   local rc=0
   require_wine_stopped "執行移除"
-  bash "$ROOT/scripts/launcher-dock.sh" show || rc=1
-  bash "$ROOT/scripts/patch-cyder-loopback.sh" restore || rc=1
-  bash "$ROOT/scripts/patch-cyder-dlls.sh" restore || rc=1
-  bash "$ROOT/scripts/patch-cyder-winemac.sh" restore || rc=1
+  run_script launcher-dock.sh restore || rc=1
+  run_script patch-cyder-loopback.sh restore || rc=1
+  run_script patch-cyder-dlls.sh restore || rc=1
+  run_script patch-cyder-winemac.sh restore || rc=1
   # 除錯簽章是開發工具，只會由 repo 內的 tools/sign-debug.sh 套用；App 內沒有這個檔案
-  if [[ -f "$ROOT/tools/sign-debug.sh" ]]; then
-    bash "$ROOT/tools/sign-debug.sh" restore || rc=1
+  if [[ -f "$MACMEOW_ROOT/tools/sign-debug.sh" ]]; then
+    bash "$MACMEOW_ROOT/tools/sign-debug.sh" restore || rc=1
   fi
-  bash "$ROOT/scripts/cyder-settings.sh" restore || rc=1
+  run_script cyder-settings.sh restore || rc=1
   # 記錄在 MACMEOW_SUPPORT，必須在 purge 刪除它之前還原
-  bash "$ROOT/scripts/quarantine.sh" restore || rc=1
+  run_script quarantine.sh restore || rc=1
   remove_loopback || rc=1
   return $rc
 }
@@ -89,8 +85,8 @@ cmd_stage() {
   local dir tmp="${TMPDIR:-/tmp}"
   dir="$(/usr/bin/mktemp -d "${tmp%/}/${STAGE_PREFIX}XXXXXX")"
   mkdir -p "$dir/scripts/lib"
-  install -m 755 "$ROOT/scripts/uninstall.sh" "$dir/scripts/uninstall.sh"
-  install -m 644 "$ROOT/scripts/lib/common.sh" "$dir/scripts/lib/common.sh"
+  install -m 755 "$MACMEOW_SCRIPTS/uninstall.sh" "$dir/scripts/uninstall.sh"
+  install -m 644 "$MACMEOW_SCRIPTS/lib/common.sh" "$dir/scripts/lib/common.sh"
   echo "$dir/scripts/uninstall.sh"
 }
 
@@ -107,7 +103,7 @@ cmd_purge() {
   /usr/bin/defaults delete "$MACMEOW_BUNDLE_ID" >/dev/null 2>&1 || true
   echo "已刪除 MacMeow.app 的設定與記錄"
   # 由 stage 複製出來執行時刪除自己（整段已讀進記憶體）
-  [[ "$(basename "$ROOT")" != "$STAGE_PREFIX"* ]] || rm -rf "$ROOT"
+  [[ "${MACMEOW_ROOT##*/}" != "$STAGE_PREFIX"* ]] || rm -rf "$MACMEOW_ROOT"
 }
 
 # system 有任何步驟失敗就不 purge：quarantine.macmeow-orig 等還原記錄在 MACMEOW_SUPPORT，
@@ -163,15 +159,14 @@ cmd_cask() {
     stage) cmd_stage ;;
     purge)
       shift
-      (($# <= 1)) || usage
+      (($# <= 1)) || usage "$USAGE"
       cmd_purge "$@"
       ;;
     brew-command)
-      (($# == 2)) || usage
-      homebrew_app "$2" || exit 1
-      echo "brew uninstall --cask $MACMEOW_CASK"
+      (($# == 2)) || usage "$USAGE"
+      brew_command uninstall "$2" || exit 1
       ;;
-    *) usage ;;
+    *) usage "$USAGE" ;;
   esac
   exit
 }

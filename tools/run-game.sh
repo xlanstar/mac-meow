@@ -32,7 +32,7 @@ OUT="$(out_dir run)"
 LOG="$OUT/wine.log"
 
 # ---------- 環境 ----------
-export WINEPREFIX="$CYDER_PREFIX"
+export WINEPREFIX="$SHARED_BOTTLE"
 export LANG=zh_TW.UTF-8 LC_ALL=zh_TW.UTF-8 LC_CTYPE=zh_TW.UTF-8
 unset WINEMSYNC WINEESYNC
 case "$MACMEOW_SYNC" in

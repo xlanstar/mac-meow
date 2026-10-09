@@ -8,9 +8,8 @@
 #   bash scripts/report.sh bundle <輸出.zip> [記錄檔]   # 診斷檔：摘要、狀態、記錄、MacMeow 當機報告
 # 環境變數：MACMEOW_VERSION（App 版本；未設定時讀 repo 的 VERSION），以及 common.sh 的設定與路徑
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
-source "$SCRIPT_DIR/lib/common.sh"
+source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
 
 # 隱藏家目錄、任何 /Users/<名稱>，以及 HostShield 的通道 token（程序參數）。
 # 使用者名稱也會單獨出現（例如 lsof 的 USER 欄）；太短的名稱容易誤傷一般文字，只取代 3 個字元以上的。
@@ -25,8 +24,8 @@ redact() {
 app_version() {
   if [[ -n "${MACMEOW_VERSION:-}" ]]; then
     echo "$MACMEOW_VERSION"
-  elif [[ -f "$SCRIPT_DIR/../VERSION" ]]; then
-    echo "$(cat "$SCRIPT_DIR/../VERSION")（原始碼）"
+  elif [[ -f "$MACMEOW_ROOT/VERSION" ]]; then
+    echo "$(cat "$MACMEOW_ROOT/VERSION")（原始碼）"
   else echo "未知"; fi
 }
 
@@ -40,7 +39,8 @@ settings_summary() {
   echo "${out% }"
 }
 
-plist_value() { /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null || echo "?"; }
+# plist_or_unknown <檔案> <keypath>：同 plist_value，讀不到時輸出「?」。
+plist_or_unknown() { plist_value "$1" "$2" || echo "?"; }
 
 summary() {
   local cyder engine_manifest="$CYDER_ENGINE/engine-manifest.json" mem missing exe
@@ -50,12 +50,12 @@ summary() {
   echo "- 晶片：$(/usr/sbin/sysctl -n machdep.cpu.brand_string)，記憶體 ${mem} GB"
   if [[ -e /Library/Apple/usr/share/rosetta/rosetta ]]; then echo "- Rosetta 2：已安裝"; else echo "- Rosetta 2：未安裝"; fi
   if cyder="$(find_cyder)"; then
-    echo "- Cyder：$(plist_value "$cyder/Contents/Info.plist" CFBundleShortVersionString)（${cyder%/Cyder.app}）"
+    echo "- Cyder：$(plist_or_unknown "$cyder/Contents/Info.plist" CFBundleShortVersionString)（${cyder%/Cyder.app}）"
   else
     echo "- Cyder：未安裝"
   fi
   if [[ -f "$engine_manifest" ]]; then
-    echo "- Engine：$(plist_value "$engine_manifest" versionLabel)（CrossOver $(plist_value "$engine_manifest" base.crossover)、Wine $(plist_value "$engine_manifest" base.wine)）"
+    echo "- Engine：$(plist_or_unknown "$engine_manifest" versionLabel)（CrossOver $(plist_or_unknown "$engine_manifest" base.crossover)、Wine $(plist_or_unknown "$engine_manifest" base.wine)）"
   else
     echo "- Engine：未下載"
   fi
@@ -68,13 +68,13 @@ summary() {
     echo "- MapleStory.exe：$(/usr/bin/stat -f %z "$exe") bytes，sha256 $(sha256 "$exe" | /usr/bin/cut -c1-16)"
   fi
   echo "- 修補：$({
-    bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check
-    bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check
-    bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check
-    bash "$SCRIPT_DIR/launcher-dock.sh" status
+    run_script patch-cyder-loopback.sh check
+    run_script patch-cyder-dlls.sh check
+    run_script patch-cyder-winemac.sh check
+    run_script launcher-dock.sh check
   } 2>&1 \
     | /usr/bin/paste -sd '|' - | /usr/bin/sed 's/|/，/g')"
-  echo "- 狀態：$(bash "$SCRIPT_DIR/play.sh" status --porcelain 2>/dev/null \
+  echo "- 狀態：$(run_script play.sh status --porcelain 2>/dev/null \
     | /usr/bin/grep -vE '^(cyder|game_dir|missing_file)=' | /usr/bin/paste -sd ' ' -)"
 }
 
@@ -95,7 +95,7 @@ bundle() {
   dir="$work/$(basename "$out" .zip)"
   /bin/mkdir -p "$dir"
   summary | redact >"$dir/summary.md"
-  bash "$SCRIPT_DIR/play.sh" status 2>&1 | redact >"$dir/status.txt" || true
+  run_script play.sh status 2>&1 | redact >"$dir/status.txt" || true
   [[ -n "$log" && -f "$log" ]] && /usr/bin/tail -n 5000 "$log" | redact >"$dir/launcher.log"
   [[ -f "$MACMEOW_LOGS/session.log" ]] && /usr/bin/tail -n 2000 "$MACMEOW_LOGS/session.log" | redact >"$dir/session.log"
   # 最近 7 天 MacMeow.app 自己的當機報告
@@ -108,18 +108,16 @@ bundle() {
   echo "$out"
 }
 
+USAGE="[log <記錄檔> [行數]|bundle <輸出.zip> [記錄檔]]"
 case "${1:-}" in
   "") summary | redact ;;
   log)
-    [[ $# -ge 2 ]] || die "用法：$0 log <記錄檔> [行數]"
+    (($# >= 2)) || usage "$USAGE"
     log_tail "$2" "${3:-40}" | redact
     ;;
   bundle)
-    [[ $# -ge 2 ]] || die "用法：$0 bundle <輸出.zip> [記錄檔]"
+    (($# >= 2)) || usage "$USAGE"
     bundle "$2" "${3:-}"
     ;;
-  *)
-    echo "用法：$0 [log <記錄檔> [行數]|bundle <輸出.zip> [記錄檔]]" >&2
-    exit 64
-    ;;
+  *) usage "$USAGE" ;;
 esac

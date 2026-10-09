@@ -19,7 +19,7 @@ set -euo pipefail
 # shellcheck source=lib/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
 
-BACKUP="$CYDER_SETTINGS.macmeow-orig"
+BAK="$CYDER_SETTINGS.macmeow-orig"
 
 # 認證器.exe 的 D3DM_MAX_FPS（plutil keypath：perProfile.<id>.environment.D3DM_MAX_FPS）；遊戲資料夾沒有 認證器.exe 時不處理。
 D3DM_FPS_ENV_PATH="environment.D3DM_MAX_FPS"
@@ -84,7 +84,7 @@ wanted_value() {
 # is_ours <可能寫入的值> <目前值>：目前值是本專案可能寫入的值之一（值清單有空值時，空的目前值也算）。
 is_ours() { [[ "|$1|" == *"|$2|"* ]]; }
 
-setting_exists() { /usr/bin/plutil -extract "$1" raw -o - "$CYDER_SETTINGS" >/dev/null 2>&1; }
+setting_exists() { plist_value "$CYDER_SETTINGS" "$1" >/dev/null; }
 setting_is_dict() { /usr/bin/plutil -extract "$1" json -o - "$CYDER_SETTINGS" 2>/dev/null | /usr/bin/grep -q '^{'; }
 
 # ensure_parent_dicts <keypath>：建立 keypath 上層不存在的字典（perProfile.<id>.environment）。
@@ -122,7 +122,7 @@ mismatched_keys() {
 restore_key() {
   local key="$1" type="$2" values="$3" cur orig
   cur="$(cyder_setting "$key")"
-  if orig="$(/usr/bin/plutil -extract "$key" raw -o - "$BACKUP" 2>/dev/null)"; then
+  if orig="$(plist_value "$BAK" "$key")"; then
     [[ "$cur" == "$orig" ]] && return 0
     if ! is_ours "$values" "$cur"; then
       echo "Cyder 設定：${key} 已被改成 ${cur}，保留"
@@ -146,67 +146,68 @@ restore_key() {
 # 以 raw 列出 perProfile 的 key（字典的 raw 是每行一個 key）；xml1 遇到任何 null 值（JSON 的 null）都會失敗。
 d3dm_fps_keys() {
   local id
-  /usr/bin/plutil -extract perProfile raw -o - "$CYDER_SETTINGS" 2>/dev/null \
+  plist_value "$CYDER_SETTINGS" perProfile \
     | LC_ALL=C /usr/bin/grep -E '^profile-[0-9a-f]{24}$' | while read -r id; do
     setting_exists "perProfile.$id.$D3DM_FPS_ENV_PATH" && echo "perProfile.$id.$D3DM_FPS_ENV_PATH"
   done
   return 0
 }
 
-case "${1:-}" in
-  check)
-    resolve_wanted
-    [[ -z "$(mismatched_keys)" ]]
-    ;;
-  apply)
-    resolve_wanted
-    ((backend_fallback)) && echo "注意：D3DMetal 無法使用（需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK），改用 DXMT"
-    keys="$(mismatched_keys)"
-    [[ -n "$keys" ]] || exit 0
-    if [[ ! -f "$BACKUP" ]]; then
-      if [[ -f "$CYDER_SETTINGS" ]]; then cp -p "$CYDER_SETTINGS" "$BACKUP"; else echo '{}' >"$BACKUP"; fi
+cmd_check() {
+  resolve_wanted
+  [[ -z "$(mismatched_keys)" ]]
+}
+
+cmd_apply() {
+  local keys key value
+  resolve_wanted
+  ((backend_fallback)) && echo "注意：D3DMetal 無法使用（需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK），改用 DXMT"
+  keys="$(mismatched_keys)"
+  [[ -n "$keys" ]] || return 0
+  if [[ ! -f "$BAK" ]]; then
+    if [[ -f "$CYDER_SETTINGS" ]]; then cp -p "$CYDER_SETTINGS" "$BAK"; else echo '{}' >"$BAK"; fi
+  fi
+  [[ -f "$CYDER_SETTINGS" ]] || echo '{"schemaVersion":1}' >"$CYDER_SETTINGS"
+  for key in $keys; do
+    value="$(wanted_value "$key")"
+    if [[ -z "$value" ]]; then
+      remove_key "$key"
+      echo "已設定 Cyder：移除 ${key}"
+      continue
     fi
-    [[ -f "$CYDER_SETTINGS" ]] || echo '{"schemaVersion":1}' >"$CYDER_SETTINGS"
-    for key in $keys; do
-      value="$(wanted_value "$key")"
-      if [[ -z "$value" ]]; then
-        remove_key "$key"
-        echo "已設定 Cyder：移除 ${key}"
-        continue
-      fi
-      ensure_parent_dicts "$key"
-      /usr/bin/plutil -replace "$key" "-$(spec_field "$key" 2)" "$value" "$CYDER_SETTINGS"
-      echo "已設定 Cyder：${key}=${value}"
-    done
-    engine_running && echo "注意：Cyder 正在執行，設定要等全部遊戲關閉後才會生效"
-    exit 0
-    ;;
-  restore)
-    [[ -f "$BACKUP" ]] || {
-      echo "Cyder 設定：無備份"
-      exit 0
-    }
-    [[ -f "$CYDER_SETTINGS" ]] || {
-      echo "Cyder 設定：找不到 settings.json，只刪除備份"
-      rm -f "$BACKUP"
-      exit 0
-    }
-    while read -r key type values; do
-      [[ "$key" == "$d3dm_fps_key" ]] && continue # 下面與其他 profile 一起處理
-      restore_key "$key" "$type" "$values"
-    done <<<"$SPEC"
-    keys="$(
-      d3dm_fps_keys
-      [[ -n "$d3dm_fps_key" ]] && echo "$d3dm_fps_key"
-      true
-    )"
-    for key in $(echo "$keys" | /usr/bin/sort -u); do
-      restore_key "$key" string "$D3DM_FPS_VALUES"
-    done
-    rm -f "$BACKUP"
-    ;;
-  *)
-    echo "用法：$0 check|apply|restore" >&2
-    exit 64
-    ;;
+    ensure_parent_dicts "$key"
+    /usr/bin/plutil -replace "$key" "-$(spec_field "$key" 2)" "$value" "$CYDER_SETTINGS"
+    echo "已設定 Cyder：${key}=${value}"
+  done
+  engine_running && echo "注意：Cyder 正在執行，設定要等全部遊戲關閉後才會生效"
+  return 0
+}
+
+cmd_restore() {
+  local key type values
+  [[ -f "$BAK" ]] || {
+    echo "Cyder 設定：無備份"
+    return 0
+  }
+  [[ -f "$CYDER_SETTINGS" ]] || {
+    echo "Cyder 設定：找不到 settings.json，只刪除備份"
+    rm -f "$BAK"
+    return 0
+  }
+  while read -r key type values; do
+    [[ "$key" == "$d3dm_fps_key" ]] && continue # 下面與其他 profile 一起處理
+    restore_key "$key" "$type" "$values"
+  done <<<"$SPEC"
+  for key in $({
+    d3dm_fps_keys
+    [[ -z "$d3dm_fps_key" ]] || echo "$d3dm_fps_key"
+  } | /usr/bin/sort -u); do
+    restore_key "$key" string "$D3DM_FPS_VALUES"
+  done
+  rm -f "$BAK"
+}
+
+case "${1:-}" in
+  check | apply | restore) "cmd_$1" ;;
+  *) usage "check|apply|restore" ;;
 esac

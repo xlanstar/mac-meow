@@ -8,7 +8,7 @@
 
 ## 目錄分工
 
-- `scripts/`：使用者流程，會打包進 `MacMeow.app`，只能用 macOS 內建指令。共用路徑、常數與函式在 `scripts/lib/common.sh`（遊戲檔案清單、迴路位址、Cyder 路徑、`wine_running`、`wineserver_kill` 等），新增腳本請 source 它，不要重複定義。
+- `scripts/`：使用者流程，會打包進 `MacMeow.app`，只能用 macOS 內建指令。共用路徑、常數與函式在 `scripts/lib/common.sh`（遊戲檔案清單、迴路位址、Cyder 路徑、`wine_running`、`wineserver_kill` 等），新增腳本請 source 它，不要重複定義；子指令與用法錯誤依 `docs/architecture.md` 的「子指令慣例」。
 - `app/`：SwiftUI App（`app/Sources/`，Swift 5 語言模式、最低 macOS 13），由 `app/build-app.sh` 以 `swiftc` 編譯，不需要 Xcode 專案。App 只負責 UI：需要新狀態就加到 `play.sh` 的 `porcelain()` 並同步 `app/Sources/Core/EnvStatus.swift`；需要新進度就在腳本呼叫 `progress <id> <訊息>`，並在同一檔案的 `Step(progressID:)` 對應清單項目（`@@STEP`／`@@PROGRESS`／`@@WAIT` 標記只在 `Core/ScriptEvent.swift` 解析）；新的腳本呼叫加在 `Services/Scripts.swift`。
 - `tools/`：開發與診斷，可用 Xcode、Homebrew、`python3`。入口腳本放在 `tools/*.sh`，共用函式在 `tools/lib.sh`（建立在 `common.sh` 之上），原始碼在 `tools/src/<工具>/`，建置產物一律輸出到 `build/tools/`，診斷紀錄一律寫到 `debug/`。
 - 例外：`tools/sign-debug.sh` 會被 `scripts/uninstall.sh` 呼叫（只在 repo 內執行時；App 不打包 `tools/`），因此只用 macOS 內建指令。

@@ -1,7 +1,7 @@
 import AppKit
 
 /// 檢查與安裝更新：讀取 GitHub 最新正式版，「更新」交給 scripts/update.sh 下載、驗證並取代 App 後重新開啟；
-/// App 由 Homebrew 安裝時（`update.sh homebrew`）改為顯示 brew 的更新指令。
+/// App 由 Homebrew 安裝時（`update.sh brew-command`）改為顯示 brew 的更新指令。
 /// 偏好設定存在 App 的 UserDefaults（uninstall.sh 會刪除）。
 @MainActor
 final class Updater: ObservableObject {

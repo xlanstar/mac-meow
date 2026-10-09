@@ -8,7 +8,7 @@
 # 用法：
 #   sudo bash scripts/setup-loopback.sh install    # 立即生效並開機自動套用
 #   sudo bash scripts/setup-loopback.sh uninstall  # 移除
-#   bash scripts/setup-loopback.sh status          # 全部位址都在則回傳 0
+#   bash scripts/setup-loopback.sh check           # 全部位址都在則回傳 0
 #   bash scripts/setup-loopback.sh installed       # 有任何位址或 LaunchDaemon 輸出 yes，否則 no（uninstall.sh 判斷是否需要密碼）
 set -euo pipefail
 # shellcheck source=lib/common.sh
@@ -24,7 +24,7 @@ need_root() {
 # 不用 `ifconfig | grep -q`：pipefail 下 grep 提早結束可能讓 ifconfig 收到 SIGPIPE 而誤判。
 has_alias() { [[ "$(/sbin/ifconfig lo0)" == *"inet $1 "* ]]; }
 
-cmd_status() {
+cmd_check() {
   local ip missing=0
   for ip in "${LOOPBACK_IPS[@]}"; do
     if has_alias "$ip"; then echo "OK      $ip"; else
@@ -74,7 +74,7 @@ EOF
   for ip in "${LOOPBACK_IPS[@]}"; do
     has_alias "$ip" || /sbin/ifconfig lo0 alias "$ip" netmask 255.255.255.255 up
   done
-  cmd_status
+  cmd_check
 }
 
 cmd_uninstall() {
@@ -87,9 +87,6 @@ cmd_uninstall() {
 }
 
 case "${1:-}" in
-  install | uninstall | status | installed) "cmd_$1" ;;
-  *)
-    echo "用法：$0 install|uninstall|status|installed" >&2
-    exit 64
-    ;;
+  install | uninstall | check | installed) "cmd_$1" ;;
+  *) usage "install|uninstall|check|installed" ;;
 esac

@@ -10,11 +10,15 @@ MACMEOW_COMMON_LOADED=1
 # ---------- 路徑（可用環境變數覆寫；GAME_DIR 見下方「設定」） ----------
 CYDER_ENGINE="${CYDER_ENGINE:-$HOME/.cyder/runtime/Engines/wine-x86_64}"
 CYDER_ENGINE="${CYDER_ENGINE%/}" # 去掉結尾斜線，供路徑前綴比對（sign-debug.sh 等）
-CYDER_SUPPORT="$HOME/Library/Application Support/Cyder"
-CYDER_SETTINGS="$CYDER_SUPPORT/settings.json"
-CYDER_PREFIX="$CYDER_SUPPORT/bottles/shared"
+# Cyder 的資料夾與 shared bottle。不用 Cyder 腳本會讀取的 CYDER_SUPPORT、CYDER_PREFIX，避免影響 Cyder 的腳本。
+CYDER_SUPPORT_DIR="$HOME/Library/Application Support/Cyder"
+CYDER_SETTINGS="$CYDER_SUPPORT_DIR/settings.json"
+SHARED_BOTTLE="$CYDER_SUPPORT_DIR/bottles/shared"
 WINE_BIN="$CYDER_ENGINE/bin/wine"
 WINESERVER_BIN="$CYDER_ENGINE/bin/wineserver"
+# 本專案的檔案：scripts/（repo 或 MacMeow.app 的 Resources）與其上層（patches/、tools/）。
+MACMEOW_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MACMEOW_ROOT="${MACMEOW_SCRIPTS%/*}"
 # MacMeow 自己的設定與記錄（uninstall.sh 整個刪除；App 端路徑見 app/Sources/Services/AppPaths.swift）。
 MACMEOW_SUPPORT="$HOME/Library/Application Support/MacMeow"
 MACMEOW_LOGS="$HOME/Library/Logs/MacMeow"
@@ -111,6 +115,25 @@ die() {
   exit 1
 }
 
+# usage <子指令說明>：輸出用法並以 64（EX_USAGE）結束。
+usage() {
+  echo "用法：${0##*/} $*" >&2
+  exit 64
+}
+
+# run_script <腳本> [參數...]：執行 scripts/ 下的其他腳本。
+run_script() {
+  local script="$1"
+  shift
+  bash "$MACMEOW_SCRIPTS/$script" "$@"
+}
+
+# plist_value <檔案> <keypath>：plist 或 JSON 檔中的值（讀不到時回傳 1）。
+plist_value() { /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null; }
+
+# pid_gone <PID>：程序已結束（供 wait_until 使用）。
+pid_gone() { ! kill -0 "$1" 2>/dev/null; }
+
 # homebrew_app <.app>：App 由 Homebrew cask 安裝（update.sh、uninstall.sh 改為提示 brew 指令）。
 # 條件：任一 Homebrew prefix 有本 cask 的 Caskroom，且 App 位於該次安裝的 appdir（--appdir；
 # 記錄在 Caskroom/<token>/.metadata/config.json，優先序 explicit → env → default）；排除 dist/ 等其他位置的複本。
@@ -121,12 +144,18 @@ homebrew_app() {
     [[ -d "$room" ]] || continue
     dir=""
     for key in explicit env default; do
-      dir="$(/usr/bin/plutil -extract "$key.appdir" raw -o - "$room/.metadata/config.json" 2>/dev/null)" && break
+      dir="$(plist_value "$room/.metadata/config.json" "$key.appdir")" && break
       dir=""
     done
     [[ "$1" == "${dir:-/Applications}/MacMeow.app" ]] && return 0
   done
   return 1
+}
+
+# brew_command <upgrade|uninstall> <.app>：App 由 Homebrew 安裝時輸出對應的 brew 指令，否則回傳 1。
+brew_command() {
+  homebrew_app "$2" || return 1
+  echo "brew $1 --cask $MACMEOW_CASK"
 }
 
 # 依序尋找 Cyder.app；找到則輸出路徑。
@@ -158,9 +187,7 @@ missing_game_file() {
 }
 
 # cyder_setting <key>：讀取 Cyder settings.json 的值（不存在則輸出空字串）。
-cyder_setting() {
-  /usr/bin/plutil -extract "$1" raw -o - "$CYDER_SETTINGS" 2>/dev/null || true
-}
+cyder_setting() { plist_value "$CYDER_SETTINGS" "$1" || true; }
 
 # gptk_complete <GPTK 目錄>：external/libd3dshared.dylib 可讀、external/D3DMetal.framework 存在
 # （與 Cyder 的 cyder_d3dmetal_launch_allowed 檢查的檔案相同；tools/run-game.sh 也使用）。
@@ -174,7 +201,7 @@ d3dmetal_available() {
   version="$(/usr/bin/sw_vers -productVersion 2>/dev/null)" || return 1
   major="${version%%.*}"
   [[ "$major" =~ ^[0-9]+$ ]] && ((major >= 14)) || return 1
-  for root in "$CYDER_SUPPORT/runtime/apple_gptk" /Applications/CrossOver.app/Contents/SharedSupport/CrossOver/lib64/apple_gptk; do
+  for root in "$CYDER_SUPPORT_DIR/runtime/apple_gptk" /Applications/CrossOver.app/Contents/SharedSupport/CrossOver/lib64/apple_gptk; do
     gptk_complete "$root" && return 0
   done
   return 1
@@ -191,10 +218,10 @@ cyder_profile_id() {
 }
 
 # Cyder 已建立 Windows 環境（shared bottle）且 engine 已下載。
-cyder_ready() { [[ -f "$CYDER_PREFIX/system.reg" && -x "$WINE_BIN" ]]; }
+cyder_ready() { [[ -f "$SHARED_BOTTLE/system.reg" && -x "$WINE_BIN" ]]; }
 
 # 認證器.exe（VB6）需要的 runtime 已安裝。
-vb6_installed() { [[ -f "$CYDER_PREFIX/drive_c/windows/syswow64/msvbvm60.dll" ]]; }
+vb6_installed() { [[ -f "$SHARED_BOTTLE/drive_c/windows/syswow64/msvbvm60.dll" ]]; }
 
 # progress <id> <訊息>：顯示步驟訊息。MACMEOW_PROGRESS=1（MacMeow.app）時改輸出「@@STEP <id> <訊息>」供 App 解析。
 progress() {
@@ -211,7 +238,7 @@ progress() {
 wineservers() {
   local exe dev ino server=""
   exe="$(cd "$CYDER_ENGINE/bin" 2>/dev/null && pwd -P)/wineserver" || return 0
-  read -r dev ino < <(/usr/bin/stat -f '%d %i' "$CYDER_PREFIX" 2>/dev/null) && server="$(printf '/server-%x-%x' "$dev" "$ino")"
+  read -r dev ino < <(/usr/bin/stat -f '%d %i' "$SHARED_BOTTLE" 2>/dev/null) && server="$(printf '/server-%x-%x' "$dev" "$ino")"
   /usr/sbin/lsof -a -c '/^wineserver$/' -d cwd,txt -Fpfn 2>/dev/null | EXE="$exe" SERVER="$server" /usr/bin/awk '
     function flush() { if (ours) print pid, (shared ? "shared" : "other") }
     /^p/ { flush(); pid = substr($0, 2); ours = shared = 0 }
@@ -240,7 +267,7 @@ require_wine_stopped() {
 
 # 匯出 Wine client 需要的環境。client 必須與執行中的 wineserver 使用相同同步機制（依 Cyder 設定）。
 export_wine_env() {
-  export WINEPREFIX="$CYDER_PREFIX"
+  export WINEPREFIX="$SHARED_BOTTLE"
   # 與 Cyder 的 wineLocale=zh_TW 相同。Wine 依 locale 決定字碼頁；與 bottle 記錄的不同時（Fonts\Codepages），
   # 任何 Wine 程式啟動都會改寫語系相依的字型設定（FontSubstitutes 的 MS Shell Dlg 等），例如從 LANG=C 的 shell 執行 reg。
   export LANG=zh_TW.UTF-8 LC_ALL=zh_TW.UTF-8

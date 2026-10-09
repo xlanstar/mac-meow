@@ -10,9 +10,8 @@
 #   status   watch 在執行則回傳 0
 #   cleanup  結束 Cyder 遺留的 sentinel 程序（其啟動流程已結束、但程序沒有退出）
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
-source "$SCRIPT_DIR/lib/common.sh"
+source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
 
 PID_FILE="$MACMEOW_SUPPORT/session-watch.pid"
 LOG_FILE="$MACMEOW_LOGS/session.log"
@@ -95,7 +94,7 @@ count_procs() {
     END { print l + 0, g + 0, o + 0 }'
 }
 
-watch() {
+cmd_watch() {
   local pid server launcher game other launcher_seen=0 game_seen=0 ended=0 started=$SECONDS reason
   mkdir -p "$MACMEOW_SUPPORT"
   if pid="$(watcher_pid)"; then
@@ -140,31 +139,36 @@ watch() {
   wine_running || cleanup_sentinels
 }
 
+cmd_start() {
+  local pid
+  if pid="$(watcher_pid)"; then
+    echo "遊戲階段監看已在執行（PID ${pid}）"
+    return 0
+  fi
+  mkdir -p "$MACMEOW_LOGS"
+  # 與呼叫者（MacMeow.app／終端機）脫離：輸出寫入記錄檔，關閉 App 或終端機後仍繼續監看。
+  nohup /bin/bash "$MACMEOW_SCRIPTS/session.sh" watch </dev/null >>"$LOG_FILE" 2>&1 &
+  echo "已啟動遊戲階段監看：遊戲關閉後會自動關閉登入器與背景程式（記錄：${LOG_FILE}）"
+}
+
+cmd_close() {
+  stop_watcher
+  close_session
+}
+
+cmd_status() {
+  local pid
+  if pid="$(watcher_pid)"; then
+    echo "遊戲階段監看：執行中（PID ${pid}）"
+  else
+    echo "遊戲階段監看：未執行"
+    return 1
+  fi
+}
+
+cmd_cleanup() { wine_running || cleanup_sentinels; }
+
 case "${1:-}" in
-  start)
-    pid="$(watcher_pid)" && {
-      echo "遊戲階段監看已在執行（PID ${pid}）"
-      exit 0
-    }
-    mkdir -p "$MACMEOW_LOGS"
-    # 與呼叫者（MacMeow.app／終端機）脫離：輸出寫入記錄檔，關閉 App 或終端機後仍繼續監看。
-    nohup /bin/bash "$SCRIPT_DIR/session.sh" watch </dev/null >>"$LOG_FILE" 2>&1 &
-    echo "已啟動遊戲階段監看：遊戲關閉後會自動關閉登入器與背景程式（記錄：${LOG_FILE}）"
-    ;;
-  watch) watch ;;
-  close)
-    stop_watcher
-    close_session
-    ;;
-  status)
-    if pid="$(watcher_pid)"; then echo "遊戲階段監看：執行中（PID ${pid}）"; else
-      echo "遊戲階段監看：未執行"
-      exit 1
-    fi
-    ;;
-  cleanup) wine_running || cleanup_sentinels ;;
-  *)
-    echo "用法：$0 start|watch|close|status|cleanup" >&2
-    exit 64
-    ;;
+  start | watch | close | status | cleanup) "cmd_$1" ;;
+  *) usage "start|watch|close|status|cleanup" ;;
 esac

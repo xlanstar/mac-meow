@@ -9,18 +9,15 @@
 #   apply    套用；原檔備份為 *.macmeow-orig，並以 *.macmeow-applied 記錄裝上去的檔案雜湊
 #   restore  還原並刪除備份（engine 已更新時只刪除過期備份）
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/common.sh
-source "$ROOT/scripts/lib/common.sh"
+source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
 
-SRC_DIR="$ROOT/patches/bin/x86_64-windows"
-SUMS="$ROOT/patches/bin/SHA256SUMS"
+SRC_DIR="$MACMEOW_ROOT/patches/bin/x86_64-windows"
+SUMS="$MACMEOW_ROOT/patches/bin/SHA256SUMS"
 DST_DIR="$CYDER_ENGINE/lib/wine/x86_64-windows"
 REQUIRED_BASE="26.3.0"
 
-engine_base() {
-  /usr/bin/plutil -extract base.crossover raw -o - "$CYDER_ENGINE/engine-manifest.json" 2>/dev/null || echo unknown
-}
+engine_base() { plist_value "$CYDER_ENGINE/engine-manifest.json" base.crossover || echo unknown; }
 
 # 修補 DLL 必須與 SHA256SUMS 相符（避免套用損毀或未登記的建置）。
 verify_sources() {
@@ -93,8 +90,5 @@ cmd_restore() {
 
 case "${1:-}" in
   check | apply | restore) "cmd_$1" ;;
-  *)
-    echo "用法：$0 check|apply|restore" >&2
-    exit 64
-    ;;
+  *) usage "check|apply|restore" ;;
 esac
