@@ -3,7 +3,7 @@
 #
 # 用法：bash tools/release.sh <指令> <X.Y.Z>
 #   check    只做發佈前檢查（乾淨工作目錄、在 main、Unreleased 有內容、版本號遞增、
-#            tag 不存在、bash -n、patches/bin/SHA256SUMS、Homebrew cask 範本、簽章與公證設定）
+#            tag 不存在、bash -n、App 編譯與 Core 單元測試、patches/bin/SHA256SUMS、Homebrew cask 範本、簽章與公證設定）
 #   prepare  check 後改寫 CHANGELOG.md 與 VERSION，commit「chore(release): X.Y.Z」並建立 annotated tag vX.Y.Z（不 push）
 #   publish  push main 與 tag；GitHub Actions（.github/workflows/release.yml）接著執行 ci，正式發佈 Release
 #   ci       CI 專用：確認 tag 在 origin/main 上、VERSION 與 CHANGELOG 一致，再執行 build、draft、release 與 tap
@@ -122,6 +122,8 @@ cmd_check() {
   swiftc -typecheck -swift-version 5 -parse-as-library -target "$APP_SWIFT_TARGET" \
     -sdk "$(xcrun --sdk macosx --show-sdk-path)" "${APP_SOURCES[@]}" || die "app/Sources 無法編譯"
   ok "swiftc -typecheck（app/Sources）"
+  bash "$ROOT/tools/test-app.sh" >/dev/null || die "app/Sources/Core 單元測試失敗（bash tools/test-app.sh）"
+  ok "Core 單元測試（tools/test-app.sh）"
 
   (cd patches/bin/x86_64-windows && shasum -a 256 -c ../SHA256SUMS >/dev/null) || die "patches/bin/SHA256SUMS 與 DLL 不符"
   ok "patches/bin/SHA256SUMS"
