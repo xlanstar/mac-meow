@@ -15,6 +15,7 @@ struct MainView: View {
             HeaderView(launcher: launcher)
             HeroCard(launcher: launcher)
             ChecklistCard(launcher: launcher)
+            SyncCard(launcher: launcher)
             LogSection(launcher: launcher)
         }
         .padding(.horizontal, 22)
@@ -108,7 +109,6 @@ private struct HeaderView: View {
             }
             .buttonStyle(.plain)
             .help("回報問題")
-            SettingsButton()
         }
     }
 }
@@ -123,22 +123,6 @@ private struct HeaderIcon: View {
             .background(Circle().fill(Color.primary.opacity(0.06)))
             .contentShape(Circle())
     }
-}
-
-private struct SettingsButton: View {
-    var body: some View {
-        if #available(macOS 14, *) {
-            SettingsLink { icon }.buttonStyle(.plain).help("設定")
-        } else {
-            Button {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } label: {
-                icon
-            }
-            .buttonStyle(.plain).help("設定")
-        }
-    }
-    private var icon: some View { HeaderIcon(symbol: "gearshape.fill") }
 }
 
 // MARK: - 主要狀態與動作
@@ -437,6 +421,53 @@ private struct StateBadge: View {
         case .unknown:
             Image(systemName: "ellipsis.circle").foregroundStyle(.tertiary)
         }
+    }
+}
+
+// MARK: - Wine 設定
+
+private struct SyncCard: View {
+    @ObservedObject var launcher: Launcher
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Text("Wine 設定")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                if launcher.syncDirty {
+                    Text("下次「開始遊戲」時套用")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.15), value: launcher.syncDirty)
+            .padding(.bottom, 6)
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.orange)
+                    .frame(width: 22)
+                HStack(spacing: 4) {
+                    Text("同步機制").font(.system(size: 13, weight: .medium))
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .help("MSync 效能最好。寫入 Cyder 的全域設定，下次「開始遊戲」時套用；Cyder 正在執行時要全部關閉後才會生效。")
+                }
+                Spacer(minLength: 8)
+                Picker("同步機制", selection: $launcher.config.sync) {
+                    ForEach(SyncMode.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+            }
+            .padding(.vertical, 7)
+        }
+        .modifier(Card(padding: 14))
     }
 }
 

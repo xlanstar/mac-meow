@@ -28,6 +28,9 @@ final class Launcher: ObservableObject {
             Task { await refresh() }
         }
     }
+    /// 上次成功「開始遊戲」時套用的同步機制；與 config.sync 不同表示有尚未套用的變更。
+    @Published private(set) var appliedSync = AppConfig.load().sync
+    var syncDirty: Bool { config.sync != appliedSync }
 
     private let logFile = LogFile()
     private var pollTask: Task<Void, Never>?
@@ -129,6 +132,7 @@ final class Launcher: ObservableObject {
 
         // 6. play.sh：修補、VB6、Cyder 設定、啟動認證器並等待通道
         phase = .working("正在啟動貓貓谷…")
+        let sync = config.sync
         var env = config.environment
         env["MACMEOW_PROGRESS"] = "1"
         var lastError: String?
@@ -155,6 +159,7 @@ final class Launcher: ObservableObject {
         await refresh()
         if exitCode == 0 {
             phase = .launched
+            appliedSync = sync
             record("完成：登入器已啟動")
         } else {
             fail(lastStep, lastError ?? "啟動沒有完成。")

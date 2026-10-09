@@ -32,10 +32,6 @@ struct MacMeowApp: App {
                 Button("專案網頁") { NSWorkspace.shared.open(AppPaths.repo) }
             }
         }
-
-        Settings {
-            SettingsView(launcher: launcher)
-        }
     }
 }
 
