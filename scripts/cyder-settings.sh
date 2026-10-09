@@ -62,7 +62,7 @@ case "${1:-}" in
       /usr/bin/plutil -replace "$key" "-$type" "$value" "$CYDER_SETTINGS"
       echo "已設定 Cyder：${key}=${value}"
     done
-    wine_running && echo "注意：Cyder 正在執行，設定要等全部遊戲關閉後才會生效"
+    engine_running && echo "注意：Cyder 正在執行，設定要等全部遊戲關閉後才會生效"
     exit 0
     ;;
   restore)

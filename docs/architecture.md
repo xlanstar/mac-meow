@@ -19,7 +19,7 @@ MapleStory.exe → 202.80.104.28:37629（lo0 alias）
 
 使用者流程（只能用 macOS 內建指令）：
 
-- `scripts/lib/common.sh`：所有使用者腳本共用的路徑、常數（遊戲檔案、HostShield 與迴路位址）與函式（`wine_running`、`wineserver_kill` 等）。
+- `scripts/lib/common.sh`：所有使用者腳本共用的路徑、常數（遊戲檔案、HostShield 與迴路位址）與函式（`wine_running`、`wineserver_kill` 等）。wineserver 判斷分兩層：`engine_running` 是這個 engine 有任何 wineserver（所有 bottle 共用 engine，修改 engine 前以 `require_wine_stopped` 檢查）；`wine_running`／`wineserver_pid` 只看 shared bottle 的 wineserver（以工作目錄 `.wine-<uid>/server-<prefix dev>-<inode>` 辨識，`stop`、`session.sh` 等待 Wine 結束時使用）。wineserver 以程序名稱找，再核對命令列以 engine 路徑開頭，不比對整行命令列（否則參數含 wineserver 路徑的 `xxd`、`codesign` 會被誤判）。
 - `scripts/play.sh`：入口。依序檢查前置條件、處理前次殘留程序、套用 loopback 與 DLL 修補、`vb6run`、Cyder 設定（`cyder-settings.sh apply`）、移除遊戲資料夾的下載隔離標記（`quarantine.sh clear`），再以 `open -a Cyder` 開 `認證器.exe`，等待 4 個 HostShield 位址都在監聽，最後啟動 `session.sh start`（登入器已在執行時也會補啟動）。`play.sh status` 顯示狀態，`status --porcelain` 輸出給 App 讀的 `key=value`，`stop` 關閉 shared bottle 內所有 Windows 程式。設 `MACMEOW_PROGRESS=1` 時各步驟訊息改為 `@@STEP <id> <訊息>`。
 - `scripts/setup-loopback.sh install|uninstall|status`：lo0 alias 與 LaunchDaemon `tw.macmeow.loopback`。位址清單是 `common.sh` 的 `LOOPBACK_IPS`。唯一需要 root 的步驟。
 - `scripts/patch-cyder-loopback.sh check|apply|restore`：wineserver 1 byte 修補；指令序列找不到或不唯一就不修改。
