@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # 開發工具共用設定。tools/*.sh 以 `source "$(dirname "$0")/lib.sh"` 載入。
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作），另外提供：
-#   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、out_dir、maple_pids、need_tool、in_aqua_terminal、run_wine、llvm 路徑、
+#   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、out_dir、maple_pids、need_tool、in_terminal、run_wine、llvm_paths（LLVM 路徑）、
 #   APP_SWIFT_TARGET / app_sources（App 原始碼）
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
 MACMEOW_TOOLS_LOADED=1
