@@ -10,8 +10,33 @@ enum Theme {
 struct MainView: View {
     @ObservedObject var launcher: Launcher
     @ObservedObject var updater: Updater
+    /// 內容實際高度（量測而得）。
+    @State private var contentHeight: CGFloat = 0
+    /// 螢幕可用高度扣掉標題列，由 `MainWindowAccessor` 回報。
+    @State private var maxHeight: CGFloat = .infinity
 
     var body: some View {
+        // 視窗高度跟著內容（.contentSize），但不超過螢幕；放不下時改為捲動。
+        ScrollView(.vertical) {
+            content
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                    }
+                )
+        }
+        .modifier(BounceOnlyWhenScrollable())
+        .frame(width: 500, height: min(contentHeight, maxHeight))
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
+        .background(Backdrop())
+        .background(MainWindowAccessor { maxHeight = $0 })
+        .task { launcher.startPolling() }
+        .sheet(item: $launcher.bugReport) { context in
+            BugReportView(context: context, env: launcher.config.environment)
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 14) {
             HeaderView(launcher: launcher)
             if let release = updater.notice {
@@ -26,11 +51,21 @@ struct MainView: View {
         .padding(.top, 6)
         .padding(.bottom, 20)
         .frame(width: 500)
-        .background(Backdrop())
-        .background(MainWindowAccessor())
-        .task { launcher.startPolling() }
-        .sheet(item: $launcher.bugReport) { context in
-            BugReportView(context: context, env: launcher.config.environment)
+    }
+}
+
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// 內容放得下時不讓觸控板拖出彈性效果（macOS 13.3 起才有 API）。
+private struct BounceOnlyWhenScrollable: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 13.3, *) {
+            content.scrollBounceBehavior(.basedOnSize)
+        } else {
+            content
         }
     }
 }

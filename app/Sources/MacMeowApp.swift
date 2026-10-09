@@ -88,17 +88,57 @@ final class MainWindow: NSObject {
     }
 }
 
-/// 放在主視窗內容的背景，取得所在的 NSWindow 交給 `MainWindow`。
+/// 放在主視窗內容的背景，取得所在的 NSWindow 交給 `MainWindow`；
+/// 並回報內容區最多可用的高度（螢幕可用區域扣掉標題列），視窗變大時保持在螢幕內。
 struct MainWindowAccessor: NSViewRepresentable {
+    var onMaxContentHeight: (CGFloat) -> Void = { _ in }
+
     final class AccessorView: NSView {
+        var onMaxContentHeight: (CGFloat) -> Void = { _ in }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if let window { MainWindow.attach(window) }
+            let center = NotificationCenter.default
+            center.removeObserver(self)
+            guard let window else { return }
+            MainWindow.attach(window)
+            center.addObserver(
+                self, selector: #selector(screenChanged), name: NSWindow.didChangeScreenNotification, object: window)
+            center.addObserver(
+                self, selector: #selector(screenChanged),
+                name: NSApplication.didChangeScreenParametersNotification, object: nil)
+            center.addObserver(
+                self, selector: #selector(windowResized), name: NSWindow.didResizeNotification, object: window)
+            // 不在 SwiftUI 版面更新途中改狀態
+            DispatchQueue.main.async { [weak self] in self?.screenChanged() }
+        }
+
+        @objc private func screenChanged() {
+            guard let window, let screen = window.screen ?? NSScreen.main else { return }
+            let titleBar = window.frame.height - window.contentLayoutRect.height
+            onMaxContentHeight(max(screen.visibleFrame.height - titleBar, 200))
+            windowResized()
+        }
+
+        /// 內容變高時 AppKit 固定視窗左上角往下長，可能超出螢幕底部（Dock）；往上移回可用區域。
+        @objc private func windowResized() {
+            guard let window, let screen = window.screen ?? NSScreen.main else { return }
+            let visible = screen.visibleFrame
+            let frame = window.frame
+            let y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+            if y != frame.minY { window.setFrameOrigin(NSPoint(x: frame.minX, y: y)) }
         }
     }
 
-    func makeNSView(context: Context) -> AccessorView { AccessorView() }
-    func updateNSView(_ nsView: AccessorView, context: Context) {}
+    func makeNSView(context: Context) -> AccessorView {
+        let view = AccessorView()
+        view.onMaxContentHeight = onMaxContentHeight
+        return view
+    }
+
+    func updateNSView(_ nsView: AccessorView, context: Context) {
+        nsView.onMaxContentHeight = onMaxContentHeight
+    }
 }
 
 /// 選單列圖示的選單。
