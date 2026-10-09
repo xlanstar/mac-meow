@@ -1,0 +1,22 @@
+# Changelog
+
+User-visible changes, newest first: new or changed sites and features, fixes.
+List each change under `## Unreleased` as it lands
+
+## Unreleased
+
+首次釋出：可在 Apple Silicon Mac 以 Cyder 執行貓貓谷原版登入流程並進入遊戲，不修改任何遊戲或登入器檔案。
+
+- `MacMeow.app`：原生 SwiftUI 視窗，含環境檢查清單、啟動進度、連線通道狀態、詳細記錄，以及「開始遊戲」「全部關閉」「重新啟動」；需要 macOS 13 以上
+- `MacMeow.app` 設定：遊戲資料夾、同步機制
+- 第一次啟動自動完成：選擇遊戲資料夾、管理員授權設定本機網路、套用 Cyder 修補、安裝 VB6 執行環境、調整 Cyder 設定
+- 網路：lo0 加入 HostShield 通道位址與 202.80.104.28，並以 LaunchDaemon 開機自動套用
+- Cyder wineserver：關閉 bind 127.x → 127.0.0.1 改寫
+- Wine 修補：`wsock32!recv` 獨立化（修正遊戲凍結）、advapi32 CSP 常駐（修正 rsaenh 反覆載入）；套用前比對 `SHA256SUMS`
+- Cyder 設定：zh_TW、DXMT、MSync
+- 啟動時等到 4 個 HostShield 通道都開始監聽才回報成功
+- 套用修補時若有其他 Cyder 遊戲在執行，提示先關閉，不會自動關閉 Wine
+- 指令介面：`play.sh` 啟動、`play.sh status` 列出各位址的監聽 port 數與程序、`play.sh stop` 關閉 Cyder 內所有 Windows 程式
+- `uninstall.sh` 還原 Cyder engine 修補、移除本機網路位址與 LaunchDaemon、App 設定與記錄；若 Cyder 已更新 engine，不會把舊檔蓋回新版
+- Releases 的 `MacMeow.app` 以 Developer ID 簽章並經 Apple 公證，下載後可直接開啟
+- 已知問題：人多的地方卡頓（Themida × Rosetta SMC，見 docs/technical-notes.md）

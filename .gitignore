@@ -1,0 +1,25 @@
+# 大型、第三方、私密內容（絕對不要提交）
+/build/
+/debug/
+login.txt
+.env
+*.log
+
+# 遊戲／私服二進位（防止誤加）
+HostShield.exe
+XCGUI.dll
+認證器.exe
+貓貓TMS登入器.exe
+MapleStory.exe*
+*.wz
+
+# 診斷工具建置產物輸出到 build/tools/（tools/build.sh），已由 /build/ 涵蓋
+
+# app 打包輸出（app/build-app.sh）
+/dist/
+
+# macOS / Python
+.DS_Store
+__pycache__/
+
+tmp/

@@ -1,0 +1,150 @@
+#!/bin/bash
+# 在 macOS 用 Cyder 啟動貓貓谷（原封不動執行 認證器.exe → HostShield → 貓貓TMS登入器 → MapleStory）。
+# 只做 macOS 端的環境準備，不修改任何登入器或遊戲檔案。每一步都先檢查，需要時才套用（可重複執行）。
+#
+# 用法：
+#   bash scripts/play.sh            # 檢查環境並啟動
+#   bash scripts/play.sh status     # 查看迴路位址、通道與 Wine 程序狀態
+#   bash scripts/play.sh status --porcelain   # 機器可讀的 key=value 狀態（MacMeow.app 使用）
+#   bash scripts/play.sh stop       # 關閉 Cyder shared bottle 內所有 Windows 程式（含其他 Cyder 遊戲）
+# 環境變數：GAME_DIR、CYDER_ENGINE、MAPLE_SYNC=msync|esync|none（見 docs/architecture.md）
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+
+LAUNCHER_RE='貓貓TMS登入器\.exe|MapleStory\.exe'
+HELPER_RE='認證器\.exe|HostShield\.exe'
+SHIELD_RE="^($(IFS='|'; echo "${HOSTSHIELD_IPS[*]}" | /usr/bin/sed 's/\./\\./g')):"
+
+proc_running() { /usr/bin/pgrep -f "$1" >/dev/null 2>&1; }
+
+# 每個 HostShield 位址目前監聽的 port 數；4 個位址都有監聽才算通道建立。
+listeners() {
+  /usr/sbin/lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | /usr/bin/awk '{print $9}' \
+    | /usr/bin/grep -E "$SHIELD_RE" | /usr/bin/cut -d: -f1 | /usr/bin/sort | /usr/bin/uniq -c || true
+}
+tunnels_up() { [[ "$(listeners | /usr/bin/wc -l | /usr/bin/tr -d ' ')" -eq ${#HOSTSHIELD_IPS[@]} ]]; }
+
+status() {
+  echo "== 迴路位址"
+  bash "$SCRIPT_DIR/setup-loopback.sh" status || true
+  echo "== HostShield 通道監聽（位址：port 數，預期 ${#HOSTSHIELD_IPS[@]} 個位址、各 ${HOSTSHIELD_PORTS}）"
+  listeners | /usr/bin/awk '{printf "%-16s %s\n", $2, $1}'
+  echo "== Wine 程序"
+  /bin/ps -axo pid=,command= | /usr/bin/grep -E "${HELPER_RE}|${LAUNCHER_RE}|BlackCipher|BlackXchg" \
+    | /usr/bin/grep -vE 'grep|cyder_launcher|CyderSwift' | /usr/bin/cut -c1-160 || true
+}
+
+flag() { if "$@" >/dev/null 2>&1; then echo 1; else echo 0; fi; }
+patches_applied() {
+  bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check && bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check
+}
+
+# MacMeow.app 讀取的狀態；新增 key 時同步更新 app/Sources/Status.swift。
+porcelain() {
+  local missing
+  missing="$(missing_game_file "$GAME_DIR" || true)"
+  echo "cyder=$(find_cyder || true)"
+  echo "cyder_ready=$(flag cyder_ready)"
+  echo "game_dir=$GAME_DIR"
+  echo "game_dir_valid=$(flag game_dir_valid "$GAME_DIR")"
+  echo "missing_file=$missing"
+  echo "loopback=$(flag bash "$SCRIPT_DIR/setup-loopback.sh" status)"
+  echo "patched=$(flag patches_applied)"
+  echo "vb6=$(flag vb6_installed)"
+  echo "wine=$(flag wine_running)"
+  echo "helpers=$(flag proc_running "$HELPER_RE")"
+  echo "launcher=$(flag proc_running '貓貓TMS登入器\.exe')"
+  echo "game=$(flag proc_running 'MapleStory\.exe')"
+  echo "tunnels=$(listeners | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+  echo "tunnels_total=${#HOSTSHIELD_IPS[@]}"
+}
+
+case "${1:-}" in
+  status)
+    if [[ "${2:-}" == --porcelain ]]; then porcelain; else status; fi
+    exit 0 ;;
+  stop)
+    echo "關閉 Cyder 內所有 Windows 程式 ..."
+    wineserver_kill
+    wine_stopped || die "Wine 仍在執行，請稍後再試或在 Cyder 中結束。"
+    echo "已全部關閉"
+    exit 0 ;;
+  "") ;;
+  *) echo "用法：$0 [status [--porcelain]|stop]" >&2; exit 64 ;;
+esac
+
+# 1. 前置條件
+progress check "檢查環境 ..."
+CYDER="$(find_cyder)" || die "找不到 Cyder.app，請先安裝到 /Applications"
+CYDER_SCRIPTS="$CYDER/Contents/Resources/ogom-scripts"
+[[ "$CYDER" == "$HOME/Downloads/"* ]] && echo "提示：建議把 Cyder.app 移到 /Applications（避免 App Translocation）"
+if f="$(missing_game_file "$GAME_DIR")"; then
+  die "缺少 ${GAME_DIR}/${f}（請把登入器壓縮檔內容解到遊戲資料夾）"
+fi
+bash "$SCRIPT_DIR/setup-loopback.sh" status >/dev/null \
+  || die "lo0 尚未加上貓貓谷位址，請先執行：sudo bash ${SCRIPT_DIR}/setup-loopback.sh install"
+cyder_ready || die "Cyder prefix 尚未初始化，請先開啟一次 Cyder"
+
+# 2. 前一次留下的程序：登入器或遊戲還在就不重複啟動；只剩 認證器／HostShield 殘留時，關閉整個 bottle。
+if proc_running "$LAUNCHER_RE"; then
+  echo "貓貓谷已在執行中（登入器或遊戲視窗仍開著）"; exit 0
+fi
+if proc_running "$HELPER_RE"; then
+  progress cleanup "關閉前一次殘留的 認證器／HostShield ..."
+  wineserver_kill
+fi
+
+# 3. Cyder engine 修補（Wine 執行中會拒絕套用）
+#    wineserver：關閉 127.x bind→127.0.0.1 改寫（否則 4 個 HostShield 互搶 port 全部退出）
+#    DLL：wsock32（recv hook 無限遞迴凍結）、advapi32（rsaenh 常駐，避免遊戲內 <1 FPS）
+progress patch "檢查 Cyder engine 修補 ..."
+bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check >/dev/null 2>&1 || bash "$SCRIPT_DIR/patch-cyder-loopback.sh" apply
+bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check >/dev/null 2>&1 || bash "$SCRIPT_DIR/patch-cyder-dlls.sh" apply
+
+# 4. 認證器.exe 是 VB6 程式，需要 VB6 runtime
+if ! vb6_installed; then
+  require_wine_stopped "安裝 VB6 runtime"
+  [[ -f "$CYDER_SCRIPTS/cyder-winetricks.sh" ]] \
+    || die "找不到 Cyder 的 winetricks（${CYDER_SCRIPTS}/cyder-winetricks.sh），Cyder 版本可能不相容"
+  progress vb6 "安裝 VB6 runtime（vb6run，約 1–2 分鐘）..."
+  bash "$CYDER_SCRIPTS/cyder-winetricks.sh" install vb6run
+fi
+
+# 5. Cyder 全域設定。Cyder 只在「直接啟動 MapleStory.exe」時套用楓之谷設定；
+#    經由登入器啟動時要改成全域設定，子程序才會繼承。
+#    同步機制預設 MSync（Cyder 預設關閉，此時每次同步都經 wineserver，楓之谷會明顯卡頓）。
+case "${MAPLE_SYNC:-msync}" in
+  msync) want_msync=true want_esync=false ;;
+  esync) want_msync=false want_esync=true ;;
+  none) want_msync=false want_esync=false ;;
+  *) die "MAPLE_SYNC 只能是 msync|esync|none" ;;
+esac
+progress settings "檢查 Cyder 設定 ..."
+[[ -f "$CYDER_SETTINGS" ]] || echo '{"schemaVersion":1}' >"$CYDER_SETTINGS"
+set_setting() {  # set_setting <key> <type> <value>
+  [[ "$(cyder_setting "$1")" == "$3" ]] && return 0
+  /usr/bin/plutil -replace "$1" "-$2" "$3" "$CYDER_SETTINGS"
+  echo "已設定 Cyder：$1=$3"
+  wine_running && echo "注意：Cyder 正在執行，設定要等全部遊戲關閉後才會生效"
+  return 0
+}
+set_setting wineLocale string zh_TW
+set_setting graphicsBackend string dxmt
+set_setting msync bool "$want_msync"
+set_setting esync bool "$want_esync"
+
+# 6. 移除 macOS 下載隔離標記（只動 xattr，不動檔案內容）
+/usr/bin/xattr -dr com.apple.quarantine "$GAME_DIR" 2>/dev/null || true
+
+# 7. 照官方教學：從「認證器」啟動，等待 HostShield 通道
+progress launch "啟動 認證器.exe ..."
+/usr/bin/open -n -a "$CYDER" "$GAME_DIR/認證器.exe"
+progress tunnels "等待 HostShield 通道建立（最多 60 秒）..."
+if wait_until 60 tunnels_up; then
+  echo "通道已建立："; status; exit 0
+fi
+echo "60 秒內沒看到全部通道監聽，請執行 bash scripts/play.sh status 檢查" >&2
+status
+exit 1

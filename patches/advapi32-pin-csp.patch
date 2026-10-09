@@ -1,0 +1,19 @@
+--- a/dlls/advapi32/crypt.c
++++ b/dlls/advapi32/crypt.c
+@@ -217,6 +217,16 @@
+ 		errorcode = (GetLastError() == ERROR_FILE_NOT_FOUND) ? NTE_PROV_DLL_NOT_FOUND : NTE_PROVIDER_DLL_FAIL;
+ 		FIXME("Failed to load dll %s\n", debugstr_w(pImage));
+ 		goto error;
++	}
++	/* Keep the CSP image resident.  Some applications (e.g. a MapleStory
++	 * private-server MachineIdLib.dll) acquire and release crypt contexts
++	 * in tight loops; unloading and remapping rsaenh.dll every time is
++	 * cheap on Windows but very slow when the x86 code must be translated
++	 * again (Rosetta 2), dropping the game to below 1 FPS. */
++	{
++		HMODULE pinned;
++		GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
++		                   (LPCWSTR)provider->hModule, &pinned);
+ 	}
+ 	provider->dwMagic = MAGIC_CRYPTPROV;
+ 	provider->refcount = 1;

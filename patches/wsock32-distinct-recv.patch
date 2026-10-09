@@ -1,0 +1,42 @@
+--- a/dlls/wsock32/wsock32.spec
++++ b/dlls/wsock32/wsock32.spec
+@@ -13,7 +13,7 @@
+  13 stdcall listen(long long) ws2_32.listen
+  14 stdcall ntohl(long) ws2_32.ntohl
+  15 stdcall ntohs(long) ws2_32.ntohs
+- 16 stdcall recv(long ptr long long) ws2_32.recv
++ 16 stdcall recv(long ptr long long) WSOCK32_recv
+  17 stdcall recvfrom(long ptr long long ptr ptr) ws2_32.recvfrom
+  18 stdcall select(long ptr ptr ptr ptr) ws2_32.select
+  19 stdcall send(long ptr long long) ws2_32.send
+--- a/dlls/wsock32/socket.c
++++ b/dlls/wsock32/socket.c
+@@ -652,3 +652,28 @@
+     FIXME("(%s): stub\n",message);
+     return;
+ }
++
++/***********************************************************************
++ *      recv          (WSOCK32.16)
++ *
++ * Windows' wsock32.dll has its own recv entry point rather than a forwarder
++ * to ws2_32.recv.  Some modules (e.g. a Detours-based "ApiHook" in a
++ * MapleStory private-server MachineIdLib.dll) hook wsock32!recv and
++ * ws2_32!recv separately while sharing one "original function" pointer.
++ * With a forwarder both resolve to the same code, so the second detour
++ * hooks the first one and recv recurses until the thread stack overflows.
++ */
++INT WINAPI WSOCK32_recv( SOCKET s, char *buf, INT len, INT flags )
++{
++    /* Use WSARecv, not ws2_32.recv: if the hooked ws2_32.recv were called
++     * here, a shared detour pointer could still loop back into itself. */
++    WSABUF wsabuf;
++    DWORD count = 0, wsaflags = flags;
++
++    wsabuf.len = len;
++    wsabuf.buf = buf;
++    if (WSARecv( s, &wsabuf, 1, &count, &wsaflags, NULL, NULL ) == SOCKET_ERROR)
++        return SOCKET_ERROR;
++    return count;
++}
++

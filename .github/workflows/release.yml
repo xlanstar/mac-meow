@@ -1,0 +1,47 @@
+# push tag vX.Y.Z（bash tools/release.sh publish X.Y.Z）後：建置、Developer ID 簽章、公證，並建立 GitHub Release 草稿。
+# 草稿需人工冒煙測試後再正式發佈；流程與所需 Secrets 見 docs/development.md「發佈」。
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ci 需要確認 tag 在 origin/main 上
+
+      - name: 工具版本
+        run: |
+          sw_vers
+          xcodebuild -version
+          swiftc --version
+
+      - name: 匯入簽章憑證與公證帳密
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: bash tools/ci-keychain.sh setup
+
+      - name: 建置、公證並建立 Release 草稿
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/release.sh ci "${GITHUB_REF_NAME#v}"
+
+      - name: 刪除暫時鑰匙圈
+        if: always()
+        run: bash tools/ci-keychain.sh cleanup
