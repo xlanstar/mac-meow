@@ -56,6 +56,33 @@ need_tool() {
   ((${#missing[@]} == 0)) || bash "$ROOT/tools/build.sh" "${missing[@]}"
 }
 
+# dmg_attach [--readonly] [--nobrowse] [--mountpoint <路徑>] <映像>：掛載磁碟映像，輸出格式同 hdiutil attach
+# （裝置<TAB>內容<TAB>掛載點）。macOS 26 起 hdiutil attach 已棄用（會印警告），改用 diskutil image attach；
+# 舊系統（例如 CI 的 macOS 15）沒有 diskutil image，退回 hdiutil。
+dmg_attach() {
+  local d=() h=(-noverify -noautoopen)
+  while (($# > 1)); do
+    case "$1" in
+      --readonly) d+=(--readOnly) h+=(-readonly) ;;
+      --nobrowse) d+=(--nobrowse) h+=(-nobrowse) ;;
+      --mountpoint)
+        d+=(--mountPoint "$2") h+=(-mountpoint "$2")
+        shift
+        ;;
+      *)
+        echo "dmg_attach：未知選項 $1" >&2
+        return 2
+        ;;
+    esac
+    shift
+  done
+  if diskutil image attach --help >/dev/null 2>&1; then
+    diskutil image attach ${d[@]+"${d[@]}"} "$1"
+  else
+    hdiutil attach "${h[@]}" "$1"
+  fi
+}
+
 # 設定 LLVM_BIN／LLD_BIN／BISON_BIN（Homebrew：brew install llvm lld bison）；缺少時回傳 1。
 llvm_paths() {
   local brew

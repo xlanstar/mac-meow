@@ -132,7 +132,7 @@ verify_dmg() {
   fi
   chk="$(mktemp -d)"
   mnt="$chk/mnt"
-  hdiutil attach -nobrowse -readonly -noautoopen -quiet -mountpoint "$mnt" "$dmg" || die "無法掛載 ${dmg}"
+  dmg_attach --nobrowse --readonly --mountpoint "$mnt" "$dmg" >/dev/null || die "無法掛載 ${dmg}"
   ditto "$mnt/MacMeow.app" "$chk/MacMeow.app"
   [[ -L "$mnt/應用程式" && -f "$mnt/.DS_Store" && -f "$mnt/.background/background.tiff" ]] \
     || {

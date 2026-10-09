@@ -115,7 +115,7 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   xcrun stapler staple -q "$APP"
 fi
 
-# retry <次數> <指令...>：hdiutil 偶爾回報 Resource busy（CI 常見），失敗時稍候重試
+# retry <次數> <指令...>：hdiutil／diskutil 偶爾回報 Resource busy（CI 常見），失敗時稍候重試
 retry() {
   local n="$1" i
   shift
@@ -211,7 +211,7 @@ RW="$WORK/MacMeow-rw.dmg"
 retry 3 hdiutil create -volname "$VOLNAME" -srcfolder "$STAGE" -fs HFS+ -format UDRW \
   -size "$(($(du -sm "$STAGE" | cut -f1) + 20))m" -ov -quiet "$RW"
 # 不指定 -mountpoint（/Volumes 只有 root 可寫），由系統掛載後讀回路徑
-MNT="$(retry 3 hdiutil attach "$RW" -readwrite -noverify -noautoopen | awk -F'\t' '$NF ~ /^\/Volumes\// {print $NF}')"
+MNT="$(retry 3 dmg_attach "$RW" | awk -F'\t' '$NF ~ /^\/Volumes\// {print $NF}')"
 [[ "$MNT" == "/Volumes/$VOLNAME" ]] || {
   echo "dmg 掛載位置不符：${MNT:-（無）}" >&2
   exit 1
