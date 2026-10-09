@@ -86,11 +86,10 @@ struct AppConfig: Equatable {
     }
 
     /// 由設定檔的 KEY=VALUE 還原；缺少或無效的值使用預設值。
-    /// MAPLE_SYNC 是 0.3.0 以前的 key，下次存檔時改寫成 SYNC。
     init(values v: [String: String]) {
         let defaults = GameSettings()
         gameDir = v["GAME_DIR"].flatMap { $0.isEmpty ? nil : $0 }
-        settings.sync = (v["SYNC"] ?? v["MAPLE_SYNC"]).flatMap(SyncMode.init) ?? defaults.sync
+        settings.sync = v["SYNC"].flatMap(SyncMode.init) ?? defaults.sync
         settings.graphicsBackend =
             v["GRAPHICS_BACKEND"].flatMap(GraphicsBackend.init(setting:)) ?? defaults.graphicsBackend
         settings.metalHUD = v["HUD"].map { $0 == "1" } ?? defaults.metalHUD

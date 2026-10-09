@@ -16,11 +16,6 @@ func testAppConfig() {
             "MACMEOW_HUD": "1", "MACMEOW_MAX_FPS": "144", "MACMEOW_AUTO_CLOSE": "0",
         ])
 
-    // 0.3.0 以前的 MAPLE_SYNC；SYNC 優先
-    expectEqual(AppConfig(values: ["MAPLE_SYNC": "none"]).settings.sync, SyncMode.none)
-    expectEqual(AppConfig(values: ["SYNC": "esync", "MAPLE_SYNC": "none"]).settings.sync, .esync)
-    expect(!AppConfig(values: ["MAPLE_SYNC": "esync"]).fileContents.contains("MAPLE_SYNC"))
-
     // 缺少或無效的值使用預設值
     expectEqual(AppConfig(values: [:]), AppConfig())
     let invalid = ["SYNC": "fsync", "GRAPHICS_BACKEND": "vulkan", "HUD": "yes", "MAX_FPS": "30", "AUTO_CLOSE": "1"]
