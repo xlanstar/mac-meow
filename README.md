@@ -80,6 +80,7 @@ App 會自動檢查新版本，有新版時主視窗頂端會出現提示；也�
 - **出現「Intel 架構的 App 未來將無法執行」通知**：在 macOS 27 以前不影響遊戲，直接關閉即可。
 - **Cyder 更新後無法啟動**：請回報 issue，或等待本專案更新。
 - **手動刪除 App 後 `brew uninstall` 失敗**：先 `brew reinstall --cask macmeow`，再 `brew uninstall --cask macmeow`。
+- **使用 DXMT 時 FPS 最高 60**：在「遊戲設定」改用 D3DMetal。
 
 ## 回報問題
 

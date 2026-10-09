@@ -57,3 +57,10 @@
 - 暫時解法：先 `brew reinstall --cask macmeow` 裝回 App（重裝時 Homebrew 會略過不存在的腳本），再 `brew uninstall --cask macmeow`，這樣也會一併還原修補與設定。
 - 原因：cask 的 uninstall 區塊執行 App 內的 `Contents/Resources/scripts/uninstall.sh`（見 [architecture.md](architecture.md) 的 `uninstall.sh`）。Homebrew 找不到腳本時，除非是強制模式，否則停止移除；升級也會先執行舊版的 uninstall 區塊，所以一樣失敗。
 - 狀態：Homebrew 的行為，不修正；用 Homebrew 安裝的請以 `brew uninstall` 移除。
+
+## 8. 使用 DXMT 時 FPS 最高 60
+
+- 症狀：圖形後端實際使用 DXMT 時（在 App 選了 DXMT，或選了 D3DMetal 但這台 Mac 無法使用而自動改用 DXMT），遊戲 FPS 可能被限制在最高 60。App 的「遊戲設定」會顯示橘色警告。
+- 暫時解法：改用 D3DMetal（需要 macOS 14 以上，並安裝 CrossOver 或在 Cyder 設定安裝 GPTK），或把 Cyder `settings.json` 的 `dxvkFrameRate` 改成 `120`、`144` 或 `unlimited`（不限制）。本專案不會改動這個設定。
+- 原因：Cyder 以 `dxvkFrameRate`（預設 60）設定 DXMT 的 `d3d11.preferredMaxFrameRate`，不替 D3DMetal 設上限。細節見 [technical-notes.md](technical-notes.md) 第 13 節。
+- 狀態：Cyder 的預設行為，本專案改以 D3DMetal 為預設圖形後端來避開。尚未在遊戲中實測 FPS。
