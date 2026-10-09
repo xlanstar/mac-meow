@@ -8,6 +8,9 @@ List each change under `## Unreleased` as it lands
 - 改以 `.dmg` 發佈：開啟後的視窗有圖解說明，把 `MacMeow.app` 拖到「應用程式」即可安裝，不必再解壓縮 zip
 - `MacMeow.app` 新增「回報問題」：在 App 內填寫後開啟已填好內容的 GitHub issue，並自動產生隱藏個人資訊的診斷檔；啟動失敗時可直接「回報此問題」
 - 新增 `scripts/report.sh`：輸出可貼到 issue 的環境資訊，或打包診斷檔
+- 已知問題：按住 Command 再按 A／Z／X／C／V 會變成 Ctrl（見 docs/known-issues.md）
+- 修正 `MacMeow.app` 展開「詳細記錄」時，記錄面板在淡入過程中與上方卡片重疊
+- `MacMeow.app` 視窗背景與主要按鈕改為單色，展開或收合「詳細記錄」時背景不再閃爍
 
 ## 0.1.0 — 2026-10-09
 
