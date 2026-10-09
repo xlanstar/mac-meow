@@ -14,16 +14,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
-# Wine 程序的命令列以 exe 路徑開頭（Z:\…\x.exe 或相對路徑 x.exe）；錨定開頭，避免比對到
-# Cyder 啟動腳本的參數（--launch-exe /…/認證器.exe）。
-LAUNCHER_RE='(^|\\)(貓貓TMS登入器|MapleStory)\.exe( |$)'
-HELPER_RE='(^|\\)(認證器|HostShield)\.exe( |$)'
 SHIELD_RE="^($(
   IFS='|'
   echo "${HOSTSHIELD_IPS[*]}" | /usr/bin/sed 's/\./\\./g'
 )):"
 
-proc_running() { /usr/bin/pgrep -f "$1" >/dev/null 2>&1; }
+# proc_running <exe 名稱>...：本專案的程式（session_procs，限 GAME_DIR）中有任一個在執行。
+# 其他 bottle 或其他遊戲資料夾的同名程式（例如別的私服的 MapleStory.exe）不算。
+proc_running() {
+  session_procs | LC_ALL=C NAMES=" $* " /usr/bin/awk 'index(ENVIRON["NAMES"], " " $2 " ") { found = 1 } END { exit !found }'
+}
 
 # 每個 HostShield 位址目前監聽的 port 數；4 個位址都有監聽才算通道建立。
 listeners() {
@@ -67,9 +67,9 @@ porcelain() {
   echo "patched=$(flag patches_applied)"
   echo "vb6=$(flag vb6_installed)"
   echo "wine=$(flag wine_running)"
-  echo "helpers=$(flag proc_running "$HELPER_RE")"
-  echo "launcher=$(flag proc_running '(^|\\)貓貓TMS登入器\.exe( |$)')"
-  echo "game=$(flag proc_running '(^|\\)MapleStory\.exe( |$)')"
+  echo "helpers=$(flag proc_running 認證器.exe HostShield.exe)"
+  echo "launcher=$(flag proc_running "$LAUNCHER_EXE")"
+  echo "game=$(flag proc_running MapleStory.exe)"
   echo "launcher_pid=$(session_procs | LAUNCHER="$LAUNCHER_EXE" /usr/bin/awk '$2 == ENVIRON["LAUNCHER"] { print $1; exit }')"
   echo "watching=$(flag bash "$SCRIPT_DIR/session.sh" status)"
   echo "dock_patched=$(flag bash "$SCRIPT_DIR/patch-cyder-winemac.sh" check)"
@@ -117,12 +117,12 @@ start_watcher() {
 
 # 2. 前一次留下的程序：登入器或遊戲還在就不重複啟動；只剩 認證器／HostShield 殘留時，只結束本專案的程式
 #    （session.sh close）。shared bottle 內其他 Cyder 遊戲不受影響。
-if proc_running "$LAUNCHER_RE"; then
+if proc_running "$LAUNCHER_EXE" MapleStory.exe; then
   echo "貓貓谷已在執行中（登入器或遊戲視窗仍開著）"
   start_watcher
   exit 0
 fi
-if proc_running "$HELPER_RE"; then
+if proc_running 認證器.exe HostShield.exe; then
   progress cleanup "關閉前一次殘留的 認證器／HostShield ..."
   bash "$SCRIPT_DIR/session.sh" close
 fi

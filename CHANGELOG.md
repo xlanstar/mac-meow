@@ -5,6 +5,7 @@ List each change under `## Unreleased` as it lands
 
 ## Unreleased
 
+- 修正其他 Cyder bottle 或其他私服的 `MapleStory.exe` 執行中時，開始遊戲會誤判貓貓谷「已在執行中」而不啟動；現在只認遊戲資料夾內的程式
 - 修正從 `MacMeow.app` 產生的診斷檔中，程序清單缺少登入器與認證器
 - 修正開始遊戲時若只剩前一次的認證器或 HostShield 殘留，會連同 Cyder 內其他正在執行的遊戲一起關閉；現在只結束貓貓谷自己的程式
 - 修正 App 查詢狀態與開始遊戲或「全部關閉」同時進行時，可能誤報「請先關閉所有 Cyder 遊戲」或「Wine 仍在執行」；Cyder 有其他 bottle 開著時，「全部關閉」不再等到逾時後誤報失敗
