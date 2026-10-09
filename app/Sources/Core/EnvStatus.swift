@@ -2,6 +2,7 @@ import Foundation
 
 /// `scripts/play.sh status --porcelain` 的內容。key 由 play.sh 的 porcelain() 定義。
 struct EnvStatus: Equatable {
+    /// 已成功讀取過狀態。
     var loaded = false
     var cyderPath: String?
     var cyderReady = false
@@ -13,13 +14,11 @@ struct EnvStatus: Equatable {
     var vb6 = false
     /// Cyder 可使用 D3DMetal 圖形後端（porcelain 的 d3dmetal：macOS 14 以上且有 GPTK）。
     var d3dmetalAvailable = false
-    var wine = false
     var helpers = false
     var launcher = false
     var game = false
     /// 登入器的 PID（選單「顯示登入器」用）。
     var launcherPid: pid_t?
-    var watching = false
     var tunnels = 0
     var tunnelsTotal = 4
 
@@ -38,19 +37,17 @@ struct EnvStatus: Equatable {
         patched = flag("patched")
         vb6 = flag("vb6")
         d3dmetalAvailable = flag("d3dmetal")
-        wine = flag("wine")
         helpers = flag("helpers")
         launcher = flag("launcher")
         game = flag("game")
         launcherPid = v["launcher_pid"].flatMap { pid_t($0) }
-        watching = flag("watching")
         tunnels = Int(v["tunnels"] ?? "") ?? 0
         tunnelsTotal = Int(v["tunnels_total"] ?? "") ?? 4
     }
 
     /// 放在「下載項目」的 Cyder 會被 App Translocation 搬到隨機路徑，不使用。
     var cyderInDownloads: Bool {
-        cyderPath?.hasPrefix(AppPaths.home.appendingPathComponent("Downloads").path + "/") ?? false
+        cyderPath?.hasPrefix(NSHomeDirectory() + "/Downloads/") ?? false
     }
     var cyderUsable: Bool { cyderPath != nil && !cyderInDownloads }
     var running: Bool { launcher || game }
@@ -61,7 +58,18 @@ enum Step: String, CaseIterable, Identifiable {
     case cyder, prefix, gameDir, loopback, patch, vb6, tunnels
 
     var id: String { rawValue }
+    /// 首頁「環境檢查」顯示的項目（連線通道另外以進度條顯示）。
     static let checklist: [Step] = [.cyder, .prefix, .gameDir, .loopback, .patch, .vb6]
+
+    /// play.sh 的 `progress <id>` → 清單項目；沒有對應項目時為 nil。
+    init?(progressID id: String) {
+        switch id {
+        case "patch": self = .patch
+        case "vb6": self = .vb6
+        case "launch", "tunnels": self = .tunnels
+        default: return nil
+        }
+    }
 
     var title: String {
         switch self {
@@ -84,16 +92,6 @@ enum Step: String, CaseIterable, Identifiable {
         case .patch: return "bandage"
         case .vb6: return "puzzlepiece.extension"
         case .tunnels: return "point.3.connected.trianglepath.dotted"
-        }
-    }
-
-    /// play.sh 的 `progress <id>` → 清單項目。
-    static func fromProgress(_ id: String) -> Step? {
-        switch id {
-        case "patch": return .patch
-        case "vb6": return .vb6
-        case "launch", "tunnels": return .tunnels
-        default: return nil
         }
     }
 }

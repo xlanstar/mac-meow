@@ -1,4 +1,4 @@
-# 欄位 id 對應 MacMeow.app「回報問題」預先填入的網址參數（app/Sources/BugReport.swift 的 issueURL()）；改 id 時兩邊一起改。
+# 欄位 id 對應 MacMeow.app「回報問題」預先填入的網址參數（app/Sources/Core/IssueDraft.swift 的 issueURL()）；改 id 時兩邊一起改。
 name: 問題回報
 description: 回報 MacMeow.app 或啟動流程的問題
 labels: [bug]

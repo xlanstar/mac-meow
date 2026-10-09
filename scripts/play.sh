@@ -55,7 +55,7 @@ patches_applied() {
   bash "$SCRIPT_DIR/patch-cyder-loopback.sh" check && bash "$SCRIPT_DIR/patch-cyder-dlls.sh" check
 }
 
-# MacMeow.app 讀取的狀態；新增 key 時同步更新 app/Sources/Status.swift。
+# MacMeow.app 讀取的狀態；新增 key 時同步更新 app/Sources/Core/EnvStatus.swift。
 porcelain() {
   local missing
   missing="$(missing_game_file "$GAME_DIR" || true)"

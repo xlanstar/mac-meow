@@ -16,14 +16,14 @@ CYDER_SETTINGS="$CYDER_SUPPORT/settings.json"
 CYDER_PREFIX="$CYDER_SUPPORT/bottles/shared"
 WINE_BIN="$CYDER_ENGINE/bin/wine"
 WINESERVER_BIN="$CYDER_ENGINE/bin/wineserver"
-# MacMeow 自己的設定與記錄（uninstall.sh 整個刪除；App 端路徑見 app/Sources/Paths.swift）。
+# MacMeow 自己的設定與記錄（uninstall.sh 整個刪除；App 端路徑見 app/Sources/Services/AppPaths.swift）。
 MACMEOW_SUPPORT="$HOME/Library/Application Support/MacMeow"
 MACMEOW_LOGS="$HOME/Library/Logs/MacMeow"
 MACMEOW_CACHE="$HOME/Library/Caches/MacMeow" # update.sh 下載的新版
 
 # ---------- MacMeow.app 發佈 ----------
 # 一鍵更新（update.sh）只從這個 repo 的 Release 下載，且新版必須符合 MACMEOW_REQUIREMENT；
-# release.sh 發佈前也以此驗證。App 端的網址在 app/Sources/Paths.swift，改 repo 時一起改。
+# release.sh 發佈前也以此驗證。App 端的網址在 app/Sources/Services/AppPaths.swift，改 repo 時一起改。
 MACMEOW_REPO="xlanstar/mac-meow"
 MACMEOW_BUNDLE_ID="tw.macmeow.launcher"
 MACMEOW_TEAM_ID="LJJN3L2PS6"
