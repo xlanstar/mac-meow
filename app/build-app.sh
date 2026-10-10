@@ -40,10 +40,7 @@ rm -rf "$APP" "$WORK"
 mkdir -p "$APP/Contents/MacOS" "$RES/scripts/lib" "$RES/patches/bin" "$RES/zh-Hant.lproj" "$WORK"
 
 # SwiftUI 主程式（app/Sources，含子資料夾）
-app_sources
-swiftc -O -swift-version 5 -parse-as-library -module-name MacMeow \
-  -sdk "$SDK" -target "$APP_SWIFT_TARGET" \
-  -o "$APP/Contents/MacOS/MacMeow" "${APP_SOURCES[@]}"
+compile_app "$APP/Contents/MacOS/MacMeow"
 
 # App 圖示（app/make-icon.swift 繪製）
 swiftc -O -sdk "$SDK" -o "$WORK/make-icon" "$ROOT/app/make-icon.swift"

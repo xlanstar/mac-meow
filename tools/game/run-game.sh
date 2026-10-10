@@ -25,7 +25,7 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 mode="${1:-plain}"
-case "$mode" in plain | trace | relay | virtual | server) ;; *) die "未知模式：${mode}（plain|trace|relay|virtual|server）" ;; esac
+case "$mode" in plain | trace | relay | virtual | server) ;; *) usage_doc ;; esac
 game_dir_valid "$GAME_DIR" || die "GAME_DIR 不是有效的遊戲資料夾：${GAME_DIR}"
 
 OUT="$(out_dir run)"

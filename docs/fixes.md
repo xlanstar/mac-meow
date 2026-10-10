@@ -132,7 +132,7 @@
   4. `sendEditMenuCommand:` 也會刻意把 Command 標記成沒有按下。原始碼註解寫明這是為了讓放開 Command 時不會選取選單列。
   5. 只有在字母的按下事件帶有 Command 時才會被當成快捷鍵，所以「先按 Command 再按字母」才會觸發。
 - 驗證：Cyder engine `CX26.3.0-W11-Cyder012` 的 `winemac.so` 裡有 `selectAll:`、`sendEditMenuCommand:` 等符號；Cyder bottle 裡沒有設定 `EditMenu`，所以使用預設的 `key` 模式。以上是讀原始碼得到的結論，還沒有用 `WINEDEBUG=+key` 實際錄下按鍵順序來確認。
-- 可能的修正：`EditMenu` 設成 `key` 或 `message` 以外的值，這個功能就會關閉。關閉後，⌘A 會照常以 Alt＋A 送給遊戲。可以只對楓之谷設定：`HKCU\Software\Wine\AppDefaults\MapleStory.exe\Mac Driver` 的 `EditMenu="n"`。這個值在程序啟動時讀取，設定後要重開遊戲才會生效。這是 repo 以外的狀態，實作時要依 `AGENTS.md` 規則 4 處理，並列入 [external-state.md](external-state.md#清單)。
+- 可能的修正：`EditMenu` 設成 `key` 或 `message` 以外的值，這個功能就會關閉。關閉後，⌘A 會照常以 Alt＋A 送給遊戲。可以只對楓之谷設定：`HKCU\Software\Wine\AppDefaults\MapleStory.exe\Mac Driver` 的 `EditMenu="n"`。這個值在程序啟動時讀取，設定後要重開遊戲才會生效。這是 repo 以外的狀態，實作時要依 `AGENTS.md` Hard rule 3 處理，並列入 [external-state.md](external-state.md#清單)。
 - 狀態：未修正。
 
 ## 其他觀察

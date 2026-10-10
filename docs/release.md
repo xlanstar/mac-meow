@@ -44,7 +44,7 @@ gh run watch                 # 等 CI 完成
    1. 結束 Cyder 的 Wine 程序後，把 dmg 複製到暫存資料夾，加上 quarantine 模擬下載：`xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");Safari;" MacMeow-X.Y.Z.dmg`。
    2. 雙擊 dmg：視窗應顯示背景圖，`MacMeow.app` 與「應用程式」捷徑位於貓掌足跡兩端。
    3. 把 App 拖到「應用程式」後開啟：Gatekeeper 應只出現「從網際網路下載」的確認，不能出現「無法驗證開發者」或「Apple 無法檢查」。
-2. `bash scripts/play.sh status` 的結果符合 [AGENTS.md](../AGENTS.md#definition-of-done)「Definition of done」第 3 點（HostShield 監聽與登入器執行中）。
+2. `bash scripts/play.sh status` 的結果符合 [AGENTS.md](../AGENTS.md#runtime-pitfalls)「Runtime pitfalls」的啟動流程檢查（HostShield 監聽與登入器執行中）。
 3. 按「開始遊戲」，進入遊戲並登入角色。
 4. 若本版改了修補或外部狀態：`bash scripts/uninstall.sh` 後各 `check` 回報未修補，再以 App 重新套用一次。
 

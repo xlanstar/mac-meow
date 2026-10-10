@@ -73,6 +73,11 @@ repo-images *args:
 check-commit-body *args:
     @bash tools/dev/check-commit-body.sh "$@"
 
+# 檢查 prek 內建 hook 管不到的規範：<gitignore|justfile|external-state|dlls|usage|release-files|app>...
+[group('dev')]
+lint *args:
+    @bash tools/dev/lint.sh "$@"
+
 # 建置一次性實驗：[實驗...]
 [group('dev')]
 exp *args:

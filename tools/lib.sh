@@ -3,7 +3,7 @@
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
 #   ROOT / TOOLS_BIN / DEBUG_DIR、BREW_HINT、load_env、ok、usage_doc、need_cmd、out_dir、TARGET_EXE / target_pids、need_tool、in_terminal、
 #   run_wine、llvm_paths（LLVM 路徑）、MINGW_CC / win_exe（Windows 程式）、
-#   APP_SWIFT_TARGET / app_sources（App 原始碼）
+#   APP_SWIFT_TARGET / app_sources / compile_app（App 原始碼）
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
 MACMEOW_TOOLS_LOADED=1
 
@@ -11,9 +11,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=../scripts/lib/common.sh
 source "$ROOT/scripts/lib/common.sh"
 
-TOOLS_BIN="$ROOT/build/tools" # tools/dev/build.sh 的產物
-DEBUG_DIR="$ROOT/debug"       # 所有診斷輸出（.gitignore）
-# shellcheck disable=SC2034  # build-app.sh、release.sh 使用
+TOOLS_BIN="$ROOT/build/tools"            # tools/dev/build.sh 的產物
+DEBUG_DIR="$ROOT/debug"                  # 所有診斷輸出（.gitignore）
 APP_SWIFT_TARGET="arm64-apple-macos13.0" # App 的 swiftc target；與 Info.plist 的 LSMinimumSystemVersion 一致
 
 # 開發工具缺少時的提示（清單在 Brewfile）
@@ -150,4 +149,14 @@ app_sources() {
   for dir in "${@:-.}"; do
     while IFS= read -r f; do APP_SOURCES+=("$f"); done < <(find "$ROOT/app/Sources/$dir" -name '*.swift' | sort)
   done
+}
+
+# compile_app <輸出檔> [swiftc 參數...]：以 build-app.sh 的參數編譯 app/Sources（lint.sh app 另加 -warnings-as-errors）。
+compile_app() {
+  local out="$1"
+  shift
+  app_sources
+  swiftc -O -swift-version 5 -parse-as-library -module-name MacMeow \
+    -sdk "$(xcrun --sdk macosx --show-sdk-path)" -target "$APP_SWIFT_TARGET" \
+    "$@" -o "$out" "${APP_SOURCES[@]}"
 }

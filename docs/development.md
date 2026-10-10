@@ -42,3 +42,5 @@ prek update
 ```
 
 Hook 清單見 `prek.toml`；各工具的設定檔：`.editorconfig`（shfmt）、`.shellcheckrc`、`.swift-format`、`ruff.toml`、`_typos.toml`、`committed.toml`（commit 訊息）。shfmt、`swift format`、ruff 會直接改寫檔案，改完重新 `git add` 再提交。
+
+`AGENTS.md` 的規範能自動檢查的都在 prek：內建 hook 寫得出的（`deny-pattern` 等）直接寫在 `prek.toml`，其餘由 `tools/dev/lint.sh` 檢查（各檢查見腳本開頭，可用 `just lint <檢查>` 單獨執行）。改到 `app/` 的 Swift 時，`lint-app` 會完整編譯一次 App（約 10 秒）。確定要略過某個 hook 時用 `SKIP=<hook id> git commit …`，並在 commit body 說明原因。

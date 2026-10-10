@@ -25,7 +25,7 @@ hooks = [
   { id = "check-added-large-files", args = ["--maxkb=1024"] },
   { id = "forbid-new-submodules" },
   { id = "detect-private-key" },
-  # AGENTS.md Hard rules 1–3：遊戲／登入器檔案、login.txt、.env、診斷與建置輸出
+  # 不提交遊戲／登入器檔案（AGENTS.md Hard rule 1）、login.txt（Hard rule 2）、.env、診斷與建置輸出
   { id = "deny-filename-pattern", name = "forbid game and private files", args = [
     '(?i)(\.exe$|\.wz$|(^|/)xcgui\.dll$|(^|/)login\.txt$|(^|/)\.env$|^(debug|build|dist)/)',
   ] },
@@ -36,6 +36,31 @@ hooks = [
   # $name 緊接全形字元時 zh_TW locale 會把它當成變數名稱的一部分，要寫成 ${name}
   { id = "deny-pattern", alias = "bash-brace-cjk", name = "brace variables before CJK text", files = '\.(sh|bash)$', args = [
     '\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]',
+  ] },
+  # scripts/ 是使用者流程（打包進 App）：只用 macOS 內建指令，不呼叫 tools/（註解除外）
+  { id = "deny-pattern", alias = "scripts-builtin-only", name = "scripts use macOS built-ins only", files = '^scripts/', args = [
+    '^[^#]*\b(python3?|pip3?|uv|swiftc|xcrun|clang|just|jq)\b|^[^#"]*\bbrew\s|^[^#]*\btools/',
+  ] },
+  # experiments/ 是一次性實驗，其他資料夾不可依賴
+  { id = "deny-pattern", alias = "no-experiments-deps", name = "no dependency on experiments", files = '^(scripts|app|tools)/', exclude = '^tools/dev/lint\.sh$', args = [
+    'experiments/',
+  ] },
+  # 不寫死家目錄或使用者名稱（路徑由腳本位置、HOME、GAME_DIR、CYDER_ENGINE 決定）
+  { id = "deny-pattern", alias = "no-home-paths", name = "no hard-coded home directories", exclude = '^patches/bin/', args = ['/Users/[A-Za-z]|/home/[A-Za-z]'] },
+  # 迴路與遊戲 IP 只定義在 scripts/lib/common.sh
+  { id = "deny-pattern", alias = "shared-ips", name = "loopback IPs only in common.sh", files = '\.(sh|swift|c|py)$', exclude = '^scripts/lib/common\.sh$', args = [
+    '^[^#]*(\b127\.(?!0\.0\.1\b)\d+\.\d+\.\d+|\b202\.80\.104\.28\b)',
+  ] },
+  # 只有 setup-loopback.sh 以 root 執行：提權只出現在呼叫它的 uninstall.sh 與 App 的 Scripts.swift
+  { id = "deny-pattern", alias = "root-only-loopback", name = "privilege escalation only for setup-loopback", files = '\.(sh|swift)$', exclude = '^(scripts/(uninstall|setup-loopback)\.sh|app/Sources/Services/Scripts\.swift)$', args = [
+    '^[^#"]*\bsudo\s|with administrator privileges',
+  ] },
+  # App 分層：Core 只用 Foundation；SwiftUI 只在 UI 與 App
+  { id = "deny-pattern", alias = "app-core-foundation", name = "app Core imports Foundation only", files = '^app/Sources/Core/', args = ['^\s*import\s+(?!Foundation\b)'] },
+  { id = "deny-pattern", alias = "app-swiftui-layers", name = "SwiftUI only in app UI and App", files = '^app/Sources/(Core|Services|Features)/', args = ['^\s*import\s+SwiftUI\b'] },
+  # App 只經由 Services/Scripts.swift 呼叫 scripts/
+  { id = "deny-pattern", alias = "app-scripts-entry", name = "app runs scripts only via Scripts.swift", files = '^app/Sources/', exclude = '^app/Sources/Services/Scripts\.swift$', args = [
+    '"[^"]*\.sh"|AppPaths\.script\(',
   ] },
 ]
 
@@ -91,12 +116,19 @@ hooks = [{ id = "committed" }] # 規則在 committed.toml
 [[repos]]
 repo = "local"
 hooks = [
-  # Definition of done #1：以 macOS 內建 bash 3.2 檢查語法
+  # 以 macOS 內建 bash 3.2 檢查語法
   { id = "bash32-syntax", name = "bash 3.2 syntax check", language = "system", entry = "/bin/bash -n", types = ["shell"] },
   # Swift：工具鏈內建的 swift-format，設定在 .swift-format
   { id = "swift-format", name = "swift format", language = "system", entry = "swift format format --in-place --parallel", types = ["swift"] },
   { id = "swift-format-lint", name = "swift format lint", language = "system", entry = "swift format lint --strict --parallel", types = ["swift"] },
-  # AGENTS.md Hard rule 6：預建 DLL 必須與 SHA256SUMS 一致
-  { id = "dll-sha256", name = "verify patches/bin SHA256SUMS", language = "system", entry = "bash -c 'cd patches/bin/x86_64-windows && shasum -a 256 -c --quiet ../SHA256SUMS'", files = '^patches/bin/', pass_filenames = false },
+  # tools/dev/lint.sh：內建 hook 管不到的規範（各檢查的內容見腳本開頭）
+  { id = "lint-app", name = "app builds without warnings", language = "system", entry = "bash tools/dev/lint.sh app", files = '^(app/.*\.swift|tools/lib\.sh)$', pass_filenames = false },
+  { id = "app-tests", name = "app Core unit tests", language = "system", entry = "bash tools/dev/test-app.sh", files = '^app/(Sources/Core|Tests)/', pass_filenames = false },
+  { id = "lint-dlls", name = "prebuilt DLL checksums and sources", language = "system", entry = "bash tools/dev/lint.sh dlls", files = '^patches/', pass_filenames = false },
+  { id = "lint-external-state", name = "external state is restorable", language = "system", entry = "bash tools/dev/lint.sh external-state", files = '^(scripts/.*\.sh|docs/external-state\.md)$', pass_filenames = false },
+  { id = "lint-gitignore", name = ".gitignore keeps private files out", language = "system", entry = "bash tools/dev/lint.sh gitignore", files = '^(\.gitignore|scripts/lib/common\.sh)$', pass_filenames = false },
+  { id = "lint-justfile", name = "justfile forwards every tool script", language = "system", entry = "bash tools/dev/lint.sh justfile", files = '^(justfile|tools/.*\.sh|experiments/build\.sh)$', pass_filenames = false },
+  { id = "lint-usage", name = "bad arguments exit 64 via usage", language = "system", entry = "bash tools/dev/lint.sh usage", files = '^(scripts|tools)/.*\.sh$', pass_filenames = false },
+  { id = "lint-release-files", name = "VERSION and released changelog untouched", language = "system", entry = "bash tools/dev/lint.sh release-files", files = '^(VERSION|CHANGELOG\.md)$', pass_filenames = false },
   { id = "commit-body", name = "require commit message body", language = "system", entry = "bash tools/dev/check-commit-body.sh", stages = ["commit-msg"] },
 ]

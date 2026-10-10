@@ -120,10 +120,8 @@ check_sources() {
     git ls-files 'scripts/*.sh' 'app/*.sh' | xargs shellcheck -x -S warning || die "shellcheck 有警告"
     ok "shellcheck（scripts/、app/）"
   fi
-  app_sources
-  swiftc -typecheck -swift-version 5 -parse-as-library -target "$APP_SWIFT_TARGET" \
-    -sdk "$(xcrun --sdk macosx --show-sdk-path)" "${APP_SOURCES[@]}" || die "app/Sources 無法編譯"
-  ok "swiftc -typecheck（app/Sources）"
+  bash "$ROOT/tools/dev/lint.sh" app || die "App 編譯失敗或有警告（bash tools/dev/lint.sh app）"
+  ok "App 編譯無警告（tools/dev/lint.sh app）"
   bash "$ROOT/tools/dev/test-app.sh" >/dev/null || die "app/Sources/Core 單元測試失敗（bash tools/dev/test-app.sh）"
   ok "Core 單元測試（tools/dev/test-app.sh）"
 
@@ -160,7 +158,7 @@ cmd_prepare() {
   mv "$tmp" CHANGELOG.md
   printf '%s\n' "$v" >VERSION
   git add CHANGELOG.md VERSION
-  git commit -q -m "chore(release): $v" -m "Move the Unreleased changelog entries under $v and set VERSION to $v."
+  MACMEOW_RELEASE=1 git commit -q -m "chore(release): $v" -m "Move the Unreleased changelog entries under $v and set VERSION to $v."
   git tag -a "v$v" -m "MacMeow $v"
   echo "已建立 commit「chore(release): ${v}」與 tag v${v}（尚未 push）。"
   echo "下一步：bash tools/release/release.sh build ${v} 並冒煙測試，再 publish ${v}（push 後由 GitHub Actions 建置並正式發佈）"
@@ -389,5 +387,5 @@ cmd_tap() {
 ver_valid "$2" || die "版本格式需為 X.Y.Z：$2"
 case "$1" in
   check | prepare | build | publish | ci | draft | release | tap) "cmd_$1" "$2" ;;
-  *) die "未知指令：$1" ;;
+  *) usage_doc ;;
 esac

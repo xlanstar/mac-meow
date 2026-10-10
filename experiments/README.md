@@ -1,6 +1,6 @@
 # 實驗
 
-回答一次性問題的程式；定位與相依限制見 [AGENTS.md](../AGENTS.md#code-conventions)「Code conventions」。
+回答一次性問題的程式；定位見 [AGENTS.md](../AGENTS.md#code-conventions)「Code conventions」；其他資料夾不可依賴實驗（prek 檢查）。
 
 ## 規範
 
