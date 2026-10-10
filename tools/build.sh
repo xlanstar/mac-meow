@@ -6,7 +6,7 @@
 # macOS 工具（只需 Xcode clang）：
 #   machstack                原生 arm64，以 Mach API 讀 Rosetta 程序（src/machstack）
 #   symx86                   x86_64，在 Rosetta 下以 dladdr 解析 shared cache 符號
-# Windows 工具（brew install llvm lld）：
+# Windows 工具（Homebrew llvm lld，見 Brewfile）：
 #   wthreads.exe             不需 Windows SDK：自行宣告 API，以 llvm-dlltool 產生 import lib（lib.sh 的 nosdk_exe）
 #   wgui.exe recvcheck.exe   使用 Wine 建置樹的標頭與 import lib（先執行 tools/build-wine-dlls.sh）
 set -uo pipefail

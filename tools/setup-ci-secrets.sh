@@ -28,7 +28,7 @@ KEYCHAIN="${MACMEOW_EXPORT_KEYCHAIN:-$(security login-keychain | sed 's/^[[:spac
 repo=""
 if ((! DRY_RUN)); then
   [[ -t 0 ]] || die "請在終端機執行（需要輸入 Apple 帳密）"
-  need_cmd gh "brew install gh"
+  need_cmd gh
   gh auth status >/dev/null 2>&1 || die "請先 gh auth login"
   repo="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)" \
     || die "找不到 GitHub repo：請先建立 repo 並設定 origin（例如 gh repo create <名稱> --private --source .）"

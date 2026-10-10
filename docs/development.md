@@ -4,7 +4,7 @@
 
 - Apple Silicon Mac、Rosetta 2、Cyder。
 - Xcode 或 Command Line Tools（`swiftc`、`/usr/bin/clang`、`iconutil`）：建置 `MacMeow.app` 與 `tools/src/` 的 macOS 工具。
-- `brew install llvm lld bison`：只有重建 Wine DLL 與 Windows 端工具時需要。
+- 開發工具：在 repo 根目錄執行 `brew bundle`（清單在 `Brewfile`），`bash tools/doctor.sh` 檢查是否齊全。
 
 ## 目錄分工
 
@@ -49,7 +49,6 @@ done # 前三個應輸出「保留 MacMeow 的修補與設定」，uninstall 輸
 ## 提交前檢查（prek）
 
 ```sh
-brew install prek
 prek install            # 安裝 pre-commit 與 commit-msg hook
 prek run -a             # 對所有檔案執行
 prek update             # 更新 hook 版本（改寫 prek.toml 的 rev）

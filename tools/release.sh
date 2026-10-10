@@ -37,7 +37,7 @@ ver_gt() {
 }
 
 tag_exists() { git rev-parse -q --verify "refs/tags/v$1" >/dev/null; }
-need_gh() { need_cmd gh "brew install gh"; }
+need_gh() { need_cmd gh; }
 # release_is_draft <X.Y.Z>：輸出 GitHub Release 的 isDraft（true／false）；沒有該 Release 時回傳非 0。
 release_is_draft() { gh release view "v$1" --json isDraft --jq .isDraft 2>/dev/null; }
 release_url() { gh release view "v$1" --json url --jq .url; }

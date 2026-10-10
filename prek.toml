@@ -1,4 +1,4 @@
-# prek（https://prek.j178.dev）設定。安裝：brew install prek && prek install
+# prek（https://prek.j178.dev）設定。安裝：brew bundle && prek install
 # 更新 hook 版本：prek update
 #:schema https://www.schemastore.org/prek.json
 

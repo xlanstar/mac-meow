@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # 開發工具共用設定。tools/*.sh 以 `source "$(cd "$(dirname "$0")" && pwd)/lib.sh"` 載入。
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
-#   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、ok、usage_doc、need_cmd、out_dir、maple_pids、need_tool、in_terminal、
+#   ROOT / TOOLS_BIN / DEBUG_DIR、BREW_HINT、load_env、ok、usage_doc、need_cmd、out_dir、maple_pids、need_tool、in_terminal、
 #   run_wine、llvm_paths（LLVM 路徑）、nosdk_exe / NOSDK_MSVCRT（不需 SDK 的 Windows 程式）、
 #   APP_SWIFT_TARGET / app_sources（App 原始碼）
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
@@ -15,6 +15,9 @@ TOOLS_BIN="$ROOT/build/tools" # tools/build.sh 的產物
 DEBUG_DIR="$ROOT/debug"       # 所有診斷輸出（.gitignore）
 # shellcheck disable=SC2034  # build-app.sh、release.sh 使用
 APP_SWIFT_TARGET="arm64-apple-macos13.0" # App 的 swiftc target；與 Info.plist 的 LSMinimumSystemVersion 一致
+
+# 開發工具缺少時的提示（清單在 Brewfile）
+BREW_HINT="在 repo 根目錄執行 brew bundle"
 
 # load_env：載入 repo 根目錄的 .env（本機設定，不提交；範本見 .env.example）。
 # 格式為每行 KEY=VALUE（可加 export、引號、# 註解）；已存在的環境變數優先，不會被覆蓋。
@@ -46,8 +49,8 @@ usage_doc() {
   exit 64
 }
 
-# need_cmd <指令> <安裝方式>：缺少指令就結束。
-need_cmd() { command -v "$1" >/dev/null || die "需要 ${1}（${2}）"; }
+# need_cmd <指令>：缺少指令就結束。
+need_cmd() { command -v "$1" >/dev/null || die "需要 ${1}（${BREW_HINT}）"; }
 
 # out_dir <prefix>：建立 debug/<prefix>-<時間> 並輸出路徑（權限只限本人）。
 out_dir() {
@@ -72,7 +75,7 @@ need_tool() {
   ((${#missing[@]} == 0)) || bash "$ROOT/tools/build.sh" "${missing[@]}"
 }
 
-# 設定 LLVM_BIN／LLD_BIN／BISON_BIN（Homebrew：brew install llvm lld bison）；缺少時回傳 1。
+# 設定 LLVM_BIN／LLD_BIN／BISON_BIN（Homebrew，見 Brewfile）；缺少 LLVM／lld 時回傳 1。
 llvm_paths() {
   local brew
   brew="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
@@ -81,7 +84,7 @@ llvm_paths() {
   # shellcheck disable=SC2034  # build-wine-dlls.sh 使用
   BISON_BIN="$brew/opt/bison/bin"
   [[ -x "$LLVM_BIN/clang" && -x "$LLD_BIN/lld-link" ]] || {
-    echo "缺少 Homebrew LLVM／lld（brew install llvm lld bison）" >&2
+    echo "缺少 Homebrew LLVM／lld（${BREW_HINT}）" >&2
     return 1
   }
   export LLVM_BIN LLD_BIN
