@@ -6,7 +6,8 @@
 #                            不依賴 LLDB／Rosetta 除錯協定，對「收不到訊號、LLDB 無法暫停」的程序也有效。
 #   prof [次數=20] [間隔=0.5]  連續 mach 快照，統計各執行緒 CPU 增量與最常見呼叫鏈。
 #   lldb                     LLDB 附加，擷取所有執行緒原生堆疊後 detach（程序短暫停住）。
-# mach、prof、lldb 需要先執行 bash tools/sign-debug.sh apply（get-task-allow）。
+#   wine                     winedbg 附加 Windows 程序，逐執行緒 bt（Windows 端堆疊，含 PE 符號）後 detach。
+# mach、prof、lldb 需要先執行 bash tools/sign-debug.sh apply（get-task-allow）；wine 不需要。
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
@@ -65,9 +66,39 @@ cmd_lldb() {
   echo "$out"
 }
 
+# winedbg 的 `info thread`：程序行「<wpid 8 位 hex>[ (D)] <exe 檔名>」，其下執行緒行「<tab><tid> <prio> ...」。
+# 只取 MapleStory.exe 的「wpid tid」（只有 exe 檔名，不含命令列參數）。
+maple_wine_threads() {
+  /usr/bin/awk '
+    { sub(/\r$/, "") }
+    /^[0-9a-f]+ / { wpid = $1; keep = (tolower($NF) ~ /(^|\\)maplestory\.exe$/); next }
+    keep && /^\t[0-9a-f]+ / { print wpid, $1 }
+  ' "$1"
+}
+
+# 不用 `bt all`：它會逐一附加 bottle 內所有程序。改為只附加 MapleStory.exe，逐一 `bt <tid>`；結束時 winedbg 會 detach。
+cmd_wine() {
+  local out wpid cmds tid
+  require_maple # 確認 Wine 已在執行，避免 run_wine 啟動新的 wineserver
+  out="$(out_dir winedbg)"
+  run_wine winedbg --command "info thread" >"$out/threads.txt" 2>&1 || true
+  maple_wine_threads "$out/threads.txt" >"$out/maple-threads.txt"
+  [[ -s "$out/maple-threads.txt" ]] || die "winedbg 找不到 MapleStory.exe，見 ${out}/threads.txt"
+  for wpid in $(/usr/bin/awk '{ print $1 }' "$out/maple-threads.txt" | sort -u); do
+    cmds=""
+    for tid in $(/usr/bin/awk -v p="$wpid" '$1 == p { print $2 }' "$out/maple-threads.txt"); do
+      cmds+="bt 0x$tid"$'\n' # 每行一個指令（--command 的字串原樣寫入指令檔）
+    done
+    echo "winedbg 擷取 wpid=0x${wpid} ..."
+    run_wine winedbg --command "$cmds" "0x$wpid" >"$out/bt-$wpid.txt" 2>&1 \
+      || echo "winedbg 失敗，見 ${out}/bt-${wpid}.txt" >&2
+  done
+  echo "$out"
+}
+
 mode="${1:-mach}"
 shift || true
 case "$mode" in
-  mach | prof | lldb) "cmd_$mode" "$@" ;;
-  *) usage "mach|prof|lldb [參數]" ;;
+  mach | prof | lldb | wine) "cmd_$mode" "$@" ;;
+  *) usage "mach|prof|lldb|wine [參數]" ;;
 esac
