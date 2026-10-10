@@ -10,7 +10,8 @@
  *   H <pid> <間隔 us> <開始 epoch us>
  *   D <載入位址> <__TEXT 大小> <路徑>       x86 dyld 映像（含 shared cache 內的；只輸出新出現的）
  *   M <起點> <終點> <prot> <路徑|->         有檔案的區段與可執行的匿名區段；只輸出新出現的
- *                                           （映像與區段每 REGION_REFRESH_US 重掃）
+ *                                           （映像與區段由背景執行緒每 REGION_REFRESH_US 重掃；Wine 程序的
+ *                                            區段表很大，一次約 150 ms，放在取樣迴圈裡會讓取樣停頓）
  *   N <pid> <名稱>                          程序名稱（argv[0] 的檔名，第一次看到時）
  *   P <t> <pid> <CPU us>                    同使用者其他程序的累計 CPU（每 PROC_REFRESH_US，只輸出有增加的）
  *   C <t> <faults> <pageins> <cow_faults> <csw> <mach syscalls> <unix syscalls> <msgs sent> <msgs recv> <running threads>
@@ -30,6 +31,7 @@
 #include <mach/thread_status.h>
 #include <mach/mach_error.h>
 #include <libproc.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,8 +77,15 @@ struct range {
     int prot;
     uint32_t hash;
 };
+/* exec_ranges：取樣迴圈使用。其餘（scan_*）只由重掃的執行緒使用，結果放在 staged_* 再由取樣迴圈取用。 */
 static struct range exec_ranges[MAX_REGIONS], seen_regions[MAX_REGIONS], next_regions[MAX_REGIONS], images[MAX_IMAGES];
-static int nexec, nseen, nimages;
+static struct range scan_exec[MAX_REGIONS], staged_exec[MAX_REGIONS];
+static int nexec, nseen, nimages, nscan_exec, nstaged;
+static FILE *scan_out; /* 重掃產生的 M、D 行 */
+static char *staged_text;
+static size_t staged_len;
+static int staged_ready;
+static pthread_mutex_t staged_lock = PTHREAD_MUTEX_INITIALIZER;
 
 struct proc {
     int pid;
@@ -135,7 +144,7 @@ static void scan_regions(void) {
     struct proc_regionwithpathinfo ri;
     uint64_t addr = 0;
     int nnext = 0;
-    nexec = 0;
+    nscan_exec = 0;
     while (nnext < MAX_REGIONS && proc_pidinfo(pid, PROC_PIDREGIONPATHINFO, addr, &ri, sizeof ri) == sizeof ri) {
         uint64_t start = ri.prp_prinfo.pri_address, end = start + ri.prp_prinfo.pri_size;
         int prot = ri.prp_prinfo.pri_protection;
@@ -143,12 +152,12 @@ static void scan_regions(void) {
         if (end <= addr) break;
         addr = end;
         if (prot & VM_PROT_EXECUTE) {
-            if (nexec && exec_ranges[nexec - 1].end == start) exec_ranges[nexec - 1].end = end;
-            else if (nexec < MAX_REGIONS) exec_ranges[nexec++] = (struct range){start, end, prot, 0};
+            if (nscan_exec && scan_exec[nscan_exec - 1].end == start) scan_exec[nscan_exec - 1].end = end;
+            else if (nscan_exec < MAX_REGIONS) scan_exec[nscan_exec++] = (struct range){start, end, prot, 0};
         }
         if (!path[0] && !(prot & VM_PROT_EXECUTE)) continue;
         struct range r = {start, end, prot, hash_str(path)};
-        if (!region_seen(&r)) printf("M %llx %llx %d %s\n", start, end, prot, path[0] ? path : "-");
+        if (!region_seen(&r)) fprintf(scan_out, "M %llx %llx %d %s\n", start, end, prot, path[0] ? path : "-");
         next_regions[nnext++] = r;
     }
     memcpy(seen_regions, next_regions, nnext * sizeof *next_regions);
@@ -205,7 +214,7 @@ static void scan_images(void) {
             mach_vm_read_overwrite(task, (uint64_t)arr[i].imageFilePath, sizeof path - 1, (mach_vm_address_t)path, &got);
             uint64_t size = text_size(load);
             images[nimages++] = (struct range){load, load + size, VM_PROT_READ | VM_PROT_EXECUTE, 0};
-            if (path[0]) printf("D %llx %llx %s\n", load, size, path);
+            if (path[0]) fprintf(scan_out, "D %llx %llx %s\n", load, size, path);
         }
     }
     free(arr);
@@ -216,20 +225,67 @@ static int cmp_range(const void *a, const void *b) {
     return x->start < y->start ? -1 : x->start > y->start;
 }
 
-/* exec_ranges = 可執行區段 ∪ 映像 __TEXT，排序並合併重疊 */
+/* scan_exec = 可執行區段 ∪ 映像 __TEXT，排序並合併重疊 */
 static void build_exec_ranges(void) {
-    for (int i = 0; i < nimages && nexec < MAX_REGIONS; i++)
-        if (images[i].end > images[i].start) exec_ranges[nexec++] = images[i];
-    qsort(exec_ranges, nexec, sizeof *exec_ranges, cmp_range);
+    for (int i = 0; i < nimages && nscan_exec < MAX_REGIONS; i++)
+        if (images[i].end > images[i].start) scan_exec[nscan_exec++] = images[i];
+    qsort(scan_exec, nscan_exec, sizeof *scan_exec, cmp_range);
     int out = 0;
-    for (int i = 0; i < nexec; i++) {
-        if (out && exec_ranges[i].start <= exec_ranges[out - 1].end) {
-            if (exec_ranges[i].end > exec_ranges[out - 1].end) exec_ranges[out - 1].end = exec_ranges[i].end;
+    for (int i = 0; i < nscan_exec; i++) {
+        if (out && scan_exec[i].start <= scan_exec[out - 1].end) {
+            if (scan_exec[i].end > scan_exec[out - 1].end) scan_exec[out - 1].end = scan_exec[i].end;
         } else {
-            exec_ranges[out++] = exec_ranges[i];
+            scan_exec[out++] = scan_exec[i];
         }
     }
-    nexec = out;
+    nscan_exec = out;
+}
+
+/* 重掃一次，結果交給取樣迴圈（上一份還沒被取用時等下一輪） */
+static void rescan(void) {
+    char *text = NULL;
+    size_t len = 0;
+    scan_out = open_memstream(&text, &len);
+    if (!scan_out) return;
+    scan_images();
+    scan_regions();
+    build_exec_ranges();
+    fclose(scan_out);
+    pthread_mutex_lock(&staged_lock);
+    if (!staged_ready) {
+        memcpy(staged_exec, scan_exec, nscan_exec * sizeof *scan_exec);
+        nstaged = nscan_exec;
+        staged_text = text;
+        staged_len = len;
+        staged_ready = 1;
+        text = NULL;
+    }
+    pthread_mutex_unlock(&staged_lock);
+    free(text);
+}
+
+static void *rescan_thread(void *arg) {
+    (void)arg;
+    for (uint64_t slept = 0; !stop;) {
+        usleep(100000); /* 分段睡，結束時不必等滿一個週期 */
+        if ((slept += 100000) < REGION_REFRESH_US) continue;
+        slept = 0;
+        rescan();
+    }
+    return NULL;
+}
+
+/* 取樣迴圈：有新的重掃結果就換上（輸出順序上 M、D 行在使用它們的 S 行之前） */
+static void take_rescan(int wait) {
+    if (wait ? pthread_mutex_lock(&staged_lock) : pthread_mutex_trylock(&staged_lock)) return;
+    if (staged_ready) {
+        memcpy(exec_ranges, staged_exec, nstaged * sizeof *staged_exec);
+        nexec = nstaged;
+        fwrite(staged_text, 1, staged_len, stdout);
+        free(staged_text);
+        staged_ready = 0;
+    }
+    pthread_mutex_unlock(&staged_lock);
 }
 
 /* ---------- 程序 ---------- */
@@ -453,21 +509,17 @@ int main(int argc, char **argv) {
     uint64_t interval = (uint64_t)(interval_ms * 1000), start = now_us();
     uint64_t deadline = seconds > 0 ? start + (uint64_t)(seconds * 1e6) : 0;
     printf("H %d %llu %llu\n", pid, interval, start);
-    scan_images();
-    scan_regions();
-    build_exec_ranges();
+    rescan();
+    take_rescan(1);
+    pthread_t rescanner;
+    pthread_create(&rescanner, NULL, rescan_thread, NULL);
     sample_procs(start);
 
-    uint64_t next = start, last_regions = start, last_procs = start, samples = 0, behind = 0, cost_sum = 0, cost_max = 0;
+    uint64_t next = start, last_procs = start, samples = 0, behind = 0, cost_sum = 0, cost_max = 0;
     while (!stop) {
         uint64_t t = now_us();
         if (deadline && t >= deadline) break;
-        if (t - last_regions >= REGION_REFRESH_US) {
-            scan_images();
-            scan_regions();
-            build_exec_ranges();
-            last_regions = t;
-        }
+        take_rescan(0);
         if (t - last_procs >= PROC_REFRESH_US) {
             sample_procs(t);
             last_procs = t;
@@ -488,6 +540,8 @@ int main(int argc, char **argv) {
             usleep((useconds_t)(next - after));
         }
     }
+    stop = 1;
+    pthread_join(rescanner, NULL);
     for (int i = 0; i < nthreads; i++) mach_port_deallocate(mach_task_self(), threads[i].port);
     printf("E %llu %llu %llu %llu %llu\n", now_us(), samples, behind, samples ? cost_sum / samples : 0, cost_max);
     fflush(stdout);

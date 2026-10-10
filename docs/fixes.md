@@ -55,6 +55,7 @@
   - VM 每次進出寫入鎖變數 `0x14aa316a4`（watchpoint 確認寫入指令 `0x14ae588a6` 等），它與 VM handler 跳躍表程式碼（`0x14aa31cae`…）同在 4 KB 頁 `0x14aa31000`。
   - 熱鬧城鎮（頻道 1）對比人少地方：VM 鎖切換 23,000 對 7,500 次/秒；page fault 75,000 對 13,700 次/秒；主執行緒 CPU 約 100% 對 32%；Rosetta exceptionserver CPU 21.5% 對 4.3%。
   - `experiments/smc-same-page`：程式碼與頻繁寫入的變數同頁時慢約 11,500 倍。
+  - 打怪、撿道具時的掉幀（`just stack hitch 60`，D3DMetal、120 Hz）：60 秒 3,631 幀、超過 33 ms 的卡頓合計約 20 秒。依幀長分組，34–250 ms 的幀與 12 ms 以下的幀相比，page fault 59,000 對 36,000 次/秒、Rosetta exceptionserver CPU 14% 對 8.9%；卡頓期間主執行緒處於 Rosetta 執行環境的比例 18%（最多 47%）對平常 10%，其餘多在 `.themida` 區段的程式碼。卡頓期間 D3DMetal 送出命令的執行緒在等主執行緒，GPU 時間最多 34 ms。同次擷取中的其他來源：最長的一次（2.3 秒）是載入圖片的執行緒經 `D3DMTexture::ReplaceRegion` 讓 AGX 驅動在 CPU 上壓縮貼圖、主執行緒等它的鎖（佔卡頓時間 13%）；Wine 的 `l3codeca.acm` 每開一個 MP3 串流就重建 mpg123 的 dither 表（每秒 7 次、每次約 5 ms，佔主執行緒 4–5%）。
 - 根因：x86 CPU 以快取行偵測自我修改程式碼，不同行就沒有成本；Rosetta 以整頁保護已翻譯的程式碼，每次寫入都要「例外、讓翻譯失效、重新翻譯、重新保護」。VM 呼叫次數與畫面上的玩家、特效數量成正比。
 - 已試無效：
   - Rosetta 隱藏環境變數（`ROSETTA_*`、`CAMBRIA_*`）。

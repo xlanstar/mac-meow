@@ -26,7 +26,8 @@ just wgui list
 `just stack hitch` 在照常遊戲時連續取樣，同時要求 Metal HUD 產生效能報告（等同遊戲視窗選單 Metal HUD → Generate Performance Report），以報告的逐幀時間找出掉幀，比較「掉幀期間」與「平常」。需求與參數見 `stack.sh` 開頭。
 
 - Metal HUD 的「記錄」功能（`MTL_HUD_LOG_ENABLED`、`ToggleLogEnabled`）不適用：遊戲中切換後沒有輸出；Cyder 收集 Wine stderr 的程式每累積 64 KB 才寫入 `last-wine-launch.log` 一次。
-- 效能報告只有逐幀間隔、沒有時間戳，各幀時間由要求的時間推算（偏移見 `hitchprof.py` 的 `REPORT_LEAD_US`）。
+- 效能報告只有逐幀間隔、沒有時間戳。`hitchprof.py` 以「正在呈現畫面」的取樣自動對齊（`calibrate`），報告開頭會印出對齊結果；長幀內呈現取樣密度接近平均（> 0.5）時對齊不可靠，改用固定偏移。
+- 判斷卡頓原因時要看「幀長 vs 指標」的趨勢，而不只是卡頓／平常二分：例如依幀長分組比較 page fault、Rosetta exceptionserver 的 CPU、主執行緒處於「Rosetta 執行環境」的比例（[fixes.md #9](fixes.md#9-人多的地方很卡themida-vm--rosetta-smc未解) 的實例）。
 
 報告的讀法：
 

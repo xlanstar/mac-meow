@@ -7,7 +7,8 @@
 
 用法：hitchprof.py <machsample 輸出> <HUD 效能報告> --start-us N [--threshold-ms N] [--lead-ms N] [--top N]
   HUD 效能報告：libMTLHud 產生的 libMTLHud_<程序>_<時間>_<秒數>s.html（格式見 parse_report）；
-  --start-us      要求產生報告的時間（epoch 微秒；stack.sh hitch 記在 report-start.txt），報告的第一幀由此起算
+  --start-us      要求產生報告的時間（epoch 微秒；stack.sh hitch 記在 report-start.txt）
+  --offset-ms     第一幀相對 --start-us 的時間（預設：以呈現畫面的取樣自動對齊，見 calibrate）
   沒有幀資料時只輸出整段擷取的統計。
   --threshold-ms  卡頓門檻（預設：中位數 ×3 與中位數 +25 ms 取大者）
   --lead-ms       卡頓幀往前多算的時間（預設 2 幀）：D3DMetal 會排隊數幀，造成卡頓的工作可能早於該幀開始
@@ -70,9 +71,12 @@ ATOS_IN = re.compile(r" \(in [^)]*\)")
 SYMBOL_SUFFIX = re.compile(r"(\s*\+\s*(0x)?[0-9a-f]+)?( \([^()]*:\d+\))?$")  # +偏移、(檔案:行號)
 REPORT_JSON = re.compile(r"<script[^>]*>\s*(\{.*?\})\s*</script>", re.DOTALL)
 REPORT_ROW = re.compile(r"<tr>\s*<td[^>]*>([^<]+)</td>((?:\s*<td[^>]*>[^<]*</td>)+)\s*</tr>")
-# 報告的第一幀比要求的時間早約 0.48 秒（x86 Metal 測試程式在固定時間點停頓，5 秒與 30 秒報告中
-# 停頓幀與實際停頓的差距中位數 477–495 ms、MAD 4 ms，報告內不漂移）
-REPORT_LEAD_US = 480_000
+# 報告沒有時間戳。HUD 收到要求後先倒數約 3 秒才開始收集（libMTLHud 的
+# "Performance report generation starting... %d"）：遊戲 60 秒報告自動對齊為 +2915 ms，x86 Metal 測試程式
+# （每 1.141 秒停頓一次，偏移只能確定到週期的倍數）為 +2943 ms。仍以取樣中「正在呈現畫面」的堆疊
+# （PRESENT_MARKERS）自動對齊，以吸收 notification 送達的延遲：長幀期間沒有呈現，這些取樣應該很少。
+PRESENT_MARKERS = ("NextDrawable", "nextDrawable", "libMTLHud", "Present")
+FALLBACK_OFFSET_MS = 2930  # 無法自動對齊時（呈現取樣太少）用的偏移
 REPORT_METRICS = (
     "FPS",
     "Frame Interval",
@@ -161,33 +165,108 @@ class Capture:
 class Frame:
     __slots__ = ("end", "interval", "start")
 
-    def __init__(self, start: int, interval_ms: float) -> None:
-        self.start = start
-        self.end = start + int(interval_ms * 1000)
-        self.interval = interval_ms
+    def __init__(self, start: int, end: int, interval_ms: float) -> None:
+        self.start, self.end = start, end
+        self.interval = interval_ms  # 報告中的間隔；start/end 是對齊後的實際時間
 
 
-def parse_report(path: Path, start_us: int) -> tuple[list[Frame], list[str]]:
+def parse_report(path: Path) -> tuple[list[float], list[str]]:
     """Metal HUD 效能報告（HUD 選單的 Generate Performance Report，或 Darwin notification
     `com.apple.metal.hud.notify.PerformanceReport-<秒數>s`）：HTML 內的 JSON `{"frameintervals": [ns, ...]}`
-    依序列出報告期間每一幀的間隔，沒有時間戳；從要求產生報告的時間減 REPORT_LEAD_US 往後累加即得
-    各幀時間（誤差約數 ms）。
+    依序列出報告期間每一幀的間隔（ms），沒有時間戳（對齊見 calibrate）。
     另回傳報告「Metrics」表中幾項整段統計（平均／最後／最小／最大）。"""
     text = path.read_text(errors="replace")
     m = REPORT_JSON.search(text)
     if not m:
         return [], []
-    frames, t = [], start_us - REPORT_LEAD_US
-    for ns in json.loads(m[1]).get("frameintervals", []):
-        frame = Frame(t, ns / 1e6)
-        frames.append(frame)
-        t = frame.end
+    intervals = [ns / 1e6 for ns in json.loads(m[1]).get("frameintervals", [])]
     metrics = []
     for row in REPORT_ROW.finditer(text):
         if row[1].strip() in REPORT_METRICS:
             cells = re.findall(r"<td[^>]*>([^<]*)</td>", row[2])
             metrics.append(f"{row[1].strip()}：" + " / ".join(c.strip() for c in cells))
-    return frames, list(dict.fromkeys(metrics))
+    return intervals, list(dict.fromkeys(metrics))
+
+
+def place_frames(intervals: list[float], origin: int, scale: float) -> list[Frame]:
+    frames, elapsed = [], 0.0
+    for iv in intervals:
+        start = origin + int(elapsed * scale * 1000)
+        elapsed += iv
+        frames.append(Frame(start, origin + int(elapsed * scale * 1000), iv))
+    return frames
+
+
+def calibrate(an: Analysis, intervals: list[float], start_us: int) -> tuple[int, float, str]:
+    """找出第一幀的時間與時間比例，讓長幀（沒有呈現畫面的期間）內的呈現取樣密度相對整體最低。
+    回傳 (第一幀時間, 比例, 說明)。"""
+    cap = an.cap
+    marks = sorted(
+        s[0] for s in cap.stacks if any(k in f for f in an.chain(s)[:8] for k in PRESENT_MARKERS)
+    )
+    median = statistics.median(intervals)
+    cum = [0.0]
+    for iv in intervals:
+        cum.append(cum[-1] + iv)
+    long_idx = [i for i, iv in enumerate(intervals) if iv >= max(4 * median, 50)]
+    fallback = start_us + FALLBACK_OFFSET_MS * 1000
+    if len(marks) < 50 or len(long_idx) < 3:
+        return (
+            fallback,
+            1.0,
+            (
+                f"無法自動對齊（呈現取樣 {len(marks)} 次、長幀 {len(long_idx)} 個），"
+                f"假設第一幀在要求後 {FALLBACK_OFFSET_MS} ms；時間點可能有誤差"
+            ),
+        )
+    # 以取樣次數而非時間為分母：取樣中斷的期間（取樣程式被延遲）也沒有呈現取樣，不能當成長幀的證據
+    ticks = [c[0] for c in cap.counters]
+    density = len(marks) / max(len(ticks), 1)
+    long_total = sum(intervals[i] for i in long_idx) * 1000
+
+    def score(off_ms: float, scale: float) -> float:
+        origin = start_us + off_ms * 1000
+        n = span = sampled = 0.0
+        for i in long_idx:
+            a, b = origin + cum[i] * scale * 1000, origin + cum[i + 1] * scale * 1000
+            if a >= cap.start and b <= cap.end:
+                n += bisect.bisect_left(marks, b) - bisect.bisect_left(marks, a)
+                sampled += bisect.bisect_left(ticks, b) - bisect.bisect_left(ticks, a)
+                span += b - a
+        # 長幀大半要落在擷取範圍內，避免把它們移出範圍來得到低分
+        if span < 0.5 * long_total or not sampled:
+            return 9.0
+        return n / sampled / density
+
+    best = min(
+        (score(off, sc), off, sc)
+        for off in range(FALLBACK_OFFSET_MS - 1500, FALLBACK_OFFSET_MS + 1501, 20)
+        for sc in (1 + k / 1000 for k in range(-10, 11, 2))
+    )
+    _, off0, sc0 = best
+    best = min(
+        (score(off, sc), off, sc)
+        for off in range(off0 - 40, off0 + 41, 5)
+        for sc in (sc0 + k / 10000 for k in range(-20, 21, 4))
+    )
+    ratio, off, scale = best
+    if ratio > 0.5:
+        return (
+            fallback,
+            1.0,
+            (
+                f"自動對齊不可靠（長幀內呈現取樣密度為平均的 {ratio:.2f}），"
+                f"假設第一幀在要求後 {FALLBACK_OFFSET_MS} ms；時間點可能有誤差"
+            ),
+        )
+    return (
+        int(start_us + off * 1000),
+        scale,
+        (
+            f"以呈現取樣對齊：第一幀在要求後 {off:+.0f} ms、時間比例 {scale:.4f}"
+            f"（長幀內呈現取樣密度為平均的 {ratio:.2f}；越接近 0 越可靠）"
+        ),
+    )
 
 
 # ---------- 符號 ----------
@@ -355,14 +434,17 @@ def pct(part: float, whole: float) -> str:
 
 
 class Analysis:
-    def __init__(
-        self, cap: Capture, frames: list[Frame], metrics: list[str], args: argparse.Namespace
-    ) -> None:
+    def __init__(self, cap: Capture, metrics: list[str], args: argparse.Namespace) -> None:
         self.cap, self.args = cap, args
         self.sym = Symbols(cap)
         self.syscalls = syscall_names()
-        self.frames = [f for f in frames if f.start >= cap.start and f.end <= cap.end]
         self.metrics = metrics
+        self.alignment = ""
+        self.set_frames([])
+
+    def set_frames(self, frames: list[Frame]) -> None:
+        cap, args = self.cap, self.args
+        self.frames = [f for f in frames if f.start >= cap.start and f.end <= cap.end]
         intervals = [f.interval for f in self.frames]
         self.median = statistics.median(intervals) if intervals else 0
         self.threshold = args.threshold_ms or max(3 * self.median, self.median + 25)
@@ -464,20 +546,26 @@ class Analysis:
 # ---------- 報告 ----------
 
 
-def report(cap: Capture, frames: list[Frame], metrics: list[str], args: argparse.Namespace) -> None:
-    an = Analysis(cap, frames, metrics, args)
+def report(
+    cap: Capture, intervals: list[float], metrics: list[str], args: argparse.Namespace
+) -> None:
+    an = Analysis(cap, metrics, args)
     top = args.top
     print(f"目標 pid {cap.pid}，擷取 {(cap.end - cap.start) / 1e6:.1f} 秒；{cap.stats}")
+    an.sym.resolve({a for s in cap.stacks for a in s[5][:X86_FRAMES]})
+    if intervals:
+        if args.offset_ms is not None:
+            origin, scale = args.start_us + int(args.offset_ms * 1000), 1.0
+            an.alignment = f"指定第一幀在要求後 {args.offset_ms:+.0f} ms"
+        else:
+            origin, scale, an.alignment = calibrate(an, intervals, args.start_us)
+        an.set_frames(place_frames(intervals, origin, scale))
 
     by_phase: dict[int, list[tuple]] = collections.defaultdict(list)
     for stack in cap.stacks:
         p = an.phase(stack[0])
         if p is not None:
             by_phase[p].append(stack)
-    wanted = {a for stacks in by_phase.values() for s in stacks for a in s[5][:X86_FRAMES]}
-    if not an.frames:
-        wanted = {a for s in cap.stacks for a in s[5][:X86_FRAMES]}
-    an.sym.resolve(wanted)
 
     if not an.frames:
         print(
@@ -503,6 +591,7 @@ def print_frames(an: Analysis) -> None:
     intervals = sorted(f.interval for f in an.frames)
     p99 = intervals[min(len(intervals) - 1, int(len(intervals) * 0.99))]
     print("\n== 幀時間（Metal HUD 效能報告）")
+    print(an.alignment)
     print(
         f"{len(intervals)} 幀；中位數 {an.median:.2f} ms（約 {1000 / an.median:.0f} FPS）、"
         f"p99 {p99:.2f} ms、最長 {intervals[-1]:.2f} ms"
@@ -728,6 +817,7 @@ def main() -> None:
     parser.add_argument("samples", type=Path)
     parser.add_argument("report", type=Path)
     parser.add_argument("--start-us", type=int, required=True)
+    parser.add_argument("--offset-ms", type=float)
     parser.add_argument("--threshold-ms", type=float)
     parser.add_argument("--lead-ms", type=float)
     parser.add_argument("--top", type=int, default=12)
@@ -735,8 +825,8 @@ def main() -> None:
     cap = Capture(args.samples)
     if not cap.pid:
         sys.exit(f"{args.samples} 不是 machsample 的輸出")
-    frames, metrics = parse_report(args.report, args.start_us) if args.report.exists() else ([], [])
-    report(cap, frames, metrics, args)
+    intervals, metrics = parse_report(args.report) if args.report.exists() else ([], [])
+    report(cap, intervals, metrics, args)
 
 
 if __name__ == "__main__":

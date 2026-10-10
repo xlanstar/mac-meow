@@ -112,8 +112,8 @@ cmd_hitch() {
   touch "$out/.mark"
 
   echo "取樣 PID ${pid} ${secs} 秒，照常遊戲（Ctrl+C 中止）..."
-  # 取樣多跑 1 秒，涵蓋 notification 送達前後與報告的最後一幀
-  "$TOOLS_BIN/machsample" "$pid" "$gap" "$((secs + 2))" >"$out/samples.txt" &
+  # HUD 收到要求後約 3 秒才開始收集（見 hitchprof.py 的 FALLBACK_OFFSET_MS）；取樣涵蓋到報告結束後約 1 秒
+  "$TOOLS_BIN/machsample" "$pid" "$gap" "$((secs + 5))" >"$out/samples.txt" &
   sampler=$!
   sleep 0.5
   start="$(hud_report "$secs")" || die "無法送出 HUD 報告要求"
