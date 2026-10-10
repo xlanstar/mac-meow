@@ -4,3 +4,4 @@ extend-exclude = ["patches/*.patch", "patches/bin/"]
 [default.extend-words]
 seh = "seh"       # Wine debug channel（WINEDEBUG=+seh）
 passin = "passin" # openssl -passin
+numer = "numer"   # mach_timebase_info 的欄位

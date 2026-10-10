@@ -9,7 +9,7 @@ _default:
 
 # ---------- 診斷（tools/diag） ----------
 
-# 擷取目標程序堆疊：[--exe 名稱] [--pid pid]... mach|prof|lldb|wine [參數]
+# 擷取目標程序堆疊／卡頓分析：[--exe 名稱] [--pid pid]... mach|prof|hitch|lldb|wine [參數]
 [group('diag')]
 stack *args:
     @bash tools/diag/stack.sh "$@"

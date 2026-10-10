@@ -17,6 +17,9 @@
   - 可用條件（`cyder_d3dmetal_launch_allowed`、`cyder_dxmt_launch_allowed`、`cyder_dxvk_launch_allowed`、`cyder_preferred_gptk_root`、`cyder_gptk_root_is_valid`）或 `settings.json` 的 `graphicsBackend`／`graphicsHud`／`dxvkFrameRate` 值：同步 `common.sh` 的 `graphic_backend_available`、`gptk_complete` 與 `cyder-settings.sh`。
   - profile id 算法（`cyder-profile.sh` 的 `cyder_profile_id_for_path`）、`perProfile.<id>.environment` 格式或允許的環境變數（`cyder_game_environment_key_is_allowed`）：同步 `common.sh` 的 `cyder_profile_id` 與 `cyder-settings.sh`。
   - GPTK 改掉 `D3DM_MAX_FPS` 時，D3DMetal 的 FPS 上限會失效。
+- 卡頓分析（`just stack hitch`，見 [debugging.md](debugging.md#卡頓fps-drop)）依賴的外部格式：
+  - Cyder 改變收集 Wine stderr 的記錄檔位置或寫入方式：更新 `tools/lib.sh` 的 `CYDER_WINE_LOG`。
+  - macOS 改變 Metal HUD 的記錄行（`metal-HUD:`）格式或記錄開關（Darwin notification）：更新 `hitchprof.py` 的 `parse_hud` 與 `stack.sh` 的 `HUD_LOG_TOGGLE`。
 - 登入器改名：更新 `common.sh` 的 `LAUNCHER_EXE` 與 `launcher-dock.sh` 的 `REG_SECTION`（格式見其註解）。登入器版面改變：更新 `tools/game/auto-start.sh` 開頭的視窗 class 與按鈕座標。
 - 遊戲主程式改名或視窗標題改變：更新 `common.sh` 的 `GAME_EXE`、`GAME_WINDOW_TITLE`。
 - macOS 28 移除一般用途的 Rosetta 2（Apple 的公告見 [known-issues.md #4](known-issues.md#4-macos-28-以後可能無法執行)）：

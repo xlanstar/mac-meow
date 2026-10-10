@@ -5,6 +5,7 @@
 #
 # macOS 工具（只需 Xcode clang）：
 #   machstack                原生 arm64，以 Mach API 讀 Rosetta 程序（src/machstack）
+#   machsample               原生 arm64，連續取樣 Rosetta 程序的執行緒（卡頓分析，src/machstack）
 #   symx86                   x86_64，在 Rosetta 下以 dladdr 解析 shared cache 符號
 # Windows 工具（Homebrew mingw-w64，lib.sh 的 win_exe）：
 #   wthreads.exe wgui.exe recvcheck.exe
@@ -13,7 +14,7 @@ set -uo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 SRC="$ROOT/tools/src"
-ALL=(machstack symx86 wthreads.exe wgui.exe recvcheck.exe)
+ALL=(machstack machsample symx86 wthreads.exe wgui.exe recvcheck.exe)
 
 # mac_tool <名稱> <來源目錄> [clang 參數...]
 mac_tool() {
@@ -25,6 +26,7 @@ mac_tool() {
 build_one() {
   case "$1" in
     machstack) mac_tool machstack machstack -g -Wall ;;
+    machsample) mac_tool machsample machstack -g -Wall ;;
     symx86) mac_tool symx86 machstack -arch x86_64 ;;
     wthreads.exe) win_exe "$SRC/wthreads/wthreads.c" "$TOOLS_BIN/wthreads.exe" -lntdll ;;
     wgui.exe) win_exe "$SRC/wgui/wgui.c" "$TOOLS_BIN/wgui.exe" -lgdi32 ;;
