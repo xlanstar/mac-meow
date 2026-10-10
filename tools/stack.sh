@@ -6,7 +6,6 @@
 #                            不依賴 LLDB／Rosetta 除錯協定，對「收不到訊號、LLDB 無法暫停」的程序也有效。
 #   prof [次數=20] [間隔=0.5]  連續 mach 快照，統計各執行緒 CPU 增量與最常見呼叫鏈。
 #   lldb                     LLDB 附加，擷取所有執行緒原生堆疊後 detach（程序短暫停住）。
-#   sample                   macOS sample 3 秒（Rosetta 下常在 CoreSymbolication 內崩潰，見 docs/development.md）。
 # mach、prof、lldb 需要先執行 bash tools/sign-debug.sh apply（get-task-allow）。
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -66,29 +65,9 @@ cmd_lldb() {
   echo "$out"
 }
 
-cmd_sample() {
-  local pid out rc status=0
-  require_maple
-  out="$(out_dir sample)"
-  for pid in $pids; do
-    echo "取樣 MapleStory.exe PID=${pid}（3 秒，不會結束程序）"
-    rc=0
-    /usr/bin/sample "$pid" 3 10 -file "$out/sample-$pid.txt" >"$out/sample-$pid-status.txt" 2>&1 || rc=$?
-    ((rc == 0)) && continue
-    status=1
-    if ((rc > 128)); then
-      echo "sample 被 signal $((rc - 128)) 結束（工具本身失敗，不代表遊戲崩潰；見 ~/Library/Logs/DiagnosticReports/sample-*.ips）。改用 tools/stack.sh mach。" >&2
-    else
-      echo "sample 失敗（exit ${rc}，程序可能已退出），詳見 ${out}/sample-${pid}-status.txt" >&2
-    fi
-  done
-  echo "$out"
-  return $status
-}
-
 mode="${1:-mach}"
 shift || true
 case "$mode" in
-  mach | prof | lldb | sample) "cmd_$mode" "$@" ;;
-  *) usage "mach|prof|lldb|sample [參數]" ;;
+  mach | prof | lldb) "cmd_$mode" "$@" ;;
+  *) usage "mach|prof|lldb [參數]" ;;
 esac
