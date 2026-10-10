@@ -4,7 +4,7 @@
 
 - Apple Silicon Mac、Rosetta 2、Cyder。
 - Xcode 或 Command Line Tools（`swiftc`、`/usr/bin/clang`、`iconutil`）：建置 `MacMeow.app` 與 `tools/src/` 的 macOS 工具。
-- 開發工具：在 repo 根目錄執行 `brew bundle`（清單在 `Brewfile`），`bash tools/dev/doctor.sh` 檢查是否齊全。
+- 開發工具：在 repo 根目錄執行 `brew bundle`（清單在 `Brewfile`），`just doctor` 檢查是否齊全。
 
 ## 目錄分工
 
@@ -28,7 +28,7 @@
 ```sh
 bash app/build-app.sh                              # dist/MacMeow.app 與 dmg（預設 ad-hoc 簽章；需允許終端機控制 Finder）
 open dist/MacMeow.app                              # 開啟 App；記錄在 ~/Library/Logs/MacMeow/launcher.log
-bash tools/dev/test-app.sh                         # App Core 單元測試（只需 Command Line Tools；產物在 build/tests/）
+just test                                          # App Core 單元測試（只需 Command Line Tools；產物在 build/tests/）
 bash scripts/play.sh status --porcelain            # App 讀取的狀態（key=value）
 GAME_DIR=~/Games/MapleStory bash scripts/play.sh   # 直接跑使用者流程
 bash scripts/play.sh status                        # 通道／程序狀態
@@ -59,7 +59,7 @@ prek update             # 更新 hook 版本（改寫 prek.toml 的 rev）
 ## 重建 Wine DLL
 
 ```sh
-bash tools/dev/build-wine-dlls.sh
+just build-wine-dlls
 (cd patches/bin/x86_64-windows && shasum -a 256 *.dll) > patches/bin/SHA256SUMS
 ```
 
@@ -72,34 +72,33 @@ bash tools/dev/build-wine-dlls.sh
 3. 在 `tools/dev/build-wine-dlls.sh` 的 `MODULES` 加入對應模組。
 4. 更新 `patches/SOURCES.md`，根因寫進 [technical-notes.md](technical-notes.md)。
 
-## 診斷工具
+## 開發工具
 
-`bash tools/dev/build.sh [目標...]` 建置到 `build/tools/`（不指定則全部）。入口腳本缺工具時會自動建置。各腳本開頭有完整用法。
+`just`（即 `just --list`）列出所有指令與參數；每個 recipe 只轉呼叫 `tools/*/*.sh` 或 `experiments/build.sh`，完整用法在腳本開頭。
 
-啟動與操作（GUI 類 Wine 程式需在 Terminal.app 內執行）：
+```sh
+just build [目標...]                # 建置到 build/tools/；入口腳本缺工具時也會自動建置
+just sign-debug apply               # stack 的 mach／prof／lldb 前執行，用完 restore
+just stack mach                     # 或 prof、lldb、wine；--exe <名稱>、--pid <pid> 換目標
+just run-game trace                 # 紀錄在 debug/run-<時間>/
+just wgui list                      # 列出 bottle 內的 Wine 視窗
+```
 
-- `tools/game/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程；需要有效的 `GAME_DIR`，紀錄在 `debug/run-<時間>/`。啟動時與 Ctrl+C 時會關閉 shared bottle 內所有 Windows 程式。`plain` 無 trace（效能比較）；trace 類模式對所有程序開 `+timestamp,+pid,+tid,+process,+loaddll`，其餘頻道只對目標程序開，並記錄其執行緒數與 socket；`server` 另跑前景 `wineserver -d1`（所有程序，寫入 `server.log`）。`MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`（另可為 `dxvk|wined3d`；無法使用時與 `play.sh` 一樣退回可用的後端；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`MACMEOW_HUD=1`（Metal FPS HUD）（未設定時沿用 App 的設定）、`WZCACHE`、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
-- 目標程序：`stack.sh`、`run-game.sh` 的對象是 `TARGET_EXE`（exe 檔名，預設為 `common.sh` 的 `GAME_EXE`）；`shot.sh` 預設擷取 `GAME_WINDOW_TITLE` 視窗。
-- `tools/diag/wgui.sh list|click|sclick|shot|fg|key`：在 bottle 內列出 Wine 視窗、點擊、按鍵、截圖。預設經 Terminal.app 執行並取回輸出，已在 Terminal.app 內可加 `--here`。
-- `tools/game/auto-start.sh [--here]`：等登入器視窗出現後以 `SendInput` 點「開始遊戲」，直到 `MapleStory.exe` 啟動。整個腳本只經 Terminal.app 執行一次，已在 Terminal.app 內可加 `--here`。
-- `tools/diag/shot.sh [輸出檔] [視窗標題]`：擷取遊戲視窗（被遮住也可，螢幕鎖定時不行）。
+`--list` 看不出的事項：
 
-堆疊與效能：
-
-- `tools/diag/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack、LLDB 需要），用完執行 `restore`。
-- `tools/diag/stack.sh [--exe <名稱>] [--pid <pid>] mach|prof|lldb|wine`：擷取執行中目標程序的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`wine` 以 engine 的 `winedbg` 附加，逐執行緒取 Windows 端堆疊（Windows PID 與執行緒取自 `info thread`，只附加目標程序；尚未實測）。`mach`、`prof` 需要 `python3`。
-- `build/tools/symx86`（x86_64，在 Rosetta 下以 `dladdr` 解析 shared cache 符號）、`tools/src/machstack/symbolize.py`（替 machstack 輸出補符號）、`machprof.py`（`prof` 的統計）：由 `stack.sh` 呼叫。
-- `tools/src/machstack/pesym.py <區段檔> <addr...>`：Wine PE 位址轉函式名；區段檔取自 vmmap（每行「起點 路徑」），需要 LLVM（`LLVM_BIN`）。
-
-重現與驗證：
-
-- `wthreads.exe`、`recvcheck.exe`：Wine 執行緒狀態、recv 修補的回歸檢查。在 bottle 內執行：`bash -c 'source tools/lib.sh && run_wine build/tools/wthreads.exe <pid-hex> [n] [tid-hex]'`；`<pid-hex>` 是 Wine 內的 Windows PID；`n` 只查 suspend count、不暫停執行緒；`tid-hex` 只查該執行緒。`stack.sh wine` 實測可用後移除 `wthreads.exe`。
+- 需要 Aqua 工作階段：`run-game` 要在 Terminal.app 內執行；`wgui`、`auto-start` 預設自行經 Terminal.app 執行，已在 Terminal.app 內加 `--here`。
+- `run-game` 不經 Cyder.app 啟動完整流程，啟動時與 Ctrl+C 時會關閉 shared bottle 內所有 Windows 程式；需要有效的 `GAME_DIR`。
+- `sign-debug apply|restore` 改寫 engine 的 `wine` 簽章，Wine 執行中會拒絕。`stack` 的 `mach`、`prof` 需要 `python3`，`mach` 會暫停目標程序約 1 秒；`wine` 尚未實測。
+- 目標程序：`stack`、`run-game` 的對象是 `TARGET_EXE`（exe 檔名，預設 `common.sh` 的 `GAME_EXE`）；`shot` 預設擷取 `GAME_WINDOW_TITLE` 視窗（被遮住也可，螢幕鎖定時不行）。
+- `auto-start` 需要遊戲已啟動到登入器畫面。
+- 不是 recipe 的工具：`build/tools/symx86`、`tools/src/machstack/symbolize.py`、`machprof.py` 由 `stack.sh` 呼叫；`tools/src/machstack/pesym.py <區段檔> <addr...>` 把 Wine PE 位址轉成函式名（區段檔取自 vmmap，每行「起點 路徑」；需要 LLVM，`LLVM_BIN`）。
+- `wthreads.exe`、`recvcheck.exe`：Wine 執行緒狀態、recv 修補的回歸檢查。在 bottle 內執行：`bash -c 'source tools/lib.sh && run_wine build/tools/wthreads.exe <pid-hex> [n] [tid-hex]'`；`<pid-hex>` 是 Wine 內的 Windows PID；`n` 只查 suspend count、不暫停執行緒；`tid-hex` 只查該執行緒。`stack wine` 實測可用後移除 `wthreads.exe`。
 
 一次性實驗見 [experiments/README.md](../experiments/README.md)。
 
 ## Rosetta 除錯要點
 
-- `sample`／`spindump` 會在 CoreSymbolication 內崩潰；程序凍結時 LLDB 無法暫停。改用 `tools/diag/stack.sh mach`（machstack：`task_for_pid` + `thread_get_state`）。
+- `sample`／`spindump` 會在 CoreSymbolication 內崩潰；程序凍結時 LLDB 無法暫停。改用 `just stack mach`（machstack：`task_for_pid` + `thread_get_state`）。
 - Rosetta 執行緒在系統呼叫中時，`[sp+8]` 起依序是 x86 `rip(arm 返回位址), rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8–r15, rflags`；執行翻譯碼時 `x4=rsp`、`x5=rbp`。
 - LLDB（含 watchpoint）可附加執行中的 Rosetta 程序並取得精確 x86 `rip`，但不認得 Wine PE 映像；用 `pesym.py` 對照位址。
 - `WINEDEBUG` 可用 `程序名.exe:+channel` 只對單一程序開啟。
@@ -146,11 +145,11 @@ App 本身只有一個 Mach-O，`scripts/` 與 Windows DLL 是資源檔，由 bu
 由 `tools/release/release.sh` 與 GitHub Actions（`.github/workflows/release.yml`）執行，每一步都可以單獨重跑：
 
 ```sh
-bash tools/release/release.sh check   X.Y.Z   # 只檢查，不修改
-bash tools/release/release.sh prepare X.Y.Z   # 改 CHANGELOG／VERSION，commit「chore(release): X.Y.Z」+ tag vX.Y.Z（不 push）
-bash tools/release/release.sh build   X.Y.Z   # 本機從 tag 建置 → dist/release/X.Y.Z/，push 前必須冒煙測試
-bash tools/release/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章、公證、正式發佈（Latest）並更新 Homebrew tap
-gh run watch                          # 等 CI 完成
+just release check   X.Y.Z   # 只檢查，不修改
+just release prepare X.Y.Z   # 改 CHANGELOG／VERSION，commit「chore(release): X.Y.Z」+ tag vX.Y.Z（不 push）
+just release build   X.Y.Z   # 本機從 tag 建置 → dist/release/X.Y.Z/，push 前必須冒煙測試
+just release publish X.Y.Z   # push main + tag → CI 建置、簽章、公證、正式發佈（Latest）並更新 Homebrew tap
+gh run watch                 # 等 CI 完成
 ```
 
 - `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck` 與 Core 單元測試（`tools/dev/test-app.sh`）、`patches/bin/SHA256SUMS` 與 DLL 相符、Homebrew cask 範本填入後通過 `brew style`（有安裝 Homebrew 時）、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
@@ -171,7 +170,7 @@ gh run watch                          # 等 CI 完成
 
 `.github/dependabot.yml` 每週一檢查 workflow 引用的 action，新版發佈滿 7 天後合併成一個 `build(deps): …` PR，更新釘選的 commit SHA 與版本註解。prek hook 版本不在其範圍，以 `prek update` 手動更新。
 
-Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `gh auth login` 的終端機執行 `bash tools/release/setup-ci-secrets.sh` 即可一次設定：
+Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `gh auth login` 的終端機執行 `just setup-ci-secrets` 即可一次設定：
 
 | Secret | 內容 |
 |---|---|
@@ -199,7 +198,7 @@ Agent shell 無法啟動 GUI Wine 程式；這一步需在 Terminal.app 或 Find
 
 ### Repo 圖片
 
-`bash tools/dev/repo-images.sh [--update-readme] [App 視窗截圖.png]` 以 `tools/src/repo-images/` 的 HTML 範本與 App 視窗截圖（預設 `debug/app-shot.png`，⌘⇧4 → 空白鍵擷取）產生 2560×1280 JPEG 到 `build/repo-images/`。需先 `bash app/build-app.sh` 產生圖示，並安裝 Google Chrome。
+`just repo-images [--update-readme] [App 視窗截圖.png]` 以 `tools/src/repo-images/` 的 HTML 範本與 App 視窗截圖（預設 `debug/app-shot.png`，⌘⇧4 → 空白鍵擷取）產生 2560×1280 JPEG 到 `build/repo-images/`。需先 `bash app/build-app.sh` 產生圖示，並安裝 Google Chrome。
 
 | 圖片 | 範本 | 用途 |
 |---|---|---|

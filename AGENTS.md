@@ -41,6 +41,7 @@ Each fact lives in exactly one file. Link to it; do not copy it.
 - Shared paths, constants and helpers live in `scripts/lib/common.sh` (user side) and `tools/lib.sh` (dev side). Source them; never redefine engine/prefix paths, game file lists or loopback IPs.
 - Scripts that change external state expose `check|apply|restore` through `cmd_<sub>` functions and exit 64 via `usage` on bad arguments; call other scripts with `run_script`. Settings come from `load_settings` (`MACMEOW_SETTINGS` in `common.sh`); never hard-code their defaults elsewhere.
 - Dev tool sources go in `tools/src/<name>/`, built by `tools/dev/build.sh` into `build/tools/`. Never write build output into the source tree.
+- `justfile` is the single entry point for dev tools: every `tools/*/*.sh` and `experiments/build.sh` has a recipe that only forwards its arguments (`"$@"`) plus a one-line doc comment; put no logic in it. Scripts stay directly runnable (CI and prek call them directly).
 - Resolve paths from the script location (`$(dirname "$0")`); never hard-code a home directory or username; honor `GAME_DIR` and `CYDER_ENGINE`.
 - User-facing messages in Traditional Chinese (zh-TW); comments in zh-TW or English.
 

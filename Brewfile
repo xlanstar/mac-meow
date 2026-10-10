@@ -1,4 +1,4 @@
-# 開發用套件（使用者流程不需要）。安裝：brew bundle；檢查：bash tools/dev/doctor.sh
+# 開發用套件（使用者流程不需要）。安裝：brew bundle；檢查：just doctor
 brew "llvm"       # 重建 Wine DLL、pesym.py
 brew "lld"
 brew "bison"

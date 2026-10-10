@@ -100,7 +100,7 @@
 - 證據：以 `lsof -p <MapleStory.exe>` 看 Wine 映射的字型檔。原本 CJK 來自 Tahoma 的 SystemLink（第一順位 MINGLIU.TTC，其次 SIMSUN.TTC），所以 Wine 端設定確實生效，只是不影響主要的遊戲文字。
 - 遊戲端：`Gr2D_DX11.dll` 內含 FreeType；WZ 有內嵌字型（`FONT_DATA`，Etc 下的 `NANUMGOTHIC*.img`、`SEOULNAMSAN*.img`、`YUNGOTHIC250.img` 等韓文字型），UI 節點以 `font` 指定字型名稱（Nanum Gothic、Dotum、Arial 等）。
 - 可能原因（未證實）：遊戲要求一個 bottle 內沒有的字型名稱，Wine 再以 `find_any_face` 依序挑第一個支援該字集的家族（每次都映射的 `AppleLiSung-Light.ttf` 是明體，與畫面一致）；或主要文字使用遊戲自己的字型資料。
-- 下一步（若要繼續）：以 `tools/game/run-game.sh` 搭配 `EXTRA_DEBUG=MapleStory.exe:+font` 記錄遊戲要求的字型名稱與實際選到的字型。若是不存在的名稱，可用 Replacements 指定；若是遊戲自帶的字型資料，不改遊戲檔就無法更換。
+- 下一步（若要繼續）：以 `EXTRA_DEBUG=MapleStory.exe:+font just run-game` 記錄遊戲要求的字型名稱與實際選到的字型。若是不存在的名稱，可用 Replacements 指定；若是遊戲自帶的字型資料，不改遊戲檔就無法更換。
 - 附帶發現：Wine 依 locale 決定字碼頁，與 bottle 的 `Fonts\Codepages` 不同時，任何 Wine 程式啟動都會改寫語系相依的字型設定（`Codepages`、FontSubstitutes 的 `MS Shell Dlg`／`Tms Rmn`、FontLink）。從 `LANG=C` 的 shell 執行 `reg` 曾把 shared bottle 從 950 改成 1252，所以 `export_wine_env` 固定使用 `zh_TW.UTF-8`（與 Cyder 的 `wineLocale=zh_TW` 相同）。
 
 ## 13. 圖形後端（D3D11，預設經 D3DMetal 轉 Metal）
@@ -112,7 +112,7 @@
 - 退回的原因：Cyder 遇到無法使用的 `graphicsBackend`（`cyder_apply_graphics_preference`：`d3dmetal` 需要 macOS 14 以上與 GPTK，`dxmt` 需要 macOS 15 以上與 engine 的 `lib/dxmt`，`dxvk` 需要 engine 的 `lib/dxvk` 與 MoltenVK）不會退回其他後端，而是改用 default 且停用楓之谷的自動選擇，結果是最慢的 Wine 內建 wined3d。README 的最低需求是 macOS 13，所以 macOS 13 或沒有 GPTK 的 macOS 14 寫入 `dxmt` 一樣會變成 wined3d。`cyder-settings.sh` 因此以與 Cyder 相同的條件（`graphic_backend_available`）判斷，只寫入可用的後端。Cyder 以 `dxvkFrameRate`（預設 60）設定 DXMT 的 `d3d11.preferredMaxFrameRate` 與 DXVK 的 `DXVK_FRAME_RATE`，所以兩者的 FPS 預設上限 60；Cyder 不替 D3DMetal 設定 FPS 上限（`cyder_apply_graphics_runtime_preferences`）。效能 HUD 用 `graphicsHud=metal`（Cyder 匯出 `MTL_HUD_ENABLED=1`），DXMT 與 D3DMetal 都經 Metal 繪圖，兩者都適用。
 - D3DMetal 的 FPS 上限：`D3DMetal.framework` 讀取環境變數 `D3DM_MAX_FPS`（未公開文件）。以 `MACMEOW_GRAPHICS_BACKEND=d3dmetal MACMEOW_HUD=1 tools/game/run-game.sh` 在登入畫面實測（M4 Max、120Hz 螢幕）：`EXTRA_ENV="D3DM_MAX_FPS=30"` 時 HUD 為 30.00 FPS／33.33 ms；不設時約 117 FPS／8.5 ms，即預設只受螢幕更新率限制。HUD 同時確認 D3DMetal（Game Porting Toolkit 4.0b2）已接手 D3D11。
 - FPS 上限的做法：Cyder 的 `dxvkFrameRate` 只套用到 DXVK／DXMT，`D3DM_MAX_FPS` 也不在 Cyder 匯出的變數裡；本專案的啟動流程（`open -n -a Cyder` 開 `認證器.exe`）也無法直接帶環境變數。Cyder 會把 `settings.json` 的 `perProfile.<id>.environment`（`<id>` 為 exe 實際路徑 SHA-256 的前 24 個十六進位字元）匯出給該 exe，而 Wine 以父程序的環境建立子程序，所以寫在 `認證器.exe` 的 profile 就會傳到登入器與 `MapleStory.exe`。實測：以 `play.sh` 正常啟動、`MACMEOW_MAX_FPS=60`，D3DMetal 的 HUD 為 59.75 FPS／16.74 ms；手動寫入 `D3DM_MAX_FPS=30` 時為 29.97 FPS。
-- 未比較 DXMT 與 D3DMetal 的效能。遊戲是 2D，已知的效能問題都在 CPU 端（#7–#9），預期更換圖形後端的效果有限。要實測時以 `MACMEOW_GRAPHICS_BACKEND=dxmt|d3dmetal MACMEOW_HUD=1 bash tools/game/run-game.sh` 在同一張地圖比較 FPS 與 CPU。
+- 未比較 DXMT 與 D3DMetal 的效能。遊戲是 2D，已知的效能問題都在 CPU 端（#7–#9），預期更換圖形後端的效果有限。要實測時以 `MACMEOW_GRAPHICS_BACKEND=dxmt|d3dmetal MACMEOW_HUD=1 just run-game` 在同一張地圖比較 FPS 與 CPU。
 
 ## 其他觀察
 
