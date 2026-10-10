@@ -74,7 +74,7 @@ bash tools/build-wine-dlls.sh
 
 ## 診斷工具
 
-`bash tools/build.sh [目標...]` 建置到 `build/tools/`（不指定則全部；`wgui.exe`、`recvcheck.exe` 需要先跑過 `build-wine-dlls.sh`）。入口腳本缺工具時會自動建置。各腳本開頭有完整用法。
+`bash tools/build.sh [目標...]` 建置到 `build/tools/`（不指定則全部）。入口腳本缺工具時會自動建置。各腳本開頭有完整用法。
 
 啟動與操作（GUI 類 Wine 程式需在 Terminal.app 內執行）：
 

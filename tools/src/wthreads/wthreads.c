@@ -4,66 +4,22 @@
  *   n        只查 suspend count，不 SuspendThread、不取 context
  *   tid-hex  只處理指定執行緒
  * 不寫入目標程序記憶體；取 context 時會短暫 SuspendThread/ResumeThread。
- * 以 clang-cl + lld-link 建置，不需 Windows SDK（見 build.sh）。 */
-typedef unsigned long DWORD;
-typedef long LONG;
-typedef int BOOL;
-typedef void *HANDLE;
-typedef unsigned short WCHAR;
-typedef unsigned long long U64;
-typedef unsigned char BYTE;
-#define WINAPI __stdcall
-#define INVALID_HANDLE_VALUE ((HANDLE)(long long)-1)
-#define SUSPEND_FAILED 0xffffffff
+ * 以 mingw-w64 建置（見 tools/build.sh）。 */
+#include <windows.h>
+#include <tlhelp32.h>
+#include <winternl.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#define TH32CS_SNAPTHREAD 4
-#define TH32CS_SNAPMODULE 8
-#define PROCESS_VM_READ_QUERY 0x0410             /* PROCESS_VM_READ | PROCESS_QUERY_INFORMATION */
-#define THREAD_SUSPEND_CONTEXT_QUERY 0x004a      /* THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION */
-#define THREAD_SUSPEND_COUNT_CLASS 35            /* ThreadSuspendCount */
+typedef ULONGLONG U64;
 
-/* x64 CONTEXT（1232 bytes）中用到的欄位位移 */
-#define CTX_SIZE 1232
-#define CTX_FLAGS 0x30
-#define CTX_RSP 0x98
-#define CTX_RBP 0xA0
-#define CTX_RIP 0xF8
-#define CONTEXT_AMD64_CONTROL_INTEGER 0x100003
+#define PROCESS_VM_READ_QUERY (PROCESS_VM_READ | PROCESS_QUERY_INFORMATION)
+#define THREAD_SUSPEND_CONTEXT_QUERY (THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION)
+#define THREAD_SUSPEND_COUNT_CLASS ((THREADINFOCLASS)35) /* ThreadSuspendCount（mingw 標頭未定義） */
+#define SUSPEND_FAILED ((DWORD)-1)
 
 #define MAX_MODS 512
 #define MAX_STACK_HITS 40
-
-typedef struct {
-    DWORD dwSize, cntUsage, th32ThreadID, th32OwnerProcessID;
-    LONG tpBasePri, tpDeltaPri;
-    DWORD dwFlags;
-} THREADENTRY32;
-typedef struct {
-    DWORD dwSize, th32ModuleID, th32ProcessID, GlblcntUsage, ProccntUsage;
-    BYTE *modBaseAddr;
-    DWORD modBaseSize;
-    HANDLE hModule;
-    WCHAR szModule[256];
-    WCHAR szExePath[260];
-} MODULEENTRY32W;
-
-__declspec(dllimport) HANDLE WINAPI CreateToolhelp32Snapshot(DWORD, DWORD);
-__declspec(dllimport) BOOL WINAPI Thread32First(HANDLE, THREADENTRY32 *);
-__declspec(dllimport) BOOL WINAPI Thread32Next(HANDLE, THREADENTRY32 *);
-__declspec(dllimport) BOOL WINAPI Module32FirstW(HANDLE, MODULEENTRY32W *);
-__declspec(dllimport) BOOL WINAPI Module32NextW(HANDLE, MODULEENTRY32W *);
-__declspec(dllimport) HANDLE WINAPI OpenThread(DWORD, BOOL, DWORD);
-__declspec(dllimport) HANDLE WINAPI OpenProcess(DWORD, BOOL, DWORD);
-__declspec(dllimport) DWORD WINAPI SuspendThread(HANDLE);
-__declspec(dllimport) DWORD WINAPI ResumeThread(HANDLE);
-__declspec(dllimport) BOOL WINAPI GetThreadContext(HANDLE, void *);
-__declspec(dllimport) BOOL WINAPI ReadProcessMemory(HANDLE, const void *, void *, U64, U64 *);
-__declspec(dllimport) BOOL WINAPI CloseHandle(HANDLE);
-__declspec(dllimport) DWORD WINAPI GetLastError(void);
-__declspec(dllimport) LONG WINAPI NtQueryInformationThread(HANDLE, int, void *, DWORD, DWORD *);
-__declspec(dllimport) int __cdecl printf(const char *, ...);
-__declspec(dllimport) unsigned long __cdecl strtoul(const char *, char **, int);
-__declspec(dllimport) int __cdecl _flushall(void);
 
 typedef struct {
     U64 base, size;
@@ -71,7 +27,7 @@ typedef struct {
 } MOD;
 static MOD mods[MAX_MODS];
 static int nmods;
-static __declspec(align(16)) BYTE ctx[CTX_SIZE];
+static CONTEXT ctx;
 static U64 stackbuf[16384];
 
 static U64 min_u64(U64 a, U64 b) {
@@ -107,7 +63,7 @@ static void load_modules(DWORD pid) {
 
 /* 從 rsp 讀堆疊到 stackbuf，回傳讀到的位元組數。逐頁讀取：堆疊頂端之後可能是未映射區，一次大量讀取會整體失敗。 */
 static U64 read_stack(HANDLE proc, U64 rsp) {
-    U64 got = 0, part;
+    SIZE_T got = 0, part;
     while (proc && got < sizeof(stackbuf)
            && ReadProcessMemory(proc, (void *)(rsp + got), (BYTE *)stackbuf + got,
                                 min_u64(4096 - ((rsp + got) & 4095), sizeof(stackbuf) - got), &part)
@@ -118,12 +74,12 @@ static U64 read_stack(HANDLE proc, U64 rsp) {
 
 /* 已暫停的執行緒：RIP/RSP/RBP 與堆疊中落在模組內的值 */
 static void dump_context(HANDLE proc, HANDLE th) {
-    *(DWORD *)(ctx + CTX_FLAGS) = CONTEXT_AMD64_CONTROL_INTEGER;
-    if (!GetThreadContext(th, ctx)) {
+    ctx.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+    if (!GetThreadContext(th, &ctx)) {
         printf("  suspend/context failed %lu\n", GetLastError());
         return;
     }
-    U64 rip = *(U64 *)(ctx + CTX_RIP), rsp = *(U64 *)(ctx + CTX_RSP), rbp = *(U64 *)(ctx + CTX_RBP);
+    U64 rip = ctx.Rip, rsp = ctx.Rsp, rbp = ctx.Rbp;
     const MOD *m = find_mod(rip);
     printf("  rip=%016llx %ls+%llx rsp=%016llx rbp=%016llx\n", rip, m ? m->name : L"?", m ? rip - m->base : 0, rsp, rbp);
     U64 got = read_stack(proc, rsp);

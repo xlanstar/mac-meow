@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <shellapi.h>
 
 static HWND parse_hwnd(const char *s) {
     return (HWND)(ULONG_PTR)strtoull(s, 0, 16);
@@ -128,7 +127,7 @@ static int post_key(HWND h, UINT vk) {
     return 0;
 }
 
-static int real_main(int argc, char **argv) {
+int main(int argc, char **argv) {
     if (argc < 2) {
         printf("usage: wgui list|click|sclick|shot|fg|key ...\n");
         return 2;
@@ -148,20 +147,4 @@ static int real_main(int argc, char **argv) {
     if (!strcmp(cmd, "key") && argc >= 4) return post_key(parse_hwnd(argv[2]), strtoul(argv[3], 0, 16));
     printf("bad args\n");
     return 2;
-}
-
-/* 自訂進入點：不依賴 CRT 啟動碼（winecrt0 與此連結方式不相容）；argv 轉成 UTF-8 */
-void __cdecl start(void) {
-    int argc;
-    WCHAR **wargv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    char **argv = HeapAlloc(GetProcessHeap(), 0, sizeof(char *) * (argc + 1));
-    for (int i = 0; i < argc; i++) {
-        int n = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, 0, 0, 0, 0);
-        argv[i] = HeapAlloc(GetProcessHeap(), 0, n);
-        WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, argv[i], n, 0, 0);
-    }
-    argv[argc] = 0;
-    int rc = real_main(argc, argv);
-    fflush(stdout);
-    ExitProcess(rc);
 }

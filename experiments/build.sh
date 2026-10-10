@@ -24,10 +24,7 @@ build_one() {
   case "$1" in
     smc-same-page) mac_bins "$out" "$src" "-arch x86_64" smctest smctest2 smctest3 ;;
     rosetta-probes) mac_bins "$out" "$src" "-g -Wall" callchain memdump ;;
-    rsaenh-reload)
-      nosdk_exe "$src/reloadtest.c" "$out/reloadtest.exe" "$NOSDK_MSVCRT" \
-        "kernel32:LoadLibraryA FreeLibrary GetProcAddress CreateThread GetTickCount"
-      ;;
+    rsaenh-reload) win_exe "$src/reloadtest.c" "$out/reloadtest.exe" ;;
     *)
       echo "未知實驗：$1（可用：${ALL[*]}）" >&2
       return 1

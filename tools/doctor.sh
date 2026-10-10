@@ -39,7 +39,7 @@ while IFS= read -r line; do
     llvm) bin="$LLVM_BIN/clang" ;; # keg-only，不在 PATH
     lld) bin="$LLD_BIN/lld-link" ;;
     bison) bin="$BISON_BIN/bison" ;;
-    mingw-w64) bin=x86_64-w64-mingw32-gcc ;;
+    mingw-w64) bin="$MINGW_CC" ;;
     *) bin="$f" ;;
   esac
   check "$f" command -v "$bin"
