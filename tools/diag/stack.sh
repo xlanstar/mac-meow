@@ -1,16 +1,16 @@
 #!/bin/bash
 # 擷取執行中 MapleStory.exe 的堆疊／取樣（唯讀：不啟動或結束 Wine、不修改程序記憶體）。紀錄寫到 debug/。
 #
-# 用法：bash tools/stack.sh <模式> [參數]
+# 用法：bash tools/diag/stack.sh <模式> [參數]
 #   mach [額外 pid...]       （預設）Mach API 讀取所有執行緒的原生／x86 狀態並解析符號；程序被 task_suspend 約 1 秒。
 #                            不依賴 LLDB／Rosetta 除錯協定，對「收不到訊號、LLDB 無法暫停」的程序也有效。
 #   prof [次數=20] [間隔=0.5]  連續 mach 快照，統計各執行緒 CPU 增量與最常見呼叫鏈。
 #   lldb                     LLDB 附加，擷取所有執行緒原生堆疊後 detach（程序短暫停住）。
 #   wine                     winedbg 附加 Windows 程序，逐執行緒 bt（Windows 端堆疊，含 PE 符號）後 detach。
-# mach、prof、lldb 需要先執行 bash tools/sign-debug.sh apply（get-task-allow）；wine 不需要。
+# mach、prof、lldb 需要先執行 bash tools/diag/sign-debug.sh apply（get-task-allow）；wine 不需要。
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 SRC="$ROOT/tools/src/machstack"
 export SYMX86="$TOOLS_BIN/symx86" # symbolize.py 使用

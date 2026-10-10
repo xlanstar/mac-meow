@@ -4,20 +4,20 @@
 
 - Apple Silicon Mac、Rosetta 2、Cyder。
 - Xcode 或 Command Line Tools（`swiftc`、`/usr/bin/clang`、`iconutil`）：建置 `MacMeow.app` 與 `tools/src/` 的 macOS 工具。
-- 開發工具：在 repo 根目錄執行 `brew bundle`（清單在 `Brewfile`），`bash tools/doctor.sh` 檢查是否齊全。
+- 開發工具：在 repo 根目錄執行 `brew bundle`（清單在 `Brewfile`），`bash tools/dev/doctor.sh` 檢查是否齊全。
 
 ## 目錄分工
 
 - `scripts/`：使用者流程，會打包進 `MacMeow.app`，只能用 macOS 內建指令。共用路徑、常數與函式在 `scripts/lib/common.sh`（遊戲檔案清單、迴路位址、Cyder 路徑、`wine_running`、`wineserver_kill` 等），新增腳本請 source 它，不要重複定義；子指令與用法錯誤依 `docs/architecture.md` 的「子指令慣例」。
 - `app/`：SwiftUI App（`app/Sources/`，Swift 5 語言模式、最低 macOS 13），由 `app/build-app.sh` 以 `swiftc` 編譯，不需要 Xcode 專案。App 只負責 UI：需要新狀態就加到 `play.sh` 的 `porcelain()` 並同步 `app/Sources/Core/EnvStatus.swift`；需要新進度就在腳本呼叫 `progress <id> <訊息>`，並在同一檔案的 `Step(progressID:)` 對應清單項目（`@@STEP`／`@@PROGRESS`／`@@WAIT` 標記只在 `Core/ScriptEvent.swift` 解析）；新的腳本呼叫加在 `Services/Scripts.swift`。
-- `tools/`：開發與診斷，使用者流程不會呼叫，可用 Homebrew、uv、Xcode、`python3`。入口腳本放在 `tools/*.sh`，共用函式在 `tools/lib.sh`（建立在 `common.sh` 之上），原始碼在 `tools/src/<工具>/`，建置產物一律輸出到 `build/tools/`，診斷紀錄一律寫到 `debug/`。
+- `tools/`：開發與診斷，使用者流程不會呼叫，可用 Homebrew、uv、Xcode、`python3`。入口腳本依用途分在 `tools/diag/`（一般 Wine × Rosetta 診斷）、`tools/game/`（本專案專屬：啟動、自動操作）、`tools/dev/`（建置、測試、環境檢查）、`tools/release/`（發佈），共用函式在 `tools/lib.sh`（建立在 `common.sh` 之上），原始碼在 `tools/src/<工具>/`，建置產物一律輸出到 `build/tools/`，診斷紀錄一律寫到 `debug/`。
 - `packaging/homebrew/macmeow.rb`：Homebrew cask 範本（`@VERSION@`、`@SHA256@` 由 `release.sh tap` 填入），發佈到第三方 tap [`xlanstar/homebrew-tap`](https://github.com/xlanstar/homebrew-tap)（`common.sh` 的 `MACMEOW_TAP_REPO`）。tap 的 `Casks/` 只由 `release.sh tap` 產生，不直接修改。
 
 ### App 原始碼分層
 
 `app/Sources/` 依層分資料夾，只能由上往下依賴（UI → Features → Services → Core）；`build-app.sh` 與 `release.sh` 以 `tools/lib.sh` 的 `app_sources` 遞迴編譯整個資料夾。
 
-- `Core/`：純資料與規則（設定、porcelain 狀態、進度標記、首頁清單與摘要、Release、Issue 網址），只用 Foundation，不可 import AppKit／SwiftUI；由 `tools/test-app.sh` 單元測試。
+- `Core/`：純資料與規則（設定、porcelain 狀態、進度標記、首頁清單與摘要、Release、Issue 網址），只用 Foundation，不可 import AppKit／SwiftUI；由 `tools/dev/test-app.sh` 單元測試。
 - `Services/`：副作用（路徑、執行程序、記錄、設定檔、狀態輪詢、GitHub API、對話框與剪貼簿）。所有 `scripts/` 呼叫都經過 `Services/Scripts.swift`。
 - `Features/`：流程（啟動／關閉／迴路位址／遊戲資料夾、解除安裝、更新、回報問題、首頁狀態）；View 從這裡取得狀態並呼叫動作。
 - `App/`：App 進入點、唯一的組合根 `AppModel`、選單與選單列。
@@ -28,7 +28,7 @@
 ```sh
 bash app/build-app.sh                              # dist/MacMeow.app 與 dmg（預設 ad-hoc 簽章；需允許終端機控制 Finder）
 open dist/MacMeow.app                              # 開啟 App；記錄在 ~/Library/Logs/MacMeow/launcher.log
-bash tools/test-app.sh                             # App Core 單元測試（只需 Command Line Tools；產物在 build/tests/）
+bash tools/dev/test-app.sh                         # App Core 單元測試（只需 Command Line Tools；產物在 build/tests/）
 bash scripts/play.sh status --porcelain            # App 讀取的狀態（key=value）
 GAME_DIR=~/Games/MapleStory bash scripts/play.sh   # 直接跑使用者流程
 bash scripts/play.sh status                        # 通道／程序狀態
@@ -54,12 +54,12 @@ prek run -a             # 對所有檔案執行
 prek update             # 更新 hook 版本（改寫 prek.toml 的 rev）
 ```
 
-設定在 `prek.toml`；各工具的設定檔：`.editorconfig`（shfmt）、`.shellcheckrc`、`.swift-format`（工具鏈內建的 `swift format`）、`ruff.toml`、`_typos.toml`、`committed.toml`（commit 訊息格式）。除了 AGENTS.md 的 Hard rules（遊戲檔、`login.txt`、`.env`）、bash 3.2 相容與 `patches/bin/SHA256SUMS`，也檢查 commit 訊息必須有 body（`tools/check-commit-body.sh`；不檢查 `fixup!`／`squash!`／`amend!`／Merge／Revert）。shfmt、`swift format`、ruff 會直接改寫檔案，改完重新 `git add` 再提交。
+設定在 `prek.toml`；各工具的設定檔：`.editorconfig`（shfmt）、`.shellcheckrc`、`.swift-format`（工具鏈內建的 `swift format`）、`ruff.toml`、`_typos.toml`、`committed.toml`（commit 訊息格式）。除了 AGENTS.md 的 Hard rules（遊戲檔、`login.txt`、`.env`）、bash 3.2 相容與 `patches/bin/SHA256SUMS`，也檢查 commit 訊息必須有 body（`tools/dev/check-commit-body.sh`；不檢查 `fixup!`／`squash!`／`amend!`／Merge／Revert）。shfmt、`swift format`、ruff 會直接改寫檔案，改完重新 `git add` 再提交。
 
 ## 重建 Wine DLL
 
 ```sh
-bash tools/build-wine-dlls.sh
+bash tools/dev/build-wine-dlls.sh
 (cd patches/bin/x86_64-windows && shasum -a 256 *.dll) > patches/bin/SHA256SUMS
 ```
 
@@ -69,24 +69,24 @@ bash tools/build-wine-dlls.sh
 
 1. 在 `build/src/sources/wine` 修改。
 2. 以 `diff -u` 產生 `a/`、`b/` 前綴的 patch 放進 `patches/`。
-3. 在 `tools/build-wine-dlls.sh` 的 `MODULES` 加入對應模組。
+3. 在 `tools/dev/build-wine-dlls.sh` 的 `MODULES` 加入對應模組。
 4. 更新 `patches/SOURCES.md`，根因寫進 [technical-notes.md](technical-notes.md)。
 
 ## 診斷工具
 
-`bash tools/build.sh [目標...]` 建置到 `build/tools/`（不指定則全部）。入口腳本缺工具時會自動建置。各腳本開頭有完整用法。
+`bash tools/dev/build.sh [目標...]` 建置到 `build/tools/`（不指定則全部）。入口腳本缺工具時會自動建置。各腳本開頭有完整用法。
 
 啟動與操作（GUI 類 Wine 程式需在 Terminal.app 內執行）：
 
-- `tools/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程；需要有效的 `GAME_DIR`，紀錄在 `debug/run-<時間>/`。啟動時與 Ctrl+C 時會關閉 shared bottle 內所有 Windows 程式。`plain` 無 trace（效能比較）；trace 類模式對所有程序開 `+timestamp,+pid,+tid,+process,+loaddll`，其餘頻道只對 `MapleStory.exe` 開，並記錄其執行緒數與 socket；`server` 另跑前景 `wineserver -d1`（所有程序，寫入 `server.log`）。`MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`（另可為 `dxvk|wined3d`；無法使用時與 `play.sh` 一樣退回可用的後端；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`MACMEOW_HUD=1`（Metal FPS HUD）（未設定時沿用 App 的設定）、`WZCACHE`、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
-- `tools/wgui.sh list|click|sclick|shot|fg|key`：在 bottle 內列出 Wine 視窗、點擊、按鍵、截圖。預設經 Terminal.app 執行並取回輸出，已在 Terminal.app 內可加 `--here`。
-- `tools/auto-start.sh [--here]`：等登入器視窗出現後以 `SendInput` 點「開始遊戲」，直到 `MapleStory.exe` 啟動。整個腳本只經 Terminal.app 執行一次，已在 Terminal.app 內可加 `--here`。
-- `tools/shot-game.sh [輸出檔] [視窗標題]`：擷取遊戲視窗（被遮住也可，螢幕鎖定時不行）。
+- `tools/game/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程；需要有效的 `GAME_DIR`，紀錄在 `debug/run-<時間>/`。啟動時與 Ctrl+C 時會關閉 shared bottle 內所有 Windows 程式。`plain` 無 trace（效能比較）；trace 類模式對所有程序開 `+timestamp,+pid,+tid,+process,+loaddll`，其餘頻道只對 `MapleStory.exe` 開，並記錄其執行緒數與 socket；`server` 另跑前景 `wineserver -d1`（所有程序，寫入 `server.log`）。`MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`（另可為 `dxvk|wined3d`；無法使用時與 `play.sh` 一樣退回可用的後端；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`MACMEOW_HUD=1`（Metal FPS HUD）（未設定時沿用 App 的設定）、`WZCACHE`、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
+- `tools/diag/wgui.sh list|click|sclick|shot|fg|key`：在 bottle 內列出 Wine 視窗、點擊、按鍵、截圖。預設經 Terminal.app 執行並取回輸出，已在 Terminal.app 內可加 `--here`。
+- `tools/game/auto-start.sh [--here]`：等登入器視窗出現後以 `SendInput` 點「開始遊戲」，直到 `MapleStory.exe` 啟動。整個腳本只經 Terminal.app 執行一次，已在 Terminal.app 內可加 `--here`。
+- `tools/diag/shot.sh [輸出檔] [視窗標題]`：擷取遊戲視窗（被遮住也可，螢幕鎖定時不行）。
 
 堆疊與效能：
 
-- `tools/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack、LLDB 需要），用完執行 `restore`。
-- `tools/stack.sh mach|prof|lldb|wine`：擷取執行中 `MapleStory.exe` 的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`wine` 以 engine 的 `winedbg` 附加，逐執行緒取 Windows 端堆疊（Windows PID 與執行緒取自 `info thread`，只附加 `MapleStory.exe`；尚未實測）。`mach`、`prof` 需要 `python3`。
+- `tools/diag/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack、LLDB 需要），用完執行 `restore`。
+- `tools/diag/stack.sh mach|prof|lldb|wine`：擷取執行中 `MapleStory.exe` 的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`wine` 以 engine 的 `winedbg` 附加，逐執行緒取 Windows 端堆疊（Windows PID 與執行緒取自 `info thread`，只附加 `MapleStory.exe`；尚未實測）。`mach`、`prof` 需要 `python3`。
 - `build/tools/symx86`（x86_64，在 Rosetta 下以 `dladdr` 解析 shared cache 符號）、`tools/src/machstack/symbolize.py`（替 machstack 輸出補符號）、`machprof.py`（`prof` 的統計）：由 `stack.sh` 呼叫。
 - `tools/src/machstack/pesym.py <區段檔> <addr...>`：Wine PE 位址轉函式名；區段檔取自 vmmap（每行「起點 路徑」），需要 LLVM（`LLVM_BIN`）。
 
@@ -98,7 +98,7 @@ bash tools/build-wine-dlls.sh
 
 ## Rosetta 除錯要點
 
-- `sample`／`spindump` 會在 CoreSymbolication 內崩潰；程序凍結時 LLDB 無法暫停。改用 `tools/stack.sh mach`（machstack：`task_for_pid` + `thread_get_state`）。
+- `sample`／`spindump` 會在 CoreSymbolication 內崩潰；程序凍結時 LLDB 無法暫停。改用 `tools/diag/stack.sh mach`（machstack：`task_for_pid` + `thread_get_state`）。
 - Rosetta 執行緒在系統呼叫中時，`[sp+8]` 起依序是 x86 `rip(arm 返回位址), rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8–r15, rflags`；執行翻譯碼時 `x4=rsp`、`x5=rbp`。
 - LLDB（含 watchpoint）可附加執行中的 Rosetta 程序並取得精確 x86 `rip`，但不認得 Wine PE 映像；用 `pesym.py` 對照位址。
 - `WINEDEBUG` 可用 `程序名.exe:+channel` 只對單一程序開啟。
@@ -130,7 +130,7 @@ bash tools/build-wine-dlls.sh
    MACMEOW_NOTARY_PROFILE=macmeow-notary
    ```
    （`MACMEOW_NOTARY_KEYCHAIN` 選用：profile 不在預設鑰匙圈時指定路徑，CI 使用。）
-   `app/build-app.sh` 與 `tools/release.sh` 啟動時以 `tools/lib.sh` 的 `load_env` 載入 `.env`；已存在的環境變數優先，例如 `MACMEOW_NOTARY_PROFILE= bash app/build-app.sh` 只簽章不公證。
+   `app/build-app.sh` 與 `tools/release/release.sh` 啟動時以 `tools/lib.sh` 的 `load_env` 載入 `.env`；已存在的環境變數優先，例如 `MACMEOW_NOTARY_PROFILE= bash app/build-app.sh` 只簽章不公證。
 
 | 設定（環境變數或 `.env`） | `build-app.sh` 的行為 |
 |---|---|
@@ -142,17 +142,17 @@ App 本身只有一個 Mach-O，`scripts/` 與 Windows DLL 是資源檔，由 bu
 
 ### 流程
 
-由 `tools/release.sh` 與 GitHub Actions（`.github/workflows/release.yml`）執行，每一步都可以單獨重跑：
+由 `tools/release/release.sh` 與 GitHub Actions（`.github/workflows/release.yml`）執行，每一步都可以單獨重跑：
 
 ```sh
-bash tools/release.sh check   X.Y.Z   # 只檢查，不修改
-bash tools/release.sh prepare X.Y.Z   # 改 CHANGELOG／VERSION，commit「chore(release): X.Y.Z」+ tag vX.Y.Z（不 push）
-bash tools/release.sh build   X.Y.Z   # 本機從 tag 建置 → dist/release/X.Y.Z/，push 前必須冒煙測試
-bash tools/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章、公證、正式發佈（Latest）並更新 Homebrew tap
+bash tools/release/release.sh check   X.Y.Z   # 只檢查，不修改
+bash tools/release/release.sh prepare X.Y.Z   # 改 CHANGELOG／VERSION，commit「chore(release): X.Y.Z」+ tag vX.Y.Z（不 push）
+bash tools/release/release.sh build   X.Y.Z   # 本機從 tag 建置 → dist/release/X.Y.Z/，push 前必須冒煙測試
+bash tools/release/release.sh publish X.Y.Z   # push main + tag → CI 建置、簽章、公證、正式發佈（Latest）並更新 Homebrew tap
 gh run watch                          # 等 CI 完成
 ```
 
-- `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck` 與 Core 單元測試（`tools/test-app.sh`）、`patches/bin/SHA256SUMS` 與 DLL 相符、Homebrew cask 範本填入後通過 `brew style`（有安裝 Homebrew 時）、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
+- `check`：在 `main`、工作目錄乾淨、版本號大於 `VERSION`、tag 不存在、`## Unreleased` 至少一項、所有 `*.sh` 通過 `bash -n`、`scripts/`／`app/` 通過 shellcheck（有安裝時）、`app/Sources` 通過 `swiftc -typecheck` 與 Core 單元測試（`tools/dev/test-app.sh`）、`patches/bin/SHA256SUMS` 與 DLL 相符、Homebrew cask 範本填入後通過 `brew style`（有安裝 Homebrew 時）、`MACMEOW_SIGN_ID` 是鑰匙圈中有效的 Developer ID Application 憑證且 `MACMEOW_NOTARY_PROFILE` 能登入。
   - 例外：`MACMEOW_ALLOW_ADHOC=1` 跳過簽章檢查，`build` 產生 ad-hoc 版本，release notes 改為教使用者到「系統設定 → 隱私權與安全性」按「仍要打開」。只在無法公證時使用（CI 不使用）；舊版 App 的一鍵更新會拒絕 ad-hoc 版本，使用者需手動下載。
 - `prepare`：把 `## Unreleased` 下的項目移到 `## X.Y.Z — YYYY-MM-DD`，上方留一個空的 `## Unreleased`。
 - `build`：以 `git archive vX.Y.Z` 取出原始碼到 `build/release/X.Y.Z/` 再執行 `app/build-app.sh`，所以未提交的檔案不會進入產物。驗證 dmg 的簽章、公證票證與 Gatekeeper 評估（`spctl --type open --context context:primary-signature`），再掛載 dmg 驗證內含「應用程式」捷徑與視窗版面（`.DS_Store`、背景圖），以及 App 的 `codesign`、`CFBundleShortVersionString`、公證票證（`stapler validate`）與 Gatekeeper 評估（`spctl` 須為 `Notarized Developer ID`）、符合一鍵更新的簽章需求（`common.sh` 的 `MACMEOW_REQUIREMENT`，即官方 Team ID）、App 內有可執行的 `Contents/Resources/scripts/uninstall.sh`（cask 依賴），並產生：
@@ -166,11 +166,11 @@ gh run watch                          # 等 CI 完成
 
 ### GitHub Actions
 
-`.github/workflows/release.yml` 在 push `vX.Y.Z` tag 時於 `macos-15`（arm64）執行：`tools/ci-keychain.sh setup` 建立暫時鑰匙圈，匯入 Developer ID 憑證與 Developer ID G2 中繼憑證、存入 notarytool profile，並把 `MACMEOW_SIGN_ID`／`MACMEOW_NOTARY_PROFILE`／`MACMEOW_NOTARY_KEYCHAIN` 寫入 `$GITHUB_ENV`；接著 `release.sh ci`（建置、公證並正式發佈）；最後無論成敗都 `ci-keychain.sh cleanup` 刪除鑰匙圈。Swift 工具鏈以 runner 映像的 Xcode 為準，版本印在「工具版本」步驟。dmg 視窗版面由 `build-app.sh` 以 AppleScript 請 Finder 排版（需 Aqua 工作階段與「自動化」權限，GitHub 的 macOS runner 已具備）；Finder 90 秒內未完成時只警告並產生預設版面的 dmg，`release.sh` 的 dmg 驗證會因缺少 `.DS_Store` 而失敗。
+`.github/workflows/release.yml` 在 push `vX.Y.Z` tag 時於 `macos-15`（arm64）執行：`tools/release/ci-keychain.sh setup` 建立暫時鑰匙圈，匯入 Developer ID 憑證與 Developer ID G2 中繼憑證、存入 notarytool profile，並把 `MACMEOW_SIGN_ID`／`MACMEOW_NOTARY_PROFILE`／`MACMEOW_NOTARY_KEYCHAIN` 寫入 `$GITHUB_ENV`；接著 `release.sh ci`（建置、公證並正式發佈）；最後無論成敗都 `ci-keychain.sh cleanup` 刪除鑰匙圈。Swift 工具鏈以 runner 映像的 Xcode 為準，版本印在「工具版本」步驟。dmg 視窗版面由 `build-app.sh` 以 AppleScript 請 Finder 排版（需 Aqua 工作階段與「自動化」權限，GitHub 的 macOS runner 已具備）；Finder 90 秒內未完成時只警告並產生預設版面的 dmg，`release.sh` 的 dmg 驗證會因缺少 `.DS_Store` 而失敗。
 
 `.github/dependabot.yml` 每週一檢查 workflow 引用的 action，新版發佈滿 7 天後合併成一個 `build(deps): …` PR，更新釘選的 commit SHA 與版本註解。prek hook 版本不在其範圍，以 `prek update` 手動更新。
 
-Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `gh auth login` 的終端機執行 `bash tools/setup-ci-secrets.sh` 即可一次設定：
+Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `gh auth login` 的終端機執行 `bash tools/release/setup-ci-secrets.sh` 即可一次設定：
 
 | Secret | 內容 |
 |---|---|
@@ -181,7 +181,7 @@ Repo 的 Actions Secrets 需要以下項目。在已設定 GitHub `origin` 且 `
 | `APPLE_APP_PASSWORD` | 公證用 App 專用密碼（建議 CI 專用一組，方便撤銷） |
 | `HOMEBREW_TAP_TOKEN` | 推送 Homebrew tap 用的 fine-grained PAT（`release.sh tap`；`setup-ci-secrets.sh` 不設定，見下方） |
 
-`tools/setup-ci-secrets.sh`：以 `security export` 匯出登入鑰匙圈的簽章身分（macOS 會要求輸入登入密碼允許匯出），只挑出 `MACMEOW_SIGN_ID` 指定的憑證（未設定且只有一張 Developer ID 憑證時直接使用）與對應私鑰，以隨機密碼重新打包成 `.p12`；詢問 Apple ID 與 App 專用密碼並以 `notarytool history` 驗證；確認後以 `gh secret set` 寫入，Team ID 取自憑證。暫存檔結束時刪除，`.p12` 密碼不另外保存（需要時重跑即可）。`--dry-run` 只檢查匯出。憑證到期或更換、App 專用密碼撤銷時重跑一次。
+`tools/release/setup-ci-secrets.sh`：以 `security export` 匯出登入鑰匙圈的簽章身分（macOS 會要求輸入登入密碼允許匯出），只挑出 `MACMEOW_SIGN_ID` 指定的憑證（未設定且只有一張 Developer ID 憑證時直接使用）與對應私鑰，以隨機密碼重新打包成 `.p12`；詢問 Apple ID 與 App 專用密碼並以 `notarytool history` 驗證；確認後以 `gh secret set` 寫入，Team ID 取自憑證。暫存檔結束時刪除，`.p12` 密碼不另外保存（需要時重跑即可）。`--dry-run` 只檢查匯出。憑證到期或更換、App 專用密碼撤銷時重跑一次。
 
 `HOMEBREW_TAP_TOKEN` 另外設定：在 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) 建立 token，Repository access 只選 `xlanstar/homebrew-tap`，Repository permissions 的 Contents 設為 Read and write（其餘不給），再執行 `gh secret set HOMEBREW_TAP_TOKEN` 貼上。Token 到期後重建並重設。
 
@@ -198,7 +198,7 @@ Agent shell 無法啟動 GUI Wine 程式；這一步需在 Terminal.app 或 Find
 
 ### Repo 圖片
 
-`bash tools/repo-images.sh [--update-readme] [App 視窗截圖.png]` 以 `tools/src/repo-images/` 的 HTML 範本與 App 視窗截圖（預設 `debug/app-shot.png`，⌘⇧4 → 空白鍵擷取）產生 2560×1280 JPEG 到 `build/repo-images/`。需先 `bash app/build-app.sh` 產生圖示，並安裝 Google Chrome。
+`bash tools/dev/repo-images.sh [--update-readme] [App 視窗截圖.png]` 以 `tools/src/repo-images/` 的 HTML 範本與 App 視窗截圖（預設 `debug/app-shot.png`，⌘⇧4 → 空白鍵擷取）產生 2560×1280 JPEG 到 `build/repo-images/`。需先 `bash app/build-app.sh` 產生圖示，並安裝 Google Chrome。
 
 | 圖片 | 範本 | 用途 |
 |---|---|---|

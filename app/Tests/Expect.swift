@@ -1,7 +1,7 @@
 import Foundation
 
 /// 極簡測試工具：`expect` 記錄失敗並繼續，`finishTests()` 印出摘要並以結束碼回報。
-/// 失敗訊息寫到 stderr（tools/release.sh check 會丟掉 stdout）。
+/// 失敗訊息寫到 stderr（tools/release/release.sh check 會丟掉 stdout）。
 private var checkCount = 0
 private var failureCount = 0
 

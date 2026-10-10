@@ -4,13 +4,13 @@
 # 重新打包成只含這一張的 .p12（隨機密碼），詢問並驗證公證用的 Apple ID 與 App 專用密碼，
 # 再以 gh secret set 寫入目前 repo。暫存檔在結束時刪除，密碼不會顯示或寫到磁碟。
 #
-# 用法：bash tools/setup-ci-secrets.sh [--dry-run]
+# 用法：bash tools/release/setup-ci-secrets.sh [--dry-run]
 #   --dry-run  只匯出並檢查 .p12，不詢問 Apple 帳密、不寫入 GitHub
 # 需要：在終端機執行、gh auth login、repo 已設定 GitHub origin、.env 的 MACMEOW_SIGN_ID（鑰匙圈只有一張 Developer ID 憑證時可省略）。
 # macOS 會跳出視窗詢問是否允許匯出鑰匙圈項目：輸入登入密碼並按「允許」（每個簽章身分一次）。
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 load_env
 
 OPENSSL=/usr/bin/openssl # 系統 LibreSSL：讀得懂 security export 的格式，產生的 .p12 也能被 security import 匯入
@@ -123,4 +123,4 @@ set_secret DEVELOPER_ID_P12_PASSWORD "$p12_pw"
 set_secret APPLE_ID "$apple_id"
 set_secret APPLE_TEAM_ID "$team"
 set_secret APPLE_APP_PASSWORD "$app_pw"
-echo "完成。之後 bash tools/release.sh publish X.Y.Z 即由 GitHub Actions 建置、公證並正式發佈。"
+echo "完成。之後 bash tools/release/release.sh publish X.Y.Z 即由 GitHub Actions 建置、公證並正式發佈。"

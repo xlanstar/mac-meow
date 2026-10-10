@@ -2,7 +2,7 @@
 # 不經 Cyder.app，直接以 Cyder engine 執行完整流程（認證器.exe → … → MapleStory.exe），所有環境變數可控。
 # 會先關閉 Cyder shared bottle 內所有 Windows 程式；Ctrl+C 結束時也會關閉。
 # 需在 Terminal.app 內執行（GUI 類 Wine 程式在 agent shell／SSH 會卡住）：
-#   open -a Terminal tools/run-game.sh   或   bash tools/run-game.sh [模式]
+#   open -a Terminal tools/game/run-game.sh   或   bash tools/game/run-game.sh [模式]
 #
 # 模式（第一個參數）：
 #   plain    （預設）無 trace，用於效能比較
@@ -20,8 +20,8 @@
 #   EXTRA_ENV="K=V K2=V2"（額外環境變數）
 # 紀錄：debug/run-<時間>/
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 mode="${1:-plain}"
 case "$mode" in plain | trace | relay | virtual | server) ;; *) die "未知模式：${mode}（plain|trace|relay|virtual|server）" ;; esac
@@ -99,7 +99,7 @@ stop() {
 }
 trap stop INT TERM
 echo "執行中，紀錄：$OUT"
-echo "卡住時先在另一個終端機執行 bash tools/stack.sh，再按 Ctrl+C（會關閉此 bottle 的所有 Windows 程式）。"
+echo "卡住時先在另一個終端機執行 bash tools/diag/stack.sh，再按 Ctrl+C（會關閉此 bottle 的所有 Windows 程式）。"
 
 # maple_status：MapleStory 執行緒數、CPU、狀態與 socket（comm 不含啟動參數）。
 maple_status() {

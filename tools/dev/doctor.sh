@@ -1,10 +1,10 @@
 #!/bin/bash
 # 檢查開發環境：Xcode Command Line Tools 與 Brewfile 內的工具。全部可用時 exit 0，否則列出缺少項目並 exit 1。
 #
-# 用法：bash tools/doctor.sh
+# 用法：bash tools/dev/doctor.sh
 set -uo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 missing=()
 

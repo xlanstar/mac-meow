@@ -1,4 +1,4 @@
-/* repo 圖片共用：色票、字型與 App 視窗陰影。由 tools/repo-images.sh 複製到 build/repo-images/。 */
+/* repo 圖片共用：色票、字型與 App 視窗陰影。由 tools/dev/repo-images.sh 複製到 build/repo-images/。 */
 :root {
   --bg: #f7f2ec;
   --glow: rgba(255, 170, 120, .55);

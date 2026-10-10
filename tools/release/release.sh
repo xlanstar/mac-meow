@@ -1,7 +1,7 @@
 #!/bin/bash
 # 發佈流程（開發端）。完整說明見 docs/development.md「發佈」。
 #
-# 用法：bash tools/release.sh <指令> <X.Y.Z>
+# 用法：bash tools/release/release.sh <指令> <X.Y.Z>
 #   check    只做發佈前檢查（乾淨工作目錄、在 main、Unreleased 有內容、版本號遞增、
 #            tag 不存在、bash -n、App 編譯與 Core 單元測試、patches/bin/SHA256SUMS、Homebrew cask 範本、簽章與公證設定）
 #   prepare  check 後改寫 CHANGELOG.md 與 VERSION，commit「chore(release): X.Y.Z」並建立 annotated tag vX.Y.Z（不 push）
@@ -18,8 +18,8 @@
 #
 # CI 會直接正式發佈，所以 publish 之前必須以本機 build 的產物手動冒煙測試（見 docs/development.md）。
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 load_env # MACMEOW_SIGN_ID／MACMEOW_NOTARY_PROFILE（.env）；build 從 tag 建置時以環境變數傳給 build-app.sh
 cd "$ROOT"
 
@@ -124,8 +124,8 @@ check_sources() {
   swiftc -typecheck -swift-version 5 -parse-as-library -target "$APP_SWIFT_TARGET" \
     -sdk "$(xcrun --sdk macosx --show-sdk-path)" "${APP_SOURCES[@]}" || die "app/Sources 無法編譯"
   ok "swiftc -typecheck（app/Sources）"
-  bash "$ROOT/tools/test-app.sh" >/dev/null || die "app/Sources/Core 單元測試失敗（bash tools/test-app.sh）"
-  ok "Core 單元測試（tools/test-app.sh）"
+  bash "$ROOT/tools/dev/test-app.sh" >/dev/null || die "app/Sources/Core 單元測試失敗（bash tools/dev/test-app.sh）"
+  ok "Core 單元測試（tools/dev/test-app.sh）"
 
   (cd patches/bin/x86_64-windows && shasum -a 256 -c ../SHA256SUMS >/dev/null) || die "patches/bin/SHA256SUMS 與 DLL 不符"
   ok "patches/bin/SHA256SUMS"
@@ -163,7 +163,7 @@ cmd_prepare() {
   git commit -q -m "chore(release): $v" -m "Move the Unreleased changelog entries under $v and set VERSION to $v."
   git tag -a "v$v" -m "MacMeow $v"
   echo "已建立 commit「chore(release): ${v}」與 tag v${v}（尚未 push）。"
-  echo "下一步：bash tools/release.sh build ${v} 並冒煙測試，再 publish ${v}（push 後由 GitHub Actions 建置並正式發佈）"
+  echo "下一步：bash tools/release/release.sh build ${v} 並冒煙測試，再 publish ${v}（push 後由 GitHub Actions 建置並正式發佈）"
 }
 
 # verify_dmg <dmg> <X.Y.Z>：dmg（非 ad-hoc 時）已簽章、公證；掛載後 App 簽章有效、已公證且 Gatekeeper 認可、
@@ -285,7 +285,7 @@ cmd_ci() {
   cmd_draft "$v"
   cmd_release "$v"
   # Release 已公開；tap 更新失敗時 CI 標為失敗，修正後在本機重跑 tap
-  echo "（Homebrew tap 更新失敗時 Release 已發佈：修正後執行 bash tools/release.sh tap ${v}）"
+  echo "（Homebrew tap 更新失敗時 Release 已發佈：修正後執行 bash tools/release/release.sh tap ${v}）"
   cmd_tap "$v"
 }
 
@@ -304,7 +304,7 @@ cmd_draft() {
       --notes-file "$out/release-notes.md" "${assets[@]}"
     echo "已建立 GitHub Release 草稿 v${v}"
   fi
-  [[ -n "${GITHUB_ACTIONS:-}" ]] || echo "冒煙測試通過後：bash tools/release.sh release ${v}"
+  [[ -n "${GITHUB_ACTIONS:-}" ]] || echo "冒煙測試通過後：bash tools/release/release.sh release ${v}"
 }
 
 cmd_release() {

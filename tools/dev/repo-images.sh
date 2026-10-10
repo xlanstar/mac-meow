@@ -4,13 +4,13 @@
 #   readme-hero-light.jpg    README 頂部主圖（淺色模式）
 #   readme-hero-dark.jpg     README 頂部主圖（深色模式）
 #
-# 用法：bash tools/repo-images.sh [--update-readme] [App 視窗截圖.png]
+# 用法：bash tools/dev/repo-images.sh [--update-readme] [App 視窗截圖.png]
 #   --update-readme   另把 readme-hero-*.jpg 複製到 docs/images/（README 引用的版本）
 #   App 視窗截圖預設 debug/app-shot.png（含透明圓角：⌘⇧4 → 空白鍵 → 點 App 視窗）。
 #   圖示取自 app/build-app.sh 產生的 build/app/AppIcon.iconset。需要 Google Chrome。
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 UPDATE_README=0
 if [[ "${1:-}" == --update-readme ]]; then

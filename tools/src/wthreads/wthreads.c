@@ -4,7 +4,7 @@
  *   n        只查 suspend count，不 SuspendThread、不取 context
  *   tid-hex  只處理指定執行緒
  * 不寫入目標程序記憶體；取 context 時會短暫 SuspendThread/ResumeThread。
- * 以 mingw-w64 建置（見 tools/build.sh）。 */
+ * 以 mingw-w64 建置（見 tools/dev/build.sh）。 */
 #include <windows.h>
 #include <tlhelp32.h>
 #include <winternl.h>

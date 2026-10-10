@@ -1,7 +1,7 @@
 #!/bin/bash
 # 建置 tools/src/ 下的診斷工具，產物放在 build/tools/（不污染原始碼目錄）。
 #
-# 用法：bash tools/build.sh [目標...]   （不指定則建置全部；個別失敗不中斷，最後回報）
+# 用法：bash tools/dev/build.sh [目標...]   （不指定則建置全部；個別失敗不中斷，最後回報）
 #
 # macOS 工具（只需 Xcode clang）：
 #   machstack                原生 arm64，以 Mach API 讀 Rosetta 程序（src/machstack）
@@ -9,8 +9,8 @@
 # Windows 工具（Homebrew mingw-w64，lib.sh 的 win_exe）：
 #   wthreads.exe wgui.exe recvcheck.exe
 set -uo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 SRC="$ROOT/tools/src"
 ALL=(machstack symx86 wthreads.exe wgui.exe recvcheck.exe)

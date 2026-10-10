@@ -1,12 +1,12 @@
 #!/bin/bash
 # 替 Cyder engine 的 wine 執行檔換上「可除錯」簽章（ad-hoc + get-task-allow，移除 hardened runtime），
-# 讓 tools/stack.sh（machstack、LLDB）可以讀取 Rosetta 下的遊戲程序。僅供開發診斷；查完請 restore。
+# 讓 tools/diag/stack.sh（machstack、LLDB）可以讀取 Rosetta 下的遊戲程序。僅供開發診斷；查完請 restore。
 # 原檔備份為 *.macmeow-orig。status、restore 與檔案清單在 scripts/lib/common.sh（uninstall.sh 也會還原）。
 #
-# 用法：bash tools/sign-debug.sh status|apply|restore
+# 用法：bash tools/diag/sign-debug.sh status|apply|restore
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 # debug_entitlements <輸出檔>：原有 entitlements 再加上 get-task-allow。
 debug_entitlements() {

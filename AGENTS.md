@@ -37,16 +37,16 @@ Each fact lives in exactly one file. Link to it; do not copy it.
 - Brace variables next to CJK text (`"${name}：…"`); zh_TW locales otherwise read full-width characters as part of the name.
 - `scripts/` is the user flow (bundled into the app) and uses macOS built-ins only (no `python3`, Homebrew, Xcode). `tools/` is dev-only and may use Homebrew, uv, Xcode and `python3`; the user flow never calls it.
 - `experiments/` holds one-off, unmaintained experiments (one folder each, any third-party tool); `scripts/`, `app/` and `tools/` must never depend on it. Rules in `experiments/README.md`.
-- `app/` is a SwiftUI app (macOS 13+, Swift 5 language mode) compiled by `swiftc` in `app/build-app.sh`; Xcode or Command Line Tools are needed to build only, the product links system frameworks only. It is a UI shell: every action goes through `scripts/` (`play.sh status --porcelain`, `progress` markers, `play.sh stop`, `setup-loopback.sh`). Never reimplement script logic, engine/prefix paths or game file lists in Swift; extend the scripts instead. Layers in `app/Sources/` depend downward only (UI → Features → Services → Core): `Core/` is pure Foundation (no AppKit/SwiftUI) and unit-tested by `tools/test-app.sh`; `scripts/` are invoked only via `Services/Scripts.swift`.
+- `app/` is a SwiftUI app (macOS 13+, Swift 5 language mode) compiled by `swiftc` in `app/build-app.sh`; Xcode or Command Line Tools are needed to build only, the product links system frameworks only. It is a UI shell: every action goes through `scripts/` (`play.sh status --porcelain`, `progress` markers, `play.sh stop`, `setup-loopback.sh`). Never reimplement script logic, engine/prefix paths or game file lists in Swift; extend the scripts instead. Layers in `app/Sources/` depend downward only (UI → Features → Services → Core): `Core/` is pure Foundation (no AppKit/SwiftUI) and unit-tested by `tools/dev/test-app.sh`; `scripts/` are invoked only via `Services/Scripts.swift`.
 - Shared paths, constants and helpers live in `scripts/lib/common.sh` (user side) and `tools/lib.sh` (dev side). Source them; never redefine engine/prefix paths, game file lists or loopback IPs.
 - Scripts that change external state expose `check|apply|restore` through `cmd_<sub>` functions and exit 64 via `usage` on bad arguments; call other scripts with `run_script`. Settings come from `load_settings` (`MACMEOW_SETTINGS` in `common.sh`); never hard-code their defaults elsewhere.
-- Dev tool sources go in `tools/src/<name>/`, built by `tools/build.sh` into `build/tools/`. Never write build output into the source tree.
+- Dev tool sources go in `tools/src/<name>/`, built by `tools/dev/build.sh` into `build/tools/`. Never write build output into the source tree.
 - Resolve paths from the script location (`$(dirname "$0")`); never hard-code a home directory or username; honor `GAME_DIR` and `CYDER_ENGINE`.
 - User-facing messages in Traditional Chinese (zh-TW); comments in zh-TW or English.
 
 ## Runtime pitfalls
 
-- GUI Wine programs hang if started from a non-Aqua shell (agent shell, SSH). Launch via Terminal.app: `tools/wgui.sh` does this by default; elsewhere use `in_terminal` from `tools/lib.sh`.
+- GUI Wine programs hang if started from a non-Aqua shell (agent shell, SSH). Launch via Terminal.app: `tools/diag/wgui.sh` does this by default; elsewhere use `in_terminal` from `tools/lib.sh`.
 - Wine clients must use the running wineserver's sync mode: set `WINEMSYNC=1` when Cyder has `msync=true` (`export_wine_env` in `scripts/lib/common.sh` does this).
 
 ## Definition of done
@@ -74,4 +74,4 @@ Message format (Conventional Commits), subject and body both required:
 - `description`: imperative English, lowercase start, no trailing period; keep the whole subject line within 72 characters.
 - Body: what changed and why, wrapped at 72 columns; bullets are fine. Pass it as a second `-m` (`git commit -m "<subject>" -m "<body>"`).
 
-Releases go through `tools/release.sh check|prepare|build|publish|release X.Y.Z` only; `publish` pushes the tag and `.github/workflows/release.yml` runs `release.sh ci` to build, notarize, create a draft GitHub Release and `release` it (verify the draft's assets, then un-draft it as Latest; see `docs/development.md`, 發佈). Never edit `VERSION` or the release headings by hand, and never move or reuse a pushed tag. Ask before `publish` (it releases publicly via CI) and before un-drafting a release.
+Releases go through `tools/release/release.sh check|prepare|build|publish|release X.Y.Z` only; `publish` pushes the tag and `.github/workflows/release.yml` runs `release.sh ci` to build, notarize, create a draft GitHub Release and `release` it (verify the draft's assets, then un-draft it as Latest; see `docs/development.md`, 發佈). Never edit `VERSION` or the release headings by hand, and never move or reuse a pushed tag. Ask before `publish` (it releases publicly via CI) and before un-drafting a release.

@@ -2,15 +2,15 @@
 # GitHub Actions 發佈用：建立暫時鑰匙圈，匯入 Developer ID 憑證與 notarytool 帳密。
 # 只在 CI（GITHUB_ACTIONS=true）執行，會改動目前使用者的鑰匙圈搜尋清單。
 #
-# 用法：bash tools/ci-keychain.sh setup|cleanup
+# 用法：bash tools/release/ci-keychain.sh setup|cleanup
 #   setup    需要環境變數（來自 GitHub Secrets）：
 #              DEVELOPER_ID_P12_BASE64、DEVELOPER_ID_P12_PASSWORD、
 #              APPLE_ID、APPLE_TEAM_ID、APPLE_APP_PASSWORD
 #            成功後把 MACMEOW_SIGN_ID／MACMEOW_NOTARY_PROFILE／MACMEOW_NOTARY_KEYCHAIN 寫入 $GITHUB_ENV
 #   cleanup  刪除暫時鑰匙圈（同時從搜尋清單移除）
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 [[ "${GITHUB_ACTIONS:-}" == true ]] || die "只能在 GitHub Actions 執行"
 [[ -n "${RUNNER_TEMP:-}" && -n "${GITHUB_ENV:-}" ]] || die "缺少 RUNNER_TEMP／GITHUB_ENV"

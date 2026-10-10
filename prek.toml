@@ -43,7 +43,7 @@ hooks = [
 [[repos]]
 repo = "https://github.com/shellcheck-py/shellcheck-py"
 rev = "v0.11.0.1"
-hooks = [{ id = "shellcheck", args = ["--severity=warning"] }] # 與 tools/release.sh check 一致；-x 由 .shellcheckrc 開啟
+hooks = [{ id = "shellcheck", args = ["--severity=warning"] }] # 與 tools/release/release.sh check 一致；-x 由 .shellcheckrc 開啟
 
 [[repos]]
 repo = "https://github.com/scop/pre-commit-shfmt"
@@ -98,5 +98,5 @@ hooks = [
   { id = "swift-format-lint", name = "swift format lint", language = "system", entry = "swift format lint --strict --parallel", types = ["swift"] },
   # AGENTS.md Hard rule 6：預建 DLL 必須與 SHA256SUMS 一致
   { id = "dll-sha256", name = "verify patches/bin SHA256SUMS", language = "system", entry = "bash -c 'cd patches/bin/x86_64-windows && shasum -a 256 -c --quiet ../SHA256SUMS'", files = '^patches/bin/', pass_filenames = false },
-  { id = "commit-body", name = "require commit message body", language = "system", entry = "bash tools/check-commit-body.sh", stages = ["commit-msg"] },
+  { id = "commit-body", name = "require commit message body", language = "system", entry = "bash tools/dev/check-commit-body.sh", stages = ["commit-msg"] },
 ]

@@ -2,10 +2,10 @@
 # commit-msg hook（prek.toml）：AGENTS.md 規定 commit 必須有 body（subject 之後空一行再寫內容）。
 # fixup!/squash!/amend! 與 Merge/Revert 訊息不檢查；格式與長度交給 committed。
 #
-# 用法：bash tools/check-commit-body.sh <commit-msg 檔案>
+# 用法：bash tools/dev/check-commit-body.sh <commit-msg 檔案>
 set -euo pipefail
-# shellcheck source=lib.sh
-source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+# shellcheck source=../lib.sh
+source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 
 [[ -n "${1:-}" ]] || usage "<commit-msg 檔案>"
 msg_file="$1"

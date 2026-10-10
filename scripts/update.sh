@@ -94,7 +94,7 @@ cmd_prepare() {
   (($# == 2)) || usage "$USAGE"
   local v="$1" target="$2" url dmg mnt copied=0 brew_cmd
   [[ "$v" =~ ^[0-9]+(\.[0-9]+)+$ ]] || die "版本號不正確：${v}"
-  # 網址由版本號組成，不接受外部傳入（只會下載本專案的 Release 附件，命名同 tools/release.sh）
+  # 網址由版本號組成，不接受外部傳入（只會下載本專案的 Release 附件，命名同 tools/release/release.sh）
   url="https://github.com/$MACMEOW_REPO/releases/download/v$v/MacMeow-$v.dmg"
   if brew_cmd="$(brew_command upgrade "$target")"; then
     die "這個 App 由 Homebrew 安裝，請在終端機執行：${brew_cmd}"

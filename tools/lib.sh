@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# 開發工具共用設定。tools/*.sh 以 `source "$(cd "$(dirname "$0")" && pwd)/lib.sh"` 載入。
+# 開發工具共用設定。tools/*/*.sh 以 `source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"` 載入。
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
 #   ROOT / TOOLS_BIN / DEBUG_DIR、BREW_HINT、load_env、ok、usage_doc、need_cmd、out_dir、maple_pids、need_tool、in_terminal、
 #   run_wine、llvm_paths（LLVM 路徑）、MINGW_CC / win_exe（Windows 程式）、
@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=../scripts/lib/common.sh
 source "$ROOT/scripts/lib/common.sh"
 
-TOOLS_BIN="$ROOT/build/tools" # tools/build.sh 的產物
+TOOLS_BIN="$ROOT/build/tools" # tools/dev/build.sh 的產物
 DEBUG_DIR="$ROOT/debug"       # 所有診斷輸出（.gitignore）
 # shellcheck disable=SC2034  # build-app.sh、release.sh 使用
 APP_SWIFT_TARGET="arm64-apple-macos13.0" # App 的 swiftc target；與 Info.plist 的 LSMinimumSystemVersion 一致
@@ -72,7 +72,7 @@ maple_pids() {
 need_tool() {
   local t missing=()
   for t in "$@"; do [[ -x "$TOOLS_BIN/$t" ]] || missing+=("$t"); done
-  ((${#missing[@]} == 0)) || bash "$ROOT/tools/build.sh" "${missing[@]}"
+  ((${#missing[@]} == 0)) || bash "$ROOT/tools/dev/build.sh" "${missing[@]}"
 }
 
 # 設定 LLVM_BIN／LLD_BIN／BISON_BIN（Homebrew，見 Brewfile）；缺少 LLVM／lld 時回傳 1。

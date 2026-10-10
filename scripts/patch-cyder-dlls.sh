@@ -2,7 +2,7 @@
 # 以 patches/bin/x86_64-windows/ 的修補版 Wine DLL 取代 Cyder engine 內建版（docs/technical-notes.md #6、#7）：
 #   wsock32.dll   patches/wsock32-distinct-recv.patch：wsock32!recv 獨立化，避免 recv hook 無限遞迴（遊戲凍結）
 #   advapi32.dll  patches/advapi32-pin-csp.patch：CSP（rsaenh.dll）載入後常駐，避免反覆重新映射（嚴重卡頓）
-# DLL 由 CrossOver 26.3.0（REQUIRED_BASE）原始碼建置（tools/build-wine-dlls.sh），只套用到同一基底版本的 engine。
+# DLL 由 CrossOver 26.3.0（REQUIRED_BASE）原始碼建置（tools/dev/build-wine-dlls.sh），只套用到同一基底版本的 engine。
 #
 # 用法：bash scripts/patch-cyder-dlls.sh check|apply|restore
 #   check    全部已套用則回傳 0

@@ -18,7 +18,7 @@ struct Release: Equatable {
         version.compare(current, options: .numeric) == .orderedDescending
     }
 
-    /// 解讀 `releases/latest` 的回應。還沒上傳 update.sh 要下載的 dmg（命名同 tools/release.sh）時視為尚未發佈。
+    /// 解讀 `releases/latest` 的回應。還沒上傳 update.sh 要下載的 dmg（命名同 tools/release/release.sh）時視為尚未發佈。
     init(githubJSON data: Data) throws {
         struct Payload: Decodable {
             struct Asset: Decodable { let name: String }

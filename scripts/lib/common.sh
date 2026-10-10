@@ -92,7 +92,7 @@ MACMEOW_TEAM_ID="LJJN3L2PS6"
 MACMEOW_REQUIREMENT="anchor apple generic and identifier \"$MACMEOW_BUNDLE_ID\" \
 and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists \
 and certificate leaf[subject.OU] = \"$MACMEOW_TEAM_ID\""
-# Homebrew cask（第三方 tap；cask 範本 packaging/homebrew/macmeow.rb，由 tools/release.sh tap 發佈）。
+# Homebrew cask（第三方 tap；cask 範本 packaging/homebrew/macmeow.rb，由 tools/release/release.sh tap 發佈）。
 # homebrew_app 以 <prefix>/Caskroom/<token> 判斷 App 是否由 Homebrew 安裝。
 MACMEOW_CASK="macmeow"
 MACMEOW_TAP_REPO="xlanstar/homebrew-tap" # brew 的 tap 名稱為 xlanstar/tap
@@ -208,7 +208,7 @@ files_readable() {
   for f in "$@"; do [[ -r "$dir/$f" ]] || return 1; done
 }
 
-# gptk_complete <GPTK 目錄>：與 Cyder 的 cyder_gptk_root_is_valid 相同（tools/run-game.sh 也使用）。
+# gptk_complete <GPTK 目錄>：與 Cyder 的 cyder_gptk_root_is_valid 相同（tools/game/run-game.sh 也使用）。
 gptk_complete() { [[ -r "$1/external/libd3dshared.dylib" && -d "$1/external/D3DMetal.framework" ]]; }
 
 # graphic_backend_available <後端>：與 Cyder 的 cyder_<後端>_launch_allowed 相同。
@@ -318,7 +318,7 @@ require_wine_stopped() {
 }
 
 # ---------- 開發用除錯簽章 ----------
-# tools/sign-debug.sh apply 替 engine 的 wine 換上除錯簽章（ad-hoc + get-task-allow，移除 hardened runtime），
+# tools/diag/sign-debug.sh apply 替 engine 的 wine 換上除錯簽章（ad-hoc + get-task-allow，移除 hardened runtime），
 # 原檔備份為 *.macmeow-orig。偵測與還原放在這裡，uninstall.sh 在 App 與 Caskroom 內也能還原。
 DEBUG_SIGN_FILES=("$WINE_BIN" "$CYDER_ENGINE/lib/wine/x86_64-unix/wine")
 
