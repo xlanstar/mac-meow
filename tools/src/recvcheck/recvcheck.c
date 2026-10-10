@@ -1,4 +1,6 @@
-/* 檢查 wsock32!recv 與 ws2_32!recv 是否為不同位址，並各自實際收資料（loopback TCP 連線）。 */
+/* 檢查 wsock32!recv 與 ws2_32!recv 是否為不同位址，並各自實際收資料（loopback TCP 連線）。
+ * recv 修補（wsock32-distinct-recv.patch）的回歸檢查；在 shared bottle 內執行：
+ *   bash -c 'source tools/lib.sh && run_wine build/tools/recvcheck.exe' */
 #include <winsock2.h>
 #include <stdio.h>
 

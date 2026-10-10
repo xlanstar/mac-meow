@@ -1,8 +1,8 @@
-# 技術筆記
+# 修補與根因
 
-每個問題的根因與修補。執行鏈與連線路徑見 [architecture.md](architecture.md)。
+每個修補（含試過但未採用的做法）的症狀、根因、證據與處理方式；執行鏈與連線路徑見 [architecture.md](architecture.md#執行鏈與連線路徑)。
 
-新增問題時沿用相同格式：症狀、根因、修補，必要時加上證據（使用的工具與數據）。只寫結論，不放原始記錄或個人資料。
+新增問題時沿用相同格式，依序列出用得到的欄位：症狀、根因、證據（使用的工具與數據）、修補（或結論、結果、狀態、已試無效、驗證等），沒有的欄位省略。
 
 ## 1. HostShield 無法監聽
 
@@ -13,7 +13,7 @@
 ## 2. 4 個 HostShield 互搶 port 後全部退出
 
 - 根因：Cyder/CrossOver 的 wineserver 把 `bind(127.x.x.x)` 改寫成 127.0.0.1（`connect` 不改寫）。
-- 修補：`patch-cyder-loopback.sh` 把 wineserver 的條件跳躍 `jne` 改成 `jmp`（1 byte）。
+- 修補：`patch-cyder-loopback.sh` 關閉 wineserver 的這個改寫（做法見腳本開頭）。
 
 ## 3. 「無法登入伺服器」（`CONNECT_TO_LOGIN_FAILED`）
 
@@ -28,7 +28,7 @@
 ## 5. 亂碼、設定未套用
 
 - 根因：Cyder 只在直接開 `MapleStory.exe` 時套用楓之谷設定；本流程是從 `認證器.exe` 開始。
-- 修補：Cyder 全域設定 `wineLocale=zh_TW`、`graphicsBackend=d3dmetal`（無法使用時依序退回，#13）。
+- 修補：`cyder-settings.sh`（由 `play.sh` 呼叫）改寫 Cyder 全域設定 `wineLocale=zh_TW` 與 `graphicsBackend`（#13），子程序會繼承。
 
 ## 6. 遊戲啟動約 2 秒後凍結（recv 無限遞迴）
 
@@ -45,8 +45,8 @@
 
 ## 8. 一般卡頓
 
-- 根因：Cyder 預設不開 MSync。
-- 修補：`cyder-settings.sh`（由 `play.sh` 呼叫）設定 `msync=true`。
+- 根因：Cyder 預設不開 MSync，每次同步都要經過 wineserver。
+- 修補：同 #5，`cyder-settings.sh` 寫入全域 `msync=true`（預設值見 `common.sh` 的 `MACMEOW_SETTINGS`，說明見 [settings.md](settings.md#變數)）。
 
 ## 9. 人多的地方很卡（Themida VM × Rosetta SMC，未解）
 
@@ -56,28 +56,30 @@
   - 熱鬧城鎮（頻道 1）對比人少地方：VM 鎖切換 23,000 對 7,500 次/秒；page fault 75,000 對 13,700 次/秒；主執行緒 CPU 約 100% 對 32%；Rosetta exceptionserver CPU 21.5% 對 4.3%。
   - `experiments/smc-same-page`：程式碼與頻繁寫入的變數同頁時慢約 11,500 倍。
 - 根因：x86 CPU 以快取行偵測自我修改程式碼，不同行就沒有成本；Rosetta 以整頁保護已翻譯的程式碼，每次寫入都要「例外、讓翻譯失效、重新翻譯、重新保護」。VM 呼叫次數與畫面上的玩家、特效數量成正比。
-- 已試無效：Rosetta 隱藏環境變數（`ROSETTA_*`、`CAMBRIA_*`）、MAP_JIT、一般 RWX、共享或檔案映射、不可執行頁。
+- 已試無效：
+  - Rosetta 隱藏環境變數（`ROSETTA_*`、`CAMBRIA_*`）。
+  - `experiments/smc-same-page` 的其他映射方式：MAP_JIT、一般 RWX、檔案私有映射 RWX 都沒有改善；共享記憶體 RWX（`smctest2 1`）與把程式碼放在不可執行頁（`smctest3`）會卡住。
 - 結論：根治需改動遊戲記憶體，會碰到 Themida/NGS 防外掛，不採用。使用者只能避開人多的頻道與地圖。
 
-## 10. Dock 上有兩個楓之谷圖示（隱藏登入器會讓遊戲斷線，未採用）
+## 10. Dock 上有兩個楓之谷圖示（隱藏登入器會讓遊戲斷線，實驗性）
 
 - 症狀：開始遊戲後，Dock 上同時有登入器與遊戲兩個 `wine` 圖示。登入器會一直把自己縮到最小，手動打開又會立刻縮小。
-- 根因：每個 Wine 程式都是獨立的 macOS 程序。`winemac.drv` 在程式第一次顯示視窗時（`-[WineApplicationController transformProcessToForeground:]`）把它設成一般 App（`NSApplicationActivationPolicyRegular`），之後不會改回。登入器在遊戲執行期間要轉發遊戲連線（見 [architecture.md](architecture.md) 的連線路徑），不能關閉。
+- 根因：每個 Wine 程式都是獨立的 macOS 程序。`winemac.drv` 在程式第一次顯示視窗時（`-[WineApplicationController transformProcessToForeground:]`）把它設成一般 App（`NSApplicationActivationPolicyRegular`），之後不會改回。登入器在遊戲執行期間要轉發遊戲連線（見 [architecture.md](architecture.md#執行鏈與連線路徑)），不能關閉。
 - 不可行的做法：
   - Wine 的 `Mac Driver` 登錄選項沒有 Dock 相關設定。
-  - CrossOver 的不顯示 Dock 清單（`CW HACK 24141`）比對的是 macOS 執行檔名稱，在 Cyder 中所有程式都叫 `wine`；而且那個清單會讓程式維持 Prohibited，視窗無法輸入。
+  - CrossOver 的「不顯示 Dock 圖示」清單（`CW HACK 24141`）比對的是 macOS 執行檔名稱，在 Cyder 中所有程式都叫 `wine`；而且那個清單會讓程式維持 Prohibited，視窗無法輸入。
   - 從其他程序修改：`lsappinfo setinfo <ASN> -uielement` 回傳成功，但 LaunchServices 不會套用。
   - 以 CrossOver 原始碼重建 `winemac.so`：Cyder 的 `winemac.so` 另含 Cyder 自己的楓之谷修補（`engine-manifest.json` 列出的 `maplestory-cx26-*`、`a6-final-same-view-backing-sync` 等，字串如 `MapleStoryPort: not bringing BlackXchg.aes to the foreground`），部分修補的原始碼沒有公開，重建會把這些修補拿掉。
 - 驗證：以 Swift 測試程式確認輔助程式（`NSApplicationActivationPolicyAccessory`）沒有 Dock 圖示，縮到最小的視窗也不會留在 Dock，而且仍可用 `deminiaturize` 還原。
-- 修補：`patch-cyder-winemac.sh` 只改 Cyder engine 的 `winemac.so` 內上述方法的兩段指令（只套用到 SHA-256 已知的檔案，改完重新 ad-hoc 簽章；`wine` 有 `disable-library-validation`）：
-  - `setActivationPolicy:` 的參數從固定的 `0`（Regular）改成讀取 `capture_displays_for_fullscreen`（依程式讀取的 `CaptureDisplaysForFullscreen` 登錄值，`0` 或 `1`），值為 `1` 時成為 Accessory。原本經由 GOT 呼叫的 `objc_msgSend` 改為 `callq *%r12`（同一函式），空出的位元組放得下新指令。
+- 修補：`patch-cyder-winemac.sh` 只改 Cyder engine `winemac.so` 內上述方法的兩段指令（偏移與指令見腳本開頭）：
+  - `setActivationPolicy:` 的參數從固定的 `0`（Regular）改成依程式讀取的 `CaptureDisplaysForFullscreen` 登錄值，值為 `y` 的程式成為 Accessory。改過的 `winemac.so` 只能重新 ad-hoc 簽章；Cyder 的 `wine` 有 `disable-library-validation` entitlement，所以仍會載入。
   - 「已轉成前景程式就返回」的檢查從 `policy == Regular` 改成 `policy != Prohibited`，避免 Accessory 程式每次顯示視窗都重建選單並搶走焦點。
-  - `launcher-dock.sh` 只對 `貓貓TMS登入器.exe` 寫入 `AppDefaults\貓貓TMS登入器.exe\Mac Driver\CaptureDisplaysForFullscreen=y`。其他程式（包含 `MapleStory.exe`）的值是預設的 `n`，行為不變。這個值原本只影響全螢幕時是否鎖定螢幕，登入器不會全螢幕。
-  - 登入器沒有 Dock 圖示時，Wine 會在程式被啟用時還原縮到最小的視窗（`applicationDidBecomeActive:` → `unminimizeWindowIfNoneVisible`），MacMeow 的「顯示登入器」就是啟用該程序。
+  - `launcher-dock.sh` 只對登入器寫入該值；其他程式（包含 `MapleStory.exe`）維持預設的 `n`，行為不變。這個值原本只影響全螢幕時是否鎖定螢幕，登入器不會全螢幕。
+  - 登入器沒有 Dock 圖示時，Wine 會在程式被啟用時還原縮到最小的視窗（`applicationDidBecomeActive:` → `unminimizeWindowIfNoneVisible`），所以 App 的「顯示登入器」只要啟用該程序。
 - 結果：`lsappinfo` 顯示登入器為 `UIElement`，Dock 的項目清單中沒有登入器；登入器視窗照常顯示並完成載入。但按「開始遊戲」後，遊戲顯示「與登入伺服器連線中斷」：
   - 遊戲的連線經過登入器在 `202.80.104.28:37629` 的轉發；此時直接連 HostShield（`127.145.37.1:37629`）可立即收到伺服器的 handshake，經登入器轉發則沒有回應。
   - 同一台機器把登入器改回一般 App（刪除登錄值）後，遊戲可以正常登入。輔助程式在視窗縮到最小後轉發停擺的確切原因（例如 macOS 對沒有可見視窗的輔助程式節流）尚未查明。
-  - 結論：改為實驗性，預設關閉（`MACMEOW_HIDE_LAUNCHER_DOCK=1` 才套用），App 不提供選項；未啟用時 `play.sh` 會刪除登錄值並還原 `winemac.so`。
+  - 結論：因為會讓遊戲斷線，改為實驗性、預設關閉（開關見 [settings.md](settings.md#變數) 的 `MACMEOW_HIDE_LAUNCHER_DOCK`）。
 
 ## 11. 關閉遊戲後登入器與 Wine 程式殘留
 
@@ -86,7 +88,10 @@
   - 登入器在 Windows 上本來就不會隨遊戲關閉。
   - `認證器.exe` 啟動的 4 個 `HostShield.exe`（各有一個 `conhost.exe`）不會自行結束。Wine 的 wineserver 要等所有非系統程式結束後，才會通知 `services.exe`、`explorer.exe` 等系統程式關閉（`server/process.c` 的 `user_processes`），所以整個 Wine 一直留著。
   - Cyder 0.13.2 可能留下一組 `CyderSwift --sentinel-connect` 與其 `bash`：supervisor 關閉 fifo 寫入端後，較晚啟動的 helper 卡在阻塞的 `open(fifo)`。Cyder `cyder/lifecycle-ux`（0.14.0-rc.1，commit `ed9e89e`）已修正。
-- 修補：`session.sh` 在背景監看本專案的程式（以命令列開頭是遊戲資料夾的 Windows 路徑，或 `HostShield.exe`／`認證器.exe` 來判斷）。遊戲關閉，或登入器關閉且遊戲沒在執行，連續 3 次檢查（約 6 秒）都成立就結束這些程式。Patcher 這類其他程式執行中時不收尾。只結束本專案的程式，Wine 會自行關閉，其他 Cyder 遊戲不受影響；有其他 Windows 程式時不等待 Wine 結束；Wine 沒有自行結束、也沒有其他 Windows 程式時，才執行 `wineserver -k`。`play.sh` 啟動時若只剩 `認證器.exe`／`HostShield.exe` 殘留，也以同樣方式收尾（`session.sh close`，會先停止舊的監看程序，以免它沿用上一次的狀態），不再對整個 shared bottle 執行 `wineserver -k`。Wine 結束後再結束 fifo 已刪除或監督程序已結束（PPID 1）的 sentinel。
+- 修補：`session.sh` 在背景監看本專案的程式（觸發與收尾條件見 `session.sh` 開頭與 `close_session`；判斷方式見 `common.sh` 的 `session_procs`）：
+  - 只結束本專案的程式，讓 Wine 自行關閉，其他 Cyder 遊戲不受影響。
+  - `play.sh` 啟動時若只剩 `認證器.exe`／`HostShield.exe` 殘留，也以同樣方式收尾（見 `play.sh` 步驟 2 的註解）。
+  - Wine 結束後再結束 Cyder 遺留的 sentinel（條件見 `session.sh` 的 `cleanup_sentinels`）。
 - 結果：關閉登入器後，4 秒內 HostShield、`conhost` 與所有 Wine 系統程式都結束；當時殘留的 11 組 sentinel 也一併清除。
 
 ## 12. 更換遊戲字型（Wine 端無效，未採用）
@@ -103,16 +108,32 @@
 - 下一步（若要繼續）：以 `EXTRA_DEBUG=MapleStory.exe:+font just run-game` 記錄遊戲要求的字型名稱與實際選到的字型。若是不存在的名稱，可用 Replacements 指定；若是遊戲自帶的字型資料，不改遊戲檔就無法更換。
 - 附帶發現：Wine 依 locale 決定字碼頁，與 bottle 的 `Fonts\Codepages` 不同時，任何 Wine 程式啟動都會改寫語系相依的字型設定（`Codepages`、FontSubstitutes 的 `MS Shell Dlg`／`Tms Rmn`、FontLink）。從 `LANG=C` 的 shell 執行 `reg` 曾把 shared bottle 從 950 改成 1252，所以 `export_wine_env` 固定使用 `zh_TW.UTF-8`（與 Cyder 的 `wineLocale=zh_TW` 相同）。
 
-## 13. 圖形後端（D3D11，預設經 D3DMetal 轉 Metal）
+## 13. 圖形後端（D3D11）
 
-- 結論：遊戲以 D3D11 繪圖。本專案預設 `graphicsBackend=d3dmetal`（#5，App 可改選 DXMT），所選的後端無法使用時，從它開始依 D3DMetal → DXMT → DXVK → wined3d 的順序改用第一個可用的（原因見下）。
+- 結論：遊戲以 D3D11 繪圖。`cyder-settings.sh` 把 `MACMEOW_GRAPHICS_BACKEND`（見 [settings.md](settings.md#變數)）寫入 Cyder 的 `graphicsBackend`；所選的後端無法使用時改用其他可用的後端（順序與可用條件見 [scripts.md](scripts.md#libcommonsh)，原因見下）。
 - DXMT 下的證據（改預設為 D3DMetal 之前，以 `graphicsBackend=dxmt` 取得）：遊戲執行中以 `lsof -p <MapleStory.exe>` 檢查。遊戲是 64 位元，繪圖模組為 `Gr2D_DX11.dll`；`d3d11.dll`、`dxgi.dll`、`winemetal.dll` 來自 Cyder 的 `~/.cyder/runtime/graphics/dxmt/<版本>/`，而非 Wine 內建；DXMT 的 shader 快取（`$TMPDIR/../C/dxmt/MapleStory.exe/`）在遊戲啟動後隨即被寫入。
 - 同一次檢查中，同程序也映射 Wine 內建的 `d3d9.dll`、`wined3d.dll`、`opengl32` 與 MoltenVK，推測是 `NxOverlay_x64.dll` 偵測或 hook 時載入，不是主要繪圖路徑（未以 `+loaddll` 確認載入者）。
-- 其他後端：Cyder 也支援 `d3dmetal`（Apple GPTK 的 D3DMetal，支援 D3D11／12；需要 macOS 14 以上與使用者自行安裝的 GPTK 或 CrossOver，不能隨本專案散布）、`dxvk`（D3D11 → Vulkan → MoltenVK → Metal）與 `wined3d`（OpenGL）。Cyder 對楓之谷的自動選擇是 macOS 15 以上用 DXMT，否則 DXVK，不會自動選 D3DMetal。
-- 退回的原因：Cyder 遇到無法使用的 `graphicsBackend`（`cyder_apply_graphics_preference`：`d3dmetal` 需要 macOS 14 以上與 GPTK，`dxmt` 需要 macOS 15 以上與 engine 的 `lib/dxmt`，`dxvk` 需要 engine 的 `lib/dxvk` 與 MoltenVK）不會退回其他後端，而是改用 default 且停用楓之谷的自動選擇，結果是最慢的 Wine 內建 wined3d。README 的最低需求是 macOS 13，所以 macOS 13 或沒有 GPTK 的 macOS 14 寫入 `dxmt` 一樣會變成 wined3d。`cyder-settings.sh` 因此以與 Cyder 相同的條件（`graphic_backend_available`）判斷，只寫入可用的後端。Cyder 以 `dxvkFrameRate`（預設 60）設定 DXMT 的 `d3d11.preferredMaxFrameRate` 與 DXVK 的 `DXVK_FRAME_RATE`，所以兩者的 FPS 預設上限 60；Cyder 不替 D3DMetal 設定 FPS 上限（`cyder_apply_graphics_runtime_preferences`）。效能 HUD 用 `graphicsHud=metal`（Cyder 匯出 `MTL_HUD_ENABLED=1`），DXMT 與 D3DMetal 都經 Metal 繪圖，兩者都適用。
-- D3DMetal 的 FPS 上限：`D3DMetal.framework` 讀取環境變數 `D3DM_MAX_FPS`（未公開文件）。以 `MACMEOW_GRAPHICS_BACKEND=d3dmetal MACMEOW_HUD=1 tools/game/run-game.sh` 在登入畫面實測（M4 Max、120Hz 螢幕）：`EXTRA_ENV="D3DM_MAX_FPS=30"` 時 HUD 為 30.00 FPS／33.33 ms；不設時約 117 FPS／8.5 ms，即預設只受螢幕更新率限制。HUD 同時確認 D3DMetal（Game Porting Toolkit 4.0b2）已接手 D3D11。
-- FPS 上限的做法：Cyder 的 `dxvkFrameRate` 只套用到 DXVK／DXMT，`D3DM_MAX_FPS` 也不在 Cyder 匯出的變數裡；本專案的啟動流程（`open -n -a Cyder` 開 `認證器.exe`）也無法直接帶環境變數。Cyder 會把 `settings.json` 的 `perProfile.<id>.environment`（`<id>` 為 exe 實際路徑 SHA-256 的前 24 個十六進位字元）匯出給該 exe，而 Wine 以父程序的環境建立子程序，所以寫在 `認證器.exe` 的 profile 就會傳到登入器與 `MapleStory.exe`。實測：以 `play.sh` 正常啟動、`MACMEOW_MAX_FPS=60`，D3DMetal 的 HUD 為 59.75 FPS／16.74 ms；手動寫入 `D3DM_MAX_FPS=30` 時為 29.97 FPS。
+- 其他後端：Cyder 也支援 `d3dmetal`（Apple GPTK 的 D3DMetal，支援 D3D11／12；GPTK 或 CrossOver 需使用者自行安裝，不能隨本專案散布）、`dxvk`（D3D11 → Vulkan → MoltenVK → Metal）與 `wined3d`（OpenGL）。Cyder 對楓之谷的自動選擇是 macOS 15 以上用 DXMT，否則 DXVK，不會自動選 D3DMetal。
+- 退回的原因：Cyder 遇到無法使用的 `graphicsBackend`（`cyder_apply_graphics_preference`）不會退回其他後端，而是改用 default 且停用楓之谷的自動選擇，結果是最慢的 Wine 內建 wined3d。README 的最低需求是 macOS 13，所以 macOS 13 或沒有 GPTK 的 macOS 14 寫入 `dxmt` 一樣會變成 wined3d。`cyder-settings.sh` 因此以與 Cyder 相同的條件判斷，只寫入可用的後端（見 [scripts.md](scripts.md#libcommonsh)）。
+- FPS 上限與 HUD：Cyder 以 `dxvkFrameRate` 設定 DXMT 的 `d3d11.preferredMaxFrameRate` 與 DXVK 的 `DXVK_FRAME_RATE`，預設上限為 60；Cyder 不替 D3DMetal 設定 FPS 上限，匯出的變數裡也沒有 `D3DM_MAX_FPS`（`cyder_apply_graphics_runtime_preferences`）。效能 HUD 用 `graphicsHud=metal`（Cyder 匯出 `MTL_HUD_ENABLED=1`），DXMT 與 D3DMetal 都經 Metal 繪圖，兩者都適用。
+- D3DMetal 的 FPS 上限：`D3DMetal.framework` 讀取環境變數 `D3DM_MAX_FPS`（未公開文件）。以 `MACMEOW_GRAPHICS_BACKEND=d3dmetal MACMEOW_HUD=1 just run-game` 在登入畫面實測（M4 Max、120Hz 螢幕）：`EXTRA_ENV="D3DM_MAX_FPS=30"` 時 HUD 為 30.00 FPS／33.33 ms；不設時約 117 FPS／8.5 ms，即預設只受螢幕更新率限制。HUD 同時確認 D3DMetal（Game Porting Toolkit 4.0b2）已接手 D3D11。
+- D3DMetal FPS 上限的做法：本專案的啟動流程（`open -n -a Cyder` 開 `認證器.exe`）無法直接帶環境變數。Cyder 會把 `settings.json` 的 `perProfile.<id>.environment`（`<id>` 的算法見 `common.sh` 的 `cyder_profile_id`）匯出給該 exe，而 Wine 以父程序的環境建立子程序，所以寫在 `認證器.exe` 的 profile 就會傳到登入器與 `MapleStory.exe`。實測：以 `play.sh` 正常啟動、`MACMEOW_MAX_FPS=60`，D3DMetal 的 HUD 為 59.75 FPS／16.74 ms；手動寫入 `D3DM_MAX_FPS=30` 時為 29.97 FPS。
 - 未比較 DXMT 與 D3DMetal 的效能。遊戲是 2D，已知的效能問題都在 CPU 端（#7–#9），預期更換圖形後端的效果有限。要實測時以 `MACMEOW_GRAPHICS_BACKEND=dxmt|d3dmetal MACMEOW_HUD=1 just run-game` 在同一張地圖比較 FPS 與 CPU。
+
+## 14. 按住 Command 再按 A／Z／X／C／V 變成 Ctrl（CrossOver 的 Edit 選單）
+
+使用者看到的症狀與暫時解法見 [known-issues.md](known-issues.md#2-按住-command-再按-azxcv會變成-ctrl)。
+
+- 症狀：先按住 Command（遊戲中等同 Alt）再按 A、Z、X、C 或 V，遊戲收到的是 Ctrl＋該字母，Alt 則像是放開後又按了一下；先按字母再按 Command 則正常。
+- 根因：CrossOver 在 Wine 的 Mac 驅動程式（`winemac.drv`）加了一段修改（原始碼標記為 `CrossOver Hack 10912: Mac Edit menu`），上游 Wine 沒有這段程式碼，遊戲也沒有問題。以下以 CrossOver 26.3.0 原始碼為準：
+  1. `macdrv_main.c` 的預設值是 `mac_edit_menu = MAC_EDIT_MENU_BY_KEY`。`cocoa_app.m` 依此在選單列加入「Edit」選單：Undo ⌘Z、Cut ⌘X、Copy ⌘C、Paste ⌘V、Select All ⌘A（Delete 沒有快捷鍵）。
+  2. 按下帶有 Command 的按鍵時，macOS 的 `NSApplication` 會先拿去比對選單快捷鍵。比對成功就會呼叫 `-[WineWindow selectAll:]` 這類方法，再進入 `sendEditMenuCommand:`，這個按鍵事件不會再送到 `keyDown:`。
+  3. `keyboard.c` 的 `macdrv_edit_menu_command` 會模擬一串按鍵送給 Windows 程式：放開 Alt → 按下並放開 Alt（避免焦點跑到選單列）→ 按下 Ctrl → 按下並放開字母 → 放開 Ctrl。
+  4. `sendEditMenuCommand:` 也會刻意把 Command 標記成沒有按下。原始碼註解寫明這是為了讓放開 Command 時不會選取選單列。
+  5. 只有在字母的按下事件帶有 Command 時才會被當成快捷鍵，所以「先按 Command 再按字母」才會觸發。
+- 驗證：Cyder engine `CX26.3.0-W11-Cyder012` 的 `winemac.so` 裡有 `selectAll:`、`sendEditMenuCommand:` 等符號；Cyder bottle 裡沒有設定 `EditMenu`，所以使用預設的 `key` 模式。以上是讀原始碼得到的結論，還沒有用 `WINEDEBUG=+key` 實際錄下按鍵順序來確認。
+- 可能的修正：`EditMenu` 設成 `key` 或 `message` 以外的值，這個功能就會關閉。關閉後，⌘A 會照常以 Alt＋A 送給遊戲。可以只對楓之谷設定：`HKCU\Software\Wine\AppDefaults\MapleStory.exe\Mac Driver` 的 `EditMenu="n"`。這個值在程序啟動時讀取，設定後要重開遊戲才會生效。這是 repo 以外的狀態，實作時要依 `AGENTS.md` 規則 4 處理，並列入 [external-state.md](external-state.md#清單)。
+- 狀態：未修正。
 
 ## 其他觀察
 

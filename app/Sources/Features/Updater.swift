@@ -60,7 +60,7 @@ final class Updater: ObservableObject {
         }
     }
 
-    /// 選單「檢查更新⋯」：不論是否略過過此版本，都以對話框回報結果。
+    /// 選單「檢查更新…」：不論是否略過過此版本，都以對話框回報結果。
     func checkNow() async {
         do {
             guard let release = try await fetchNewer() else {

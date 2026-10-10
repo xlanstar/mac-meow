@@ -1,5 +1,5 @@
 # 開發工具的統一入口（brew bundle 已含 just）。只轉呼叫 tools/、experiments/ 的腳本並原樣傳遞參數；
-# 用法與副作用見各腳本開頭與 docs/development.md。腳本仍可直接執行（CI、prek 直接呼叫）。
+# 用法與副作用見各腳本開頭，--list 看不出的注意事項見 docs/debugging.md。腳本仍可直接執行（CI、prek 直接呼叫）。
 
 set positional-arguments
 

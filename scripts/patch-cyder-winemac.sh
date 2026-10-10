@@ -1,5 +1,5 @@
 #!/bin/bash
-# 讓 Cyder 的 winemac.so 可以依程式隱藏 Dock 圖示（docs/technical-notes.md #10）。
+# 讓 Cyder 的 winemac.so 可以依程式隱藏 Dock 圖示（docs/fixes.md #10）。
 # 修補後，AppDefaults\<exe>\Mac Driver 設了 CaptureDisplaysForFullscreen=y 的程式會成為「輔助程式」
 # （NSApplicationActivationPolicyAccessory：沒有 Dock 圖示與縮到 Dock 的視窗，視窗仍可點擊、輸入）；
 # 其他程式行為不變。設定值由 launcher-dock.sh 寫入，只套用到登入器。
@@ -30,6 +30,8 @@ KNOWN_SHA256=6691e1ab75e16891ba332e5a6847ebab7a5884ca472c374054ce4e6c914f5e64
 A_OFF=$((0x5221))
 A_ORIG=4885c074d5
 A_NEW=3c0275d690
+# B 段：原本經 GOT 呼叫 objc_msgSend，改為 callq *%r12（%r12 已是同一個 objc_msgSend），
+# 省下的位元組放得下讀取 capture_displays_for_fullscreen 的指令。
 B_OFF=$((0x529e))
 B_ORIG=488b057bed0400488b38488b35c19c050031d2ff1511ef04004584ff7416488b35a59c0500488b7dc8ba01000000ff15f6ee0400
 B_NEW=488b057bed0400488b38488b35c19c05000fb6150ad5050041ffd44584ff7414488b35a39c0500488b7dc8ba0100000041ffd490

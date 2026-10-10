@@ -1,5 +1,5 @@
 #!/bin/bash
-# 擷取執行中 Wine 程序的堆疊／取樣（唯讀：不啟動或結束 Wine、不修改程序記憶體）。紀錄寫到 debug/。
+# 擷取執行中 Wine 程序的堆疊／取樣（唯讀：不啟動或結束 Wine、不修改程序記憶體）。記錄寫到 debug/。
 #
 # 用法：bash tools/diag/stack.sh [--exe <名稱>] [--pid <pid>]... <模式> [參數]
 #   --exe <名稱>             目標程序的 exe 檔名（預設 TARGET_EXE，未設定時為遊戲主程式）
@@ -8,8 +8,9 @@
 #                            不依賴 LLDB／Rosetta 除錯協定，對「收不到訊號、LLDB 無法暫停」的程序也有效。
 #   prof [次數=20] [間隔=0.5]  連續 mach 快照，統計各執行緒 CPU 增量與最常見呼叫鏈。
 #   lldb                     LLDB 附加，擷取所有執行緒原生堆疊後 detach（程序短暫停住）。
-#   wine                     winedbg 附加 Windows 程序，逐執行緒 bt（Windows 端堆疊，含 PE 符號）後 detach。
+#   wine                     winedbg 附加 Windows 程序，逐執行緒 bt（Windows 端堆疊，含 PE 符號）後 detach（尚未實測；確認可用後移除 tools/src/wthreads）。
 # mach、prof、lldb 需要先執行 bash tools/diag/sign-debug.sh apply（get-task-allow）；wine 不需要。
+# mach 的符號解析（symbolize.py）與 prof 的統計（machprof.py）用 python3；沒有 python3 時 mach 只輸出未解析的位址，prof 無法統計。
 set -euo pipefail
 # shellcheck source=../lib.sh
 source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"

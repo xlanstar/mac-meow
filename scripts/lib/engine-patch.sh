@@ -44,6 +44,8 @@ patch_apply() {
   require_wine_stopped "套用${PATCH_LABEL}"
   cp -p "$PATCH_FILE" "$PATCH_BAK" # 目前檔案是未修補的原檔（含 engine 更新後的新版），一律更新備份
   patch_write
+  # 改過的檔案只能重新 ad-hoc 簽章。winemac.so：Cyder 的 wine 有 disable-library-validation entitlement，
+  # 所以仍會載入 ad-hoc 簽章的 dylib（docs/fixes.md #10）。
   /usr/bin/codesign --force --sign - --preserve-metadata=entitlements "$PATCH_FILE" 2>/dev/null \
     || /usr/bin/codesign --force --sign - "$PATCH_FILE"
   if [[ "$(patch_state)" != patched ]] || ! /usr/bin/codesign --verify "$PATCH_FILE" 2>/dev/null; then

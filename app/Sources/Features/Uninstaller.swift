@@ -1,6 +1,6 @@
 import AppKit
 
-/// 「解除安裝⋯」。Homebrew 安裝的 App 改為提示 brew 指令（cask 的 uninstall 區塊執行同一支 uninstall.sh）；
+/// 「解除安裝…」。Homebrew 安裝的 App 改為提示 brew 指令（cask 的 uninstall 區塊執行同一支 uninstall.sh）；
 /// 其餘執行 uninstall.sh system（還原修補與設定、移除本機網路位址），成功後以 uninstall.sh stage 把
 /// purge 複製到暫存資料夾（~/.Trash 受隱私權保護，App 無法從垃圾桶執行腳本），把 App 移到垃圾桶，
 /// 再啟動 purge <PID> 並結束 App：設定與記錄等 App 結束後才刪除，App 結束時寫回的也會一併刪除。

@@ -1,5 +1,5 @@
 # Dependabot：只追蹤 GitHub Actions（action 以 commit SHA 釘選，Dependabot 會一併更新版本註解）。
-# prek hook 版本不在 Dependabot 支援範圍，以 `prek update` 手動更新（見 docs/development.md）。
+# prek hook 版本不在 Dependabot 支援範圍，以 `prek update` 手動更新（見 docs/ci.md「Dependabot」）。
 version: 2
 updates:
   - package-ecosystem: github-actions

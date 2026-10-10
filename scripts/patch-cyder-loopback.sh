@@ -1,5 +1,5 @@
 #!/bin/bash
-# 關閉 Cyder（CrossOver）wineserver 的「bind 127.x.x.x 一律改成 127.0.0.1」HACK（docs/technical-notes.md #2）。
+# 關閉 Cyder（CrossOver）wineserver 的「bind 127.x.x.x 一律改成 127.0.0.1」HACK（docs/fixes.md #2）。
 # setup-loopback.sh 已替 lo0 加上真正的位址，因此可以安全關閉。
 #
 # 只改 wineserver 一個位元組（jne → jmp）並重新 ad-hoc 簽章；原檔備份為 wineserver.macmeow-orig。

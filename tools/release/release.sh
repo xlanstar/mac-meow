@@ -1,5 +1,5 @@
 #!/bin/bash
-# 發佈流程（開發端）。完整說明見 docs/development.md「發佈」。
+# 發佈流程（開發端）。完整說明見 docs/release.md。
 #
 # 用法：bash tools/release/release.sh <指令> <X.Y.Z>
 #   check    只做發佈前檢查（乾淨工作目錄、在 main、Unreleased 有內容、版本號遞增、
@@ -16,7 +16,7 @@
 #   tap      以已正式發佈的 vX.Y.Z 附件雜湊產生 Homebrew cask（packaging/homebrew/），推到 tap repo
 #            （MACMEOW_TAP_REPO）；CI 用 HOMEBREW_TAP_TOKEN，本機用 gh 的登入
 #
-# CI 會直接正式發佈，所以 publish 之前必須以本機 build 的產物手動冒煙測試（見 docs/development.md）。
+# CI 會直接正式發佈，所以 publish 之前必須以本機 build 的產物手動冒煙測試（見 docs/release.md「冒煙測試」）。
 set -euo pipefail
 # shellcheck source=../lib.sh
 source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
@@ -47,7 +47,7 @@ changelog_section() {
   awk -v h="## $1" 'f && /^## /{exit} f{print} index($0, h)==1 && (length($0)==length(h) || substr($0, length(h)+1, 1)==" "){f=1}' CHANGELOG.md
 }
 
-# 發佈版本預設必須 Developer ID 簽章並公證（見 docs/development.md「簽章與公證」）
+# 發佈版本預設必須 Developer ID 簽章並公證（見 docs/signing.md）
 adhoc_release() { [[ "${MACMEOW_ALLOW_ADHOC:-}" == 1 ]]; }
 signing_check() {
   if adhoc_release; then
@@ -213,7 +213,7 @@ verify_dmg() {
 }
 
 cmd_build() {
-  local v="$1" src out dmg
+  local v="$1" src out dmg lgpl
   tag_exists "$v" || die "找不到 tag v${v}，請先執行 prepare"
   src="$ROOT/build/release/$v"
   out="$ROOT/dist/release/$v"
@@ -236,6 +236,11 @@ cmd_build() {
 
   verify_dmg "$out/$dmg" "$v"
 
+  # LGPL 原始碼清單＝patches/SOURCES.md 第一個頂層「- 」清單，到下一個空行為止（清單中間不能有空行）。
+  # 在寫入 release-notes.md 之前取出，找不到就中止，不產生缺少授權資訊的說明。
+  lgpl="$(awk '/^- /{f=1} f && /^$/{exit} f' "$src/patches/SOURCES.md")"
+  [[ -n "$lgpl" ]] || die "patches/SOURCES.md 找不到 LGPL 原始碼清單"
+
   {
     changelog_section "$v" | awk 'NF{for(;b>0;b--)print ""; s=1; print; next} s{b++}' # 去掉頭尾空行
     echo
@@ -253,7 +258,7 @@ cmd_build() {
     echo
     echo "App 內含以 LGPL-2.1-or-later 授權的修補版 Wine DLL，對應原始碼與修補如下："
     echo
-    sed -n '/^| 項目/,/^$/p' "$src/patches/SOURCES.md"
+    printf '%s\n' "$lgpl"
   } >"$out/release-notes.md"
 
   echo "產物：$out"
@@ -347,7 +352,7 @@ cmd_tap() {
 
   token="${HOMEBREW_TAP_TOKEN:-}"
   if [[ -z "$token" ]]; then
-    [[ -z "${GITHUB_ACTIONS:-}" ]] || die "CI 需要 Secret HOMEBREW_TAP_TOKEN（見 docs/development.md「GitHub Actions」）"
+    [[ -z "${GITHUB_ACTIONS:-}" ]] || die "CI 需要 Secret HOMEBREW_TAP_TOKEN（見 docs/ci.md「Secrets」）"
     token="$(gh auth token)" || die "請先 gh auth login"
   fi
   # token 只放在這次 git 指令的 HTTP header，不寫進 clone 的 .git/config

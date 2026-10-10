@@ -8,7 +8,7 @@
 #   bash scripts/play.sh status --porcelain   # 機器可讀的 key=value 狀態（MacMeow.app 使用）
 #   bash scripts/play.sh stop       # 關閉 Cyder shared bottle 內所有 Windows 程式（含其他 Cyder 遊戲）
 # 設定：App 的設定檔，可用環境變數 GAME_DIR、CYDER_ENGINE、MACMEOW_<設定> 覆寫
-# （common.sh 的 MACMEOW_SETTINGS；見 docs/architecture.md）
+# （common.sh 的 MACMEOW_SETTINGS；見 docs/settings.md）
 set -euo pipefail
 # shellcheck source=lib/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
@@ -131,7 +131,8 @@ cmd_start() {
   run_script patch-cyder-loopback.sh check >/dev/null 2>&1 || run_script patch-cyder-loopback.sh apply
   run_script patch-cyder-dlls.sh check >/dev/null 2>&1 || run_script patch-cyder-dlls.sh apply
   #    winemac：讓登入器可以不顯示在 Dock（實驗性，預設關閉：會讓遊戲與登入伺服器斷線，
-  #    見 docs/technical-notes.md #10）。關閉時把先前套用的修補還原。
+  #    見 docs/fixes.md #10）。關閉時把先前套用的修補還原；engine 有任何 Wine 執行時不還原
+  #    （restore 會被 require_wine_stopped 拒絕），留到下次啟動。
   if [[ "$MACMEOW_HIDE_LAUNCHER_DOCK" == 1 ]]; then
     run_script patch-cyder-winemac.sh check >/dev/null 2>&1 \
       || run_script patch-cyder-winemac.sh apply || echo "注意：無法套用 winemac 修補，登入器會照常顯示在 Dock"
@@ -170,6 +171,7 @@ cmd_start() {
 
   # 7. 照官方教學：從「認證器」啟動，等待 HostShield 通道
   progress launch "啟動 認證器.exe ..."
+  # -n：Cyder 已在執行時也另開新的實例來開啟 認證器.exe。
   /usr/bin/open -n -a "$cyder" "$GAME_DIR/認證器.exe"
   progress tunnels "等待 HostShield 通道建立（最多 60 秒）..."
   if wait_until 60 tunnels_up; then

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 一次設定 GitHub Actions 發佈需要的 Secrets（見 docs/development.md「GitHub Actions」）。
+# 一次設定 GitHub Actions 發佈需要的 Secrets（見 docs/ci.md「Secrets」）。
 # 從鑰匙圈匯出 MACMEOW_SIGN_ID 指定的 Developer ID Application 身分（憑證＋私鑰），
 # 重新打包成只含這一張的 .p12（隨機密碼），詢問並驗證公證用的 Apple ID 與 App 專用密碼，
 # 再以 gh secret set 寫入目前 repo。暫存檔在結束時刪除，密碼不會顯示或寫到磁碟。

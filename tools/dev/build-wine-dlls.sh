@@ -1,10 +1,10 @@
 #!/bin/bash
-# 從 CrossOver 26.3.0 原始碼重建 patches/bin/x86_64-windows/ 的修補版 Wine DLL（wsock32、advapi32）。
+# 從 CrossOver 原始碼（版本見 CX_VER）重建 patches/bin/x86_64-windows/ 的修補版 Wine DLL（wsock32、advapi32）。
 # 只建置需要的 PE 模組（不建整個 Wine）。產物會覆寫 patches/bin/x86_64-windows/*.dll。
 #
 # 需求：Xcode（/usr/bin/clang，x86_64 host 編譯經 Rosetta）、Homebrew：llvm lld bison（brew bundle）
 # 用法：bash tools/dev/build-wine-dlls.sh
-# 完成後更新 patches/bin/SHA256SUMS 與 patches/SOURCES.md（見 docs/development.md）。
+# 完成後更新 patches/bin/SHA256SUMS 與 patches/SOURCES.md（見 docs/wine-patches.md）。
 set -euo pipefail
 # shellcheck source=../lib.sh
 source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"

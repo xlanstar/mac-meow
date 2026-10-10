@@ -1,12 +1,11 @@
 # 實驗
 
-回答一次性問題的程式。不保證維護，可用任何第三方工具；`scripts/`、`app/`、`tools/` 不得依賴這裡。
+回答一次性問題的程式；定位與相依限制見 [AGENTS.md](../AGENTS.md#code-conventions)「Code conventions」。
 
 ## 規範
 
-- 每個實驗一個資料夾，`README.md` 只寫：問題、做法與執行方式、狀態（結論已記錄／未解）、對應的 [technical-notes](../docs/technical-notes.md) 編號。結論與數據只寫在 technical-notes。
-- 建置：`just exp [實驗...]`（`experiments/build.sh`；不指定則全部），產物在 `build/experiments/<實驗>/`；新實驗加進 `build.sh` 的 `ALL` 與 `build_one`。Windows 程式用 `tools/lib.sh` 的 `win_exe`。
-- 紀錄寫到 `debug/`。
+- 每個實驗資料夾的 `README.md` 只寫：問題、做法（一句）與執行指令（參數見原始碼開頭）、狀態（結論已記錄／未解）、對應的 [fixes.md](../docs/fixes.md) 編號。結論與數據只寫在 fixes.md。
+- 建置：`just exp`；新增實驗見 `experiments/build.sh` 開頭。
 
 ## 清單
 

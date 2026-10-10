@@ -14,7 +14,7 @@ struct MacMeowApp: App {
         .defaultPosition(.center)
         .commands { AppCommands(model: model) }
 
-        // 關閉視窗只會縮到 Dock，選單列圖示讓 App 隨時可以叫回主視窗。
+        // 關閉鈕只隱藏主視窗並移除 Dock 圖示；選單列圖示讓 App 隨時可以叫回主視窗。
         MenuBarExtra("貓貓谷 for Mac", systemImage: "pawprint.fill") {
             MenuBarContent(model: model, home: model.home, updater: model.updater)
         }

@@ -4,7 +4,10 @@
  *   n        只查 suspend count，不 SuspendThread、不取 context
  *   tid-hex  只處理指定執行緒
  * 不寫入目標程序記憶體；取 context 時會短暫 SuspendThread/ResumeThread。
- * 以 mingw-w64 建置（見 tools/dev/build.sh）。 */
+ * <pid-hex> 是 Wine 內的 Windows PID（不是 macOS PID）。
+ * 以 mingw-w64 建置（見 tools/dev/build.sh），在 shared bottle 內執行：
+ *   bash -c 'source tools/lib.sh && run_wine build/tools/wthreads.exe <pid-hex> [n] [tid-hex]'
+ * TODO：tools/diag/stack.sh 的 wine 模式實測可用後移除本工具。 */
 #include <windows.h>
 #include <tlhelp32.h>
 #include <winternl.h>

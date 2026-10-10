@@ -3,7 +3,7 @@
 # 需要 Xcode 或 Command Line Tools（swiftc、iconutil）；產物只用系統內建 framework。
 # 產物：dist/MacMeow.app、dist/MacMeow-<版本>.dmg；中間檔在 build/app/。
 #
-# 簽章（見 docs/development.md「簽章與公證」）：
+# 簽章（見 docs/signing.md）：
 #   預設 ad-hoc 簽章，只適合自己用；下載的使用者會被 Gatekeeper 擋下。
 #   MACMEOW_SIGN_ID=<Developer ID Application 憑證名稱或 SHA-1>：Developer ID 簽章（Hardened Runtime + 時間戳記）
 #   MACMEOW_NOTARY_PROFILE=<notarytool keychain profile>：另外送 Apple 公證並把票證釘進 App 與 dmg（需搭配 MACMEOW_SIGN_ID）
@@ -85,6 +85,7 @@ PLIST
 
 # App 內只有一個 Mach-O；腳本與 Windows DLL 是資源檔，由 bundle 簽章一併封存，不需要 --deep。
 if [[ -n "$SIGN_ID" ]]; then
+  # Hardened Runtime 不加任何 entitlement：App 只以 Process 呼叫系統的 /bin/bash 與 osascript
   codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"
 else
   codesign --force --sign - "$APP"
@@ -193,6 +194,8 @@ OSA
 }
 
 # dmg：App、「應用程式」捷徑、背景圖與磁碟圖示；先做可寫入映像讓 Finder 排版，再壓縮成唯讀 dmg
+# dmg 結構是 tools/release/release.sh 的 verify_dmg（「應用程式」捷徑、.DS_Store、.background/background.tiff）
+# 與 scripts/update.sh（根目錄的 MacMeow.app）的約定；改名或搬移時一起改。
 DMG="$DIST/MacMeow-$VERSION.dmg"
 VOLNAME="貓貓谷 for Mac"
 LINK="應用程式"

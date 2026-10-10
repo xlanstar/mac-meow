@@ -6,6 +6,7 @@ set -uo pipefail
 # shellcheck source=../tools/lib.sh
 source "$(cd "$(dirname "$0")/.." && pwd)/tools/lib.sh"
 
+# 新實驗：加進 ALL 與 build_one 的 case；macOS 程式用 mac_bins，Windows 程式用 tools/lib.sh 的 win_exe。
 ALL=(smc-same-page rsaenh-reload rosetta-probes)
 
 # mac_bins <輸出目錄> <來源目錄> <clang 參數> <名稱...>

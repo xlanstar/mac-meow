@@ -24,7 +24,7 @@ struct AppCommands: Commands {
     }
 }
 
-/// 「檢查更新⋯」與「自動檢查更新」。
+/// 「檢查更新…」與「自動檢查更新」。
 private struct UpdateCommands: View {
     @ObservedObject var updater: Updater
 
@@ -35,7 +35,7 @@ private struct UpdateCommands: View {
     }
 }
 
-/// 「解除安裝⋯」：有流程進行中或正在更新時不可用。
+/// 「解除安裝…」：有流程進行中或正在更新時不可用。
 private struct UninstallButton: View {
     let model: AppModel
     @ObservedObject var home: HomeModel

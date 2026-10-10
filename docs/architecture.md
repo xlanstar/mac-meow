@@ -1,5 +1,7 @@
 # 架構
 
+貓貓谷在 macOS 上的執行鏈與連線路徑，以及 repo 各資料夾的分工；細節在各資料夾連到的文件。
+
 ## 執行鏈與連線路徑
 
 ```
@@ -12,95 +14,23 @@ MapleStory.exe → 202.80.104.28:37629（lo0 alias）
               → WebSocket → 伺服器
 ```
 
-- 執行環境：Cyder（CrossOver 26.3 / Wine 11.0，x86_64 經 Rosetta 2）。
+- 位址與 port 見 `common.sh` 的 `HOSTSHIELD_IPS`、`HOSTSHIELD_PORTS`、`GAME_ALIAS_IP`。
+- 執行環境：Cyder（CrossOver 版 Wine，x86_64 經 Rosetta 2）；測試過的 CrossOver 基底見 [patches/SOURCES.md](../patches/SOURCES.md)。
 - `MapleStory.exe` 是 PE32+ x86-64，與台服官方相同。
+- 讓這條鏈在 Wine 上動起來的每個修補（根因與證據）見 [fixes.md](fixes.md)；這些修補改動的 repo 以外狀態見 [external-state.md](external-state.md)。
 
-## 檔案職責
+## 資料夾
 
-使用者流程（只能用 macOS 內建指令）：
-
-- `scripts/lib/common.sh`：所有使用者腳本共用的路徑、常數（遊戲檔案、HostShield 與迴路位址）、設定（`load_settings`，見「環境變數」）與函式（`run_script`、`usage`、`wine_running`、`wineserver_kill` 等），以及開發用除錯簽章的偵測與還原（`debug_sign_status`、`debug_sign_restore`；套用在 `tools/diag/sign-debug.sh`）。Cyder 的資料夾與 shared bottle 是 `CYDER_SUPPORT_DIR`、`SHARED_BOTTLE`，不用 Cyder 腳本會讀取的環境變數名稱 `CYDER_SUPPORT`、`CYDER_PREFIX`。
-- `scripts/lib/engine-patch.sh`：engine 執行檔位元組修補的共用流程（`patch-cyder-loopback.sh`、`patch-cyder-winemac.sh`）：`check|apply|restore`、備份 `*.macmeow-orig`、重新 ad-hoc 簽章、驗證失敗時還原；不是已知版本時 `apply` 回傳 2、不修改。
-- 子指令慣例：修改外部狀態的腳本提供 `check|apply|restore`（`check` 已套用則回傳 0），以 `cmd_<子指令>` 函式分派；用法錯誤以 `usage` 回傳 64。圖形後端：`GRAPHIC_BACKENDS` 是退回順序（`d3dmetal dxmt dxvk wined3d`），`effective_graphic_backend <後端>` 從該後端開始取第一個可用的，`available_graphic_backends` 列出可用的。`graphic_backend_available` 與 Cyder 的 `cyder_<後端>_launch_allowed` 判斷相同：`d3dmetal` 需要 macOS 14 以上，且 `~/Library/Application Support/Cyder/runtime/apple_gptk`（Cyder 設定安裝的 GPTK）或 CrossOver 內建的 `lib64/apple_gptk` 有可讀的 `external/libd3dshared.dylib` 與 `external/D3DMetal.framework`；`dxmt` 需要 macOS 15 以上與 engine 的 `lib/dxmt`；`dxvk` 需要 engine 的 `lib/dxvk` 與 MoltenVK；`wined3d` 一定可用。wineserver 判斷（`wineservers`）以 `lsof` 讀程序名稱為 wineserver 者的執行檔與工作目錄：執行檔必須是本 engine 的 `bin/wineserver`（不比對命令列，否則參數含此路徑的 `xxd`、`codesign` 會被誤判）；`engine_running` 是任何 bottle 的 wineserver（所有 bottle 共用 engine，修改 engine 前以 `require_wine_stopped` 檢查），`wine_running`／`wineserver_pid` 只看工作目錄為 `.wine-<uid>/server-<prefix dev>-<inode>` 的 shared bottle（`stop`、`session.sh` 等待 Wine 結束時使用）。
-- `scripts/play.sh`：入口。依序檢查前置條件、處理前次殘留程序（登入器或遊戲已在執行就不重複啟動；只剩 認證器／HostShield 時以 `session.sh close` 只結束本專案的程式；這些判斷與 porcelain 的 `helpers`／`launcher`／`game` 都只看 `session_procs`，其他 bottle 或遊戲資料夾的同名程式不算）、套用 loopback 與 DLL 修補、`vb6run`、Cyder 設定（`cyder-settings.sh apply`）、移除遊戲資料夾的下載隔離標記（`quarantine.sh apply`），再以 `open -n -a Cyder` 開 `認證器.exe`（`-n`：Cyder 已在執行時也另開新的實例），等待 4 個 HostShield 位址都在監聽，最後啟動 `session.sh start`（登入器已在執行時也會補啟動）。`play.sh status` 顯示狀態，`status --porcelain` 輸出給 App 讀的 `key=value`，`stop` 關閉 shared bottle 內所有 Windows 程式。設 `MACMEOW_PROGRESS=1` 時各步驟訊息改為 `@@STEP <id> <訊息>`。
-- `scripts/setup-loopback.sh install|uninstall|check|installed`：lo0 alias 與 LaunchDaemon `tw.macmeow.loopback`。位址清單是 `common.sh` 的 `LOOPBACK_IPS`。唯一需要 root 的步驟。`installed`（不需 root）在任一位址或 LaunchDaemon 存在時輸出 `yes`，否則 `no`。
-- `scripts/patch-cyder-loopback.sh check|apply|restore`：wineserver 1 byte 修補；指令序列找不到或不唯一時 `apply` 回傳 2、不修改。
-- `scripts/patch-cyder-dlls.sh check|apply|restore`：以 `patches/bin` 的 DLL 取代 engine 內建版；先比對 `SHA256SUMS`，只套用到 CrossOver 基底 26.3.0。
-- `scripts/patch-cyder-winemac.sh check|apply|restore`（實驗性，只在 `MACMEOW_HIDE_LAUNCHER_DOCK=1` 時由 `play.sh` 套用；未設定且 Wine 沒在執行時 `play.sh` 會還原）：改 engine `winemac.so` 兩段指令，讓設了 `CaptureDisplaysForFullscreen=y` 的程式成為沒有 Dock 圖示的輔助程式（[technical-notes.md](technical-notes.md) #10）。只套用到 SHA-256 已知的 `winemac.so`；其他版本 `apply` 回傳 2、不修改。
-- `scripts/cyder-settings.sh check|apply|restore`：Cyder 全域設定 `wineLocale=zh_TW`、`graphicsBackend`（依 `MACMEOW_GRAPHICS_BACKEND`，預設 `d3dmetal`）、`graphicsHud`（依 `MACMEOW_HUD`：`off`／`metal`）、`dxvkFrameRate`（依 `MACMEOW_MAX_FPS`：`sixty`／`120`／`144`／`unlimited`，與 Cyder App 寫入的值相同）、`msync`／`esync`（依 `MACMEOW_SYNC`），以及 `認證器.exe` 的 `perProfile.<id>.environment.D3DM_MAX_FPS`（`MACMEOW_MAX_FPS` 為數字時寫入，`unlimited` 時移除；`<id>` 由 `common.sh` 的 `cyder_profile_id` 計算）。Cyder 的 `dxvkFrameRate` 只套用到 DXVK／DXMT，D3DMetal 的上限要靠這個環境變數，Cyder 啟動 `認證器.exe` 時匯出，再由 Wine 傳給子程序（[technical-notes.md](technical-notes.md) #13）。`graphicsBackend` 寫入 `effective_graphic_backend` 的結果，退回時在 `apply` 印出提示（Cyder 遇到無法使用的後端會直接改用 wined3d，[technical-notes.md](technical-notes.md) #13）。第一次修改前把 `settings.json` 備份為 `settings.json.macmeow-orig`（之後保留，即最初的原值）；`restore` 只把這些 key 寫回原值（原本沒有的 key 刪除，並刪除因此變空的 `perProfile` 字典；`D3DM_MAX_FPS` 會檢查所有 profile，遊戲資料夾搬移過也能還原），目前值已不是本專案會寫入的值（`SPEC` 中以 `|` 分隔的任一值，例如 `graphicsBackend` 的 `d3dmetal|dxmt|dxvk|wined3d`；空值表示 key 不存在，`D3DM_MAX_FPS` 因 `unlimited` 會移除而列入；使用者事後改成其他值）就保留，最後刪除備份。
-- `scripts/quarantine.sh check|apply|restore`：遊戲資料夾的 `com.apple.quarantine`。`apply` 先以 `xattr -r -p` 把每個項目的標記值與絕對路徑（`標記值<TAB>路徑`）附加到 `~/Library/Application Support/MacMeow/quarantine.macmeow-orig`，記錄成功才 `xattr -dr`；`restore` 把標記寫回仍存在的項目並刪除記錄。
-- `scripts/launcher-dock.sh check|apply|restore`：在 shared bottle 登錄寫入（`apply`，隱藏 Dock 圖示）或刪除（`restore`）`AppDefaults\貓貓TMS登入器.exe\Mac Driver\CaptureDisplaysForFullscreen=y`（以 Wine 的 `reg.exe`；`check` 直接讀 `user.reg`）。
-- `scripts/session.sh start|watch|close|status|cleanup`：遊戲階段監看（[technical-notes.md](technical-notes.md) #11）。`start` 以 `nohup` 在背景執行 `watch`，PID 記在 `session-watch.pid`，記錄寫到 `session.log`；同時只有一個，wineserver PID 改變（Wine 結束）就退出；`close` 先停止執行中的 `watch` 再收尾。本專案程式的判斷在 `common.sh` 的 `session_procs`。
-- `scripts/update.sh prepare <X.Y.Z> <目前的 .app>|install <目前的 .app> <PID>|brew-command <目前的 .app>`：App 一鍵更新。`brew-command` 以 `common.sh` 的 `homebrew_app` 判斷 App 是否由 Homebrew cask 安裝（`HOMEBREW_PREFIXES` 任一處有 `Caskroom/$MACMEOW_CASK`，且 App 位於該次安裝的 appdir：`.metadata/config.json` 的 `appdir`，優先序 explicit → env → default，讀不到時為 `/Applications`），是則輸出 `brew upgrade --cask macmeow` 並回傳 0；這種 App 交給 brew 升級（Homebrew 記錄的版本才會一致），`prepare` 也會拒絕。`prepare` 在 App 執行中先檢查目前 App 可原地取代（不在 App Translocation、App 與上層資料夾可寫入），以版本號組成網址 `https://github.com/$MACMEOW_REPO/releases/download/vX.Y.Z/MacMeow-X.Y.Z.dmg`（不接受外部傳入網址），以 `curl --proto '=https' --proto-redir '=https' -C -` 續傳下載 dmg（進度轉成 `@@PROGRESS <百分比>`）與同名 `.sha256` 並比對（同一來源，只確認完整；不符時刪除重下一次）；連不上、中斷或 30 秒內低於 1 KB/s 時輸出 `@@WAIT`，10 秒後從中斷處繼續，連續 30 次沒有進展才放棄，4xx（408、429 除外）與轉址到非 https 不重試；未完成的 dmg 保留，下次 `prepare` 接著下載。以 `dmg_attach` 唯讀掛載後 `ditto` 取出 `MacMeow.app` 到 `~/Library/Caches/MacMeow/update/`，以 `codesign --verify --deep --strict -R="$MACMEOW_REQUIREMENT"` 驗證簽章來源（`common.sh`：Apple 簽發的 Developer ID Application 憑證、官方 Team ID `MACMEOW_TEAM_ID`、bundle id；與目前 App 的簽章無關，自行建置的 ad-hoc 版也只接受官方版）與版本。`install` 把輸出寫到 `update.log`，等 PID 結束（最多 60 秒，逾時放棄），先把新版 `ditto` 到同一資料夾的 `.MacMeow.app.macmeow-new`，再把舊版改名為 `.macmeow-old`、新版改名為原路徑，失敗時改回舊版；最後刪除暫存並 `open` App。整個腳本以 `{ …; exit; }` 包住，取代所在 App 時 bash 不會再讀到新檔案。依賴 `release.sh` 的 tag 與附件命名（`vX.Y.Z`、`MacMeow-X.Y.Z.dmg`、`.dmg.sha256`）、dmg 內的 `MacMeow.app` 與簽章需求；`release.sh` 的 `verify_dmg` 會檢查 App 符合 `MACMEOW_REQUIREMENT`。
-- `scripts/report.sh [log <記錄檔> [行數]|bundle <輸出.zip> [記錄檔]]`：問題回報用的診斷資訊。預設輸出環境摘要（Markdown：App／macOS／Cyder／engine 版本、Cyder 設定、`MapleStory.exe` 大小與雜湊前綴、修補 `check`、`status --porcelain`）；`bundle` 以 `ditto` 打包摘要、`play.sh status`、記錄檔最後 5000 行與 7 天內的 MacMeow 當機報告。所有輸出經 `redact()` 隱藏家目錄、`/Users/<名稱>`、使用者名稱（3 字元以上）與 HostShield 程序參數中的 token；不讀取 `login.txt`。App 以 `MACMEOW_VERSION` 傳入版本。
-- `scripts/uninstall.sh [cask|system|stage|purge [<PID>]|brew-command <目前的 .app>]`：還原以下「外部狀態」中所有可還原項目；各子指令見腳本開頭。打包進 App，App 的「解除安裝⋯」執行 App 內這一份；Homebrew cask 以 `preflight_steps`（App 移到 appdir 之前）把 App 內的 `scripts/` 複製到 staged_path（`Caskroom/macmeow/<版本>/scripts/`），uninstall 區塊執行那一份，使用者自行刪除 App 後 `brew uninstall` 仍能還原。還原只用到 `scripts/` 內的檔案（`patch-cyder-dlls.sh restore` 不讀 `patches/bin`）。`system` 依序還原 engine 修補、Cyder 設定與隔離標記（部分失敗時繼續、最後回傳 1），再以 root 執行 `setup-loopback.sh uninstall`（終端機前景用 `sudo`；App、Homebrew 子程序與背景執行讀不到 tty，改用 `osascript … with administrator privileges`）。不帶參數時 `system` 全部成功才 `purge`，因為 `quarantine.macmeow-orig` 存在要刪除的 MacMeow 設定資料夾。`stage` 把 `uninstall.sh` 與 `lib/common.sh` 複製到 `$TMPDIR/macmeow-uninstall.*`，`purge` 從那裡執行時最後刪除該資料夾。`cask`：Homebrew 的 upgrade、reinstall、install 也會執行 cask 的 uninstall 區塊，所以往上找最近的 `…/Library/Homebrew/brew.rb <子指令>` 程序，子指令是這三者時什麼都不做，其餘（含找不到）同不帶參數。
-
-App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系統 framework）：
-
-- `app/Sources/`：`MacMeow.app` 主程式（SwiftUI，macOS 13+；分層見 [development.md](development.md#app-原始碼分層)）。只做 UI 與引導，所有動作都呼叫打包的腳本（查詢最新版本除外）：
-  - 狀態：每 3 秒執行 `play.sh status --porcelain`（`key=value`，key 定義在 `play.sh` 的 `porcelain()`，對應 `app/Sources/Core/EnvStatus.swift`）。
-  - 互斥（`Features/LaunchController.swift`）：啟動、全部關閉、設定迴路位址、選擇遊戲資料夾與解除安裝同一時間只執行一個（含流程中的對話框）；進行中不能開始其他動作或更新，結束 App 前先確認。
-  - 啟動：依序檢查 Cyder、遊戲資料夾（`NSOpenPanel`，以 porcelain 驗證）、Cyder 初始化（開啟 Cyder 等待 prefix）、迴路位址（`osascript … with administrator privileges` 執行 `setup-loopback.sh install`），再以 `MACMEOW_PROGRESS=1` 執行 `play.sh`，解析 `@@STEP <id> <訊息>`（`common.sh` 的 `progress`）顯示進度。
-  - 全部關閉：確認後執行 `play.sh stop`。
-  - 解除安裝（App 選單「解除安裝⋯」）：整段期間占用上述互斥。先執行 `uninstall.sh brew-command <App 路徑>`，有輸出時只以對話框顯示該指令（可複製），由 brew 移除。否則確認後（遊戲執行中先 `play.sh stop`，確認文字會說明）執行 `uninstall.sh system`，失敗時顯示最後一行錯誤。成功後執行 `uninstall.sh stage`，再以 `NSWorkspace.recycle` 把 App 移到垃圾桶：`~/.Trash` 受隱私權保護，App 不能從那裡執行腳本，所以 purge 從暫存資料夾執行；`stage` 失敗時不移動 App，改從 App 內執行。移不動時（App Translocation、磁碟映像或沒有權限）請使用者手動刪除。顯示完成對話框後，以 `ProcessRunner.spawn` 啟動 `purge <PID>` 並結束 App；`purge` 等 App 結束（最多 300 秒）才刪除，App 結束時寫回的偏好設定與視窗狀態也會被刪除。
-  - 顯示登入器：以 porcelain 的 `launcher_pid` 啟用登入器程序（`NSRunningApplication.activate`）；Wine 會還原縮到最小的視窗。
-  - 視窗與選單列（`App/`、`UI/Window/MainWindow.swift`）：主視窗的關閉鈕改為隱藏（`MainWindow` 把關閉鈕的 action 換成自己的 `hide:`：`orderOut` 並把 activation policy 改為 `.accessory`，Dock 不顯示圖示；⌘W 的 `performClose:` 也經過關閉鈕），叫回時改回 `.regular`；最後一個視窗關閉時不結束 App，隱藏中從 Finder 再開啟也會叫回主視窗；`MenuBarExtra` 貓掌圖示提供狀態、顯示主視窗、開始遊戲／全部關閉與結束。
-  - 「遊戲設定」卡：同步機制、圖形後端、FPS 上限、顯示效能 HUD、遊戲關閉時自動收尾，存在 config（`play.sh` 等腳本也會直接讀取）並以環境變數傳給腳本。圖形後端依 porcelain 的 `graphic_backends`（可用的後端）標示無法使用的選項，設定的後端無法使用時依 `graphic_backend`（實際使用的後端）顯示改用哪個。
-  - 回報問題（`Features/BugReporter.swift`；網址由 `Core/IssueDraft.swift` 組成）：sheet 表單，以 `report.sh` 與 `report.sh log` 取得預覽內容；送出時以 `report.sh bundle` 在 `~/Library/Logs/MacMeow/reports/` 產生診斷檔並在 Finder 選取，再開啟 `issues/new?template=bug_report.yml&<欄位 id>=…` 預先填好 `.github/ISSUE_TEMPLATE/bug_report.yml` 的欄位（網址超過 7000 字元時先刪減記錄再截短文字；組不出網址時開啟空白表單）。沒有後端；改欄位 id 時兩邊一起改。表單右上與說明選單都依查找順序連到「已知問題與解法」（`AppPaths.knownIssues`：main 分支的 `docs/known-issues.md`）與「已回報的問題」（`AppPaths.reportedIssues`：open issue 列表）。
-  - 更新（`Features/Updater.swift`）：以 `URLSession` 讀取 GitHub API `repos/xlanstar/mac-meow/releases/latest`（只回傳正式版，不含草稿與預先發行版），把 `tag_name` 去掉 `v` 後與 `CFBundleShortVersionString` 以 `.numeric` 比較（開發版 `dev` 不提示）；還沒有 `MacMeow-X.Y.Z.dmg` 附件時視為檢查失敗（稍後再試）。「自動檢查更新」開啟時（預設）App 啟動後立即檢查，之後每 24 小時一次，失敗時不提示、10 分鐘後再試；有新版時主視窗頂端顯示橫幅、選單列加上「更新到 X.Y.Z」，「略過」的版本不再自動提醒；App 選單「檢查更新⋯」一律以對話框回報。「更新」執行 `update.sh prepare <版本> <App 路徑>`（顯示 `@@PROGRESS` 下載進度，`@@WAIT` 時顯示「等待網路」），成功後以 `ProcessRunner.spawn` 啟動 `update.sh install <App 路徑> <PID>`（不讀取輸出，App 結束後繼續執行）並結束 App；失敗時顯示最後一行錯誤並提供 Release 頁面手動下載。啟動流程進行中不更新。每次檢查前先執行 `update.sh brew-command <App 路徑>`：有輸出時橫幅改顯示該指令與「複製指令」，「更新」與「檢查更新⋯」改以對話框顯示指令，不執行一鍵更新。
-- `app/make-icon.swift`：以 Core Graphics 繪製 App 圖示，建置時轉成 `AppIcon.icns`。
-- `app/make-dmg-background.swift`：繪製 dmg 視窗背景（1x／2x，`tiffutil` 合成 `background.tiff`）。版面座標與 `build-app.sh` 中 Finder 排版的視窗大小、圖示位置必須一致。
-- dmg 內容：卷宗「貓貓谷 for Mac」，含 `MacMeow.app`、指向 `/Applications` 的捷徑「應用程式」、`.background/background.tiff`、`.VolumeIcon.icns` 與 Finder 寫入的 `.DS_Store`（視窗大小、背景、圖示位置）。
-- `app/build-app.sh`：以 `swiftc` 編譯 `app/Sources` 與圖示（中間檔在 `build/app/`），產生 `dist/MacMeow.app` 與可拖曳安裝的 `dist/MacMeow-<版本>.dmg`（預設 ad-hoc 簽章），把 `scripts/` 使用者腳本（含 `lib/`）與 `patches/bin`（含 `SHA256SUMS`）放進 `Contents/Resources`。
-
-所有修改 engine 的 `apply`／`restore` 在 Cyder 的 Wine 執行中都會拒絕。`restore` 只在目前檔案仍是本專案修補版時才寫回備份；engine 已被 Cyder 更新時只刪除過期備份，避免把舊檔蓋回新 engine。
-
-開發用（見 [development.md](development.md)）：
-
-- `tools/*/*.sh`：開發工具（分類見 [development.md](development.md#目錄分工)）；共用函式在 `tools/lib.sh`。
-- `tools/src/<name>/`：診斷工具原始碼，以 `tools/dev/build.sh` 建置到 `build/tools/`。
+- `scripts/`：使用者流程，打包進 `MacMeow.app`；各腳本見 [scripts.md](scripts.md)，遊戲設定與環境變數見 [settings.md](settings.md)。
+- `app/`：`MacMeow.app`（SwiftUI）與 dmg 的建置；見 [app.md](app.md)。
+- `tools/`：開發用。共用函式在 `tools/lib.sh`（建立在 `scripts/lib/common.sh` 之上），入口腳本依用途分在：
+  - `tools/diag/`：一般的 Wine × Rosetta 診斷，見 [debugging.md](debugging.md#診斷工具)。
+  - `tools/game/`：本專案專屬的啟動與自動操作，見 [debugging.md](debugging.md#診斷工具)。
+  - `tools/dev/`：建置、測試、環境檢查，見 [development.md](development.md)。
+  - `tools/release/`：發佈，見 [release.md](release.md)。
+  - `tools/src/<name>/`：開發工具的原始碼。診斷工具由 `tools/dev/build.sh` 建置，`repo-images/` 是 `tools/dev/repo-images.sh` 的 HTML 範本。
+- `patches/`：`*.patch` 是 Wine 原始碼修補，`bin/` 是預先建置的 DLL 與 `SHA256SUMS`；重建見 [wine-patches.md](wine-patches.md)，來源與授權見 [patches/SOURCES.md](../patches/SOURCES.md)。
+- `packaging/homebrew/`：Homebrew cask 範本，見 [homebrew.md](homebrew.md)。
 - `experiments/`：一次性實驗，見 [experiments/README.md](../experiments/README.md)。
-- `patches/*.patch`：Wine 原始碼修補；`patches/bin/`：預先建置的 DLL 與 `SHA256SUMS`。
-
-## 外部狀態
-
-格式：位置：變更內容 → 還原方式。
-
-- Cyder engine `~/.cyder/runtime/Engines/wine-x86_64`：wineserver 與 DLL 被修補，開發時 `bin/wine` 與 `lib/wine/x86_64-unix/wine` 可能被重新簽章（ad-hoc + `get-task-allow`，移除 hardened runtime）；原檔備份為 `*.macmeow-orig`，DLL 另有 `*.macmeow-applied` 標記 → `patch-cyder-*.sh restore`、`common.sh` 的 `debug_sign_restore`（`uninstall.sh`、`tools/diag/sign-debug.sh restore` 呼叫）；還原後刪除備份。
-- Cyder bottle `~/Library/Application Support/Cyder/bottles/shared`：安裝 `vb6run` → 保留。
-- Cyder engine `lib/wine/x86_64-unix/winemac.so`：兩段指令被修補並重新 ad-hoc 簽章；原檔備份為 `winemac.so.macmeow-orig` → `patch-cyder-winemac.sh restore`。
-- Cyder shared bottle 登錄（`user.reg`）：`HKCU\Software\Wine\AppDefaults\貓貓TMS登入器.exe\Mac Driver` 的 `CaptureDisplaysForFullscreen="y"` → `launcher-dock.sh restore`（`uninstall.sh` 呼叫；`MACMEOW_HIDE_LAUNCHER_DOCK` 不是 `1` 時 `play.sh` 也會呼叫）。
-- Cyder 的程序：`session.sh` 在 Wine 結束後結束 Cyder 遺留的 `CyderSwift --sentinel-connect`（只限 `--fifo` 已刪除或 PPID 為 1 者）→ 不需還原。
-- Cyder `~/Library/Application Support/Cyder/settings.json`：`wineLocale`、`graphicsBackend`、`graphicsHud`、`dxvkFrameRate`、`msync`、`esync`、`perProfile.<認證器.exe 的 id>.environment.D3DM_MAX_FPS`；原檔備份為 `settings.json.macmeow-orig` → `cyder-settings.sh restore`（還原後刪除備份）。
-- 遊戲資料夾內項目的 `com.apple.quarantine` xattr 被移除；原值記錄在 `~/Library/Application Support/MacMeow/quarantine.macmeow-orig` → `quarantine.sh restore`（`uninstall.sh` 在刪除 MacMeow 設定資料夾之前呼叫）。
-- lo0 alias 與 `/Library/LaunchDaemons/tw.macmeow.loopback.plist` → `setup-loopback.sh uninstall`。
-- `~/Library/Application Support/MacMeow/config`（`GAME_DIR=`、`SYNC=`、`GRAPHICS_BACKEND=`、`HUD=`、`MAX_FPS=`、`AUTO_CLOSE=`）與 `session-watch.pid`、`quarantine.macmeow-orig`、`~/Library/Logs/MacMeow/`（`launcher.log`、`session.log`、`update.log`、回報診斷檔 `reports/`）、`~/Library/Caches/MacMeow/`（`update.sh` 暫存的新版）、App 偏好設定 `tw.macmeow.launcher`（SwiftUI 視窗位置、`autoCheckUpdates`、`skippedUpdateVersion`）與 `~/Library/Saved Application State/tw.macmeow.launcher.savedState` → `uninstall.sh` 刪除。
-
-## 環境變數
-
-遊戲設定的值依序取自環境變數、App 的設定檔 `~/Library/Application Support/MacMeow/config`（key 為下列名稱去掉 `MACMEOW_`）、預設值，由 `common.sh` 的 `load_settings` 在載入時決定，所以從終端機執行腳本也會沿用 App 的設定。名稱、預設值與允許值只定義在 `common.sh` 的 `MACMEOW_SETTINGS`；設定檔中的無效值視為未設定（與 App 相同），環境變數的無效值由 `validate_settings` 拒絕（`play.sh` 開始時、`cyder-settings.sh check|apply`）。App 會把設定也以環境變數傳給腳本。
-
-- `GAME_DIR`（預設 `~/Games/MapleStory`）：遊戲資料夾，需含 `MapleStory.exe`、`認證器.exe`、`貓貓TMS登入器.exe`、`HostShield.exe`、`XCGUI.dll`。
-- `CYDER_ENGINE`（預設 `~/.cyder/runtime/Engines/wine-x86_64`）：Cyder engine 路徑；不讀設定檔。
-- `MACMEOW_SYNC`（預設 `msync`，可為 `none|msync|esync`）：寫入 Cyder 設定的同步模式。
-- `MACMEOW_GRAPHICS_BACKEND`（預設 `d3dmetal`，可為 `d3dmetal|dxmt`）：寫入 Cyder 設定的圖形後端；無法使用時依 D3DMetal → DXMT → DXVK → wined3d 的順序改寫第一個可用的。
-- `MACMEOW_MAX_FPS`（預設 `unlimited`，可為 `60|120|144|unlimited`）：FPS 上限，寫入 Cyder 的 `dxvkFrameRate`（DXMT／DXVK）與 `認證器.exe` 的 `D3DM_MAX_FPS`（D3DMetal）。
-- `MACMEOW_HUD`（預設 `0`）：`1` 時寫入 Cyder 設定 `graphicsHud=metal`（Metal 效能 HUD，顯示 FPS），否則 `off`。
-- `MACMEOW_AUTO_CLOSE`（預設 `1`）：`0` 時 `play.sh` 不啟動 `session.sh`，遊戲關閉後不自動收尾。
-- `MACMEOW_HIDE_LAUNCHER_DOCK`（預設 `0`，實驗性）：`1` 時 `play.sh` 套用 winemac 修補並執行 `launcher-dock.sh apply`，否則執行 `restore` 並還原 winemac 修補。開啟後遊戲會與登入伺服器斷線（[technical-notes.md](technical-notes.md) #10），App 不提供這個選項。
-
-## 外部變動時要更新的地方
-
-- 私服更換連線位址：更新 `scripts/lib/common.sh` 的 `HOSTSHIELD_IPS`／`GAME_ALIAS_IP`；使用者需重新執行 `setup-loopback.sh install`。
-- Cyder engine 的 CrossOver 基底改變：`patch-cyder-dlls.sh` 會拒絕套用。以新基底重建 DLL，並更新 `REQUIRED_BASE`、`patches/SOURCES.md`、`patches/bin/SHA256SUMS`。
-- Cyder engine 的 `winemac.so` 改變（任何 engine 更新都可能）：`patch-cyder-winemac.sh` 不修改，登入器照常顯示在 Dock。以 `otool -tV` 找出新版 `transformProcessToForeground:` 的對應指令，重新計算 `KNOWN_SHA256`、偏移與 RIP 相對位移（[technical-notes.md](technical-notes.md) #10）。
-- Repo 改名或搬移：更新 `scripts/lib/common.sh` 的 `MACMEOW_REPO` 與 `app/Sources/Services/AppPaths.swift` 的 `repo`、`latestRelease`（`knownIssues`、`reportedIssues` 與 `IssueDraft` 的表單網址由 `repo` 組成），以及 Homebrew cask 範本 `packaging/homebrew/macmeow.rb` 的 `url`、`homepage`；已發佈的舊版 App 仍查詢舊網址，仰賴 GitHub 的轉址。
-- `docs/known-issues.md` 不可改名或搬移：已發佈的 App 寫死此路徑（`AppPaths.knownIssues`）。要改時先發佈指向新位置的版本，並保留舊檔一段時間。
-- 路徑、bundle id 或 LaunchDaemon label 改變：同步 cask 範本的 `uninstall quit:` 與 `zap`（對應本文件「外部狀態」中 `uninstall.sh` 刪除的項目）。cask 的 `preflight_steps` 從 `MacMeow.app/Contents/Resources/scripts` 複製到 staged_path 的 `scripts/`，`uninstall script:` 以相對路徑 `scripts/uninstall.sh cask` 執行（Homebrew 以 staged_path 解析），App 名稱或腳本位置改變時一起改；`uninstall.sh` 的還原開始依賴 `scripts/` 以外的檔案時，也要一併複製。
-- Homebrew 改變程序命令列（`brew.rb <子指令>`）或 upgrade 時的 uninstall 流程：`uninstall.sh cask` 判斷不出時會當作移除，每次 `brew upgrade` 都會還原修補、刪除 App 設定並要求密碼；更新 `brew_subcommand`。Caskroom 的 `.metadata/config.json` 格式改變時更新 `homebrew_app`。
-- 發佈附件命名、dmg 內容、bundle id 或簽章 Team ID 改變：舊版 App 的 `update.sh` 會拒絕更新；改變前先讓 `update.sh` 支援新格式並發佈一版。換 Team ID 時更新 `common.sh` 的 `MACMEOW_TEAM_ID`，使用者需手動下載一次。
-- Cyder 改變圖形後端的啟動環境（`cyder-common.sh` 的 `cyder_apply_gptk_launch_environment`、`CYDER_GRAPHICS_*`、engine 的 `lib64/apple_gptk` 連結）：同步 `tools/game/run-game.sh` 的 `MACMEOW_GRAPHICS_BACKEND` 設定（[technical-notes.md](technical-notes.md) #13）。圖形後端的可用條件（`cyder_d3dmetal_launch_allowed`、`cyder_dxmt_launch_allowed`、`cyder_dxvk_launch_allowed`、`cyder_preferred_gptk_root`）或 `settings.json` 的 `graphicsBackend`／`graphicsHud`／`dxvkFrameRate` 值改變時，同步 `common.sh` 的 `graphic_backend_available` 與 `cyder-settings.sh`。Cyder 的 profile id 算法（`cyder-profile.sh` 的 `cyder_profile_id_for_path`）、`perProfile.<id>.environment` 格式或允許的環境變數（`cyder_game_environment_key_is_allowed`）改變時，同步 `common.sh` 的 `cyder_profile_id` 與 `cyder-settings.sh`；GPTK 改掉 `D3DM_MAX_FPS` 時 D3DMetal 的 FPS 上限會失效。
-- 登入器改名：更新 `common.sh` 的 `LAUNCHER_EXE` 與 `launcher-dock.sh` 的 `REG_SECTION`（`user.reg` 以 `\x` 跳脫非 ASCII 字元）。登入器版面改變：更新 `tools/game/auto-start.sh` 開頭的視窗 class 與按鈕座標。
-- 遊戲主程式改名或視窗標題改變：更新 `common.sh` 的 `GAME_EXE`、`GAME_WINDOW_TITLE`。
-- 伺服器要求的 `MapleStory.exe` 版本改變：更新 `README.md` 系統需求。
-- macOS 28 移除一般用途的 Rosetta 2：Apple 公告 macOS 27 是最後一個完整支援 Rosetta 的版本（macOS 26.4 起啟動 Intel 程式會跳出淘汰通知），macOS 28 起只保留給「仰賴 Intel 框架、已不再維護的舊遊戲」，是否涵蓋 Wine 未說明。整條執行鏈都依賴 Rosetta：Cyder engine 是 x86_64 Wine，`wineserver_kill` 以 `arch -x86_64` 執行，`patches/bin` 的 DLL 與 `patch-cyder-loopback.sh` 的指令序列也都針對 x86_64 engine。若 Cyder 改用原生 ARM64 Wine（CrossOver 已有 ARM64 預覽版，以 FEX 模擬 x86），上述修補都要重新驗證或重做。macOS 28 確認相容（或確認不支援）後，更新 `README.md` 已知問題與系統需求，以及 `docs/known-issues.md`。
+- `.github/`：發佈 workflow、Dependabot（見 [ci.md](ci.md)）與 issue 表單（`ISSUE_TEMPLATE/bug_report.yml`，App 的「回報問題」預先填入，見 [app.md](app.md#功能)）。
+- `docs/`：本文件與其他開發文件（各文件的分工見 `AGENTS.md`）；其中 [known-issues.md](known-issues.md) 是寫給使用者、由 App 直接開啟的頁面。`images/` 是 README 用的圖片（見 [repo-images.md](repo-images.md)）。

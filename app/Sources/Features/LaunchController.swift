@@ -64,6 +64,8 @@ final class LaunchController: ObservableObject {
     }
 
     func showLauncher() {
+        // 只要啟用登入器程序：Wine 在 applicationDidBecomeActive:（unminimizeWindowIfNoneVisible）時
+        // 會還原縮到最小的視窗，登入器隱藏 Dock 圖示時也適用（docs/fixes.md #10）。
         if let pid = status.status.launcherPid { Workspace.activate(pid: pid) }
     }
 

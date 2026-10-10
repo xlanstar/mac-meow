@@ -105,10 +105,11 @@ GAME_FILES=(認證器.exe HostShield.exe 貓貓TMS登入器.exe XCGUI.dll "$GAME
 # HostShield 各 token 的通道位址（app.ip），各監聽 HOSTSHIELD_PORTS。
 HOSTSHIELD_IPS=(127.145.37.1 127.152.149.1 127.143.13.1 127.162.167.1)
 HOSTSHIELD_PORTS="37601-37630"
-# 登入器在 Windows 上以 netsh 掛到 Loopback 的官方 IP（docs/technical-notes.md #3）。
+# 登入器在 Windows 上以 netsh 掛到 Loopback 的官方 IP（docs/fixes.md #3）。
 GAME_ALIAS_IP="202.80.104.28"
 LOOPBACK_IPS=("${HOSTSHIELD_IPS[@]}" "$GAME_ALIAS_IP")
 # 登入器的 exe 名稱（Dock 圖示設定以此為 Wine AppDefaults 的 key）。
+# 改名時同步 launcher-dock.sh 的 REG_SECTION（user.reg 中以 \x 跳脫的同一名稱）。
 LAUNCHER_EXE="貓貓TMS登入器.exe"
 
 # ---------- 共用函式 ----------
@@ -214,7 +215,7 @@ files_readable() {
 gptk_complete() { [[ -r "$1/external/libd3dshared.dylib" && -d "$1/external/D3DMetal.framework" ]]; }
 
 # graphic_backend_available <後端>：與 Cyder 的 cyder_<後端>_launch_allowed 相同。
-# Cyder 遇到無法使用的後端會直接改用 wined3d（technical-notes.md #13）。
+# Cyder 遇到無法使用的後端會直接改用 wined3d（docs/fixes.md #13）。
 graphic_backend_available() {
   local lib="$CYDER_ENGINE/lib" root
   case "$1" in
@@ -395,6 +396,7 @@ run_wine_tool() {
 # session_procs：本專案啟動的 Windows 程式，每行「PID exe 名稱」。
 # 以命令列開頭比對：遊戲資料夾的 Windows 路徑（Z:\…，含 BlackCipher、NxOverlay 等子資料夾），
 # 或以相對路徑啟動的 HostShield.exe／認證器.exe。不讀取其餘命令列參數。
+# 遊戲資料夾也以解析符號連結後的實際路徑（pwd -P）比對：GAME_DIR 是符號連結時，Wine 命令列可能是任一種。
 # ps 在非 UTF-8 locale（例如 MacMeow.app 啟動的腳本）會把中文跳脫成 M-… 字元，所以固定以 UTF-8 執行；
 # awk 以 C locale 逐位元組比對。
 session_procs() {

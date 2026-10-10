@@ -1,5 +1,5 @@
 #!/bin/bash
-# 登入器（貓貓TMS登入器.exe）是否顯示在 Dock（docs/technical-notes.md #10）。
+# 登入器（貓貓TMS登入器.exe）是否顯示在 Dock（docs/fixes.md #10）。
 # 在 Cyder shared bottle 的登錄寫入 AppDefaults\貓貓TMS登入器.exe\Mac Driver\CaptureDisplaysForFullscreen=y；
 # 搭配 patch-cyder-winemac.sh 的修補，登入器會成為沒有 Dock 圖示的輔助程式。engine 未修補時這個值只影響
 # 登入器全螢幕時是否鎖定螢幕（登入器不會全螢幕），沒有其他作用。

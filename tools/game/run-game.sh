@@ -9,7 +9,7 @@
 #   trace    記錄等待、例外、DLL 載入（程序／DLL 載入頻道對所有程序開，其餘只對目標程序），並每 0.5 秒記錄目標程序的執行緒數與 socket
 #   relay    trace + 目標程序的 API 呼叫（找出各執行緒最後呼叫；量大、干擾時序）
 #   virtual  trace + 記憶體保護／配置（查 virtual_mutex 類鎖死）
-#   server   trace + 前景 wineserver -d1 協定紀錄（含 suspend_thread 等請求者；量大，只適合短時間重現）
+#   server   trace + 前景 wineserver -d1 協定記錄（含 suspend_thread 等請求者；量大，只適合短時間重現）
 #
 # 環境變數：
 #   MACMEOW_SYNC、MACMEOW_GRAPHICS_BACKEND、MACMEOW_HUD：與 play.sh 相同（未設定時沿用 App 的設定，見 common.sh 的 load_settings）；
@@ -19,7 +19,7 @@
 #   WINEDEBUG=...（覆寫頻道）  EXTRA_DEBUG=...（附加頻道）
 #   EXTRA_ENV="K=V K2=V2"（額外環境變數）
 #   TARGET_EXE=...（目標程序的 exe 檔名，預設遊戲主程式：common.sh 的 GAME_EXE）
-# 紀錄：debug/run-<時間>/
+# 記錄：debug/run-<時間>/
 set -euo pipefail
 # shellcheck source=../lib.sh
 source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
@@ -64,7 +64,7 @@ export PATH="$CYDER_ENGINE/bin:$PATH"
 # shellcheck disable=SC2163  # kv 是 K=V 字串
 for kv in ${EXTRA_ENV:-}; do export "$kv"; done
 
-# 「程序名:+channel」只對該程序啟用（Wine debug.c parse_options），避免 HostShield／登入器灌爆紀錄。
+# 「程序名:+channel」只對該程序啟用（Wine debug.c parse_options），避免 HostShield／登入器灌爆記錄。
 M="$TARGET_EXE"
 TRACE="+timestamp,+pid,+tid,+process,+loaddll,$M:+winsock,$M:+seh,$M:+thread,$M:+sync,$M:+win,$M:+msgbox"
 case "$mode" in

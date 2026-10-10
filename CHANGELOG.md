@@ -1,7 +1,7 @@
 # Changelog
 
-User-visible changes, newest first: new or changed sites and features, fixes.
-List each change under `## Unreleased` as it lands
+User-visible changes, newest first: new or changed settings and features, and fixes.
+List each change under `## Unreleased` as it lands.
 
 ## Unreleased
 

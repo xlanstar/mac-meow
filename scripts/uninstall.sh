@@ -1,12 +1,12 @@
 #!/bin/bash
-# 移除本專案對系統與 Cyder 所做的所有變更（不刪除遊戲、Cyder 或其設定）：
+# 移除本專案對系統與 Cyder 所做的所有變更（不刪除遊戲、Cyder 或其設定）。編號是分組，不是執行順序（見 cmd_system）：
 #   1. 還原 Cyder engine：wineserver（loopback 修補）、wsock32.dll／advapi32.dll、winemac.so（Dock 圖示）、
 #      開發用除錯簽章（tools/diag/sign-debug.sh）；刪除 shared bottle 登錄中登入器的 Dock 圖示設定
 #   2. 還原 Cyder 全域設定的原值，加回遊戲資料夾的下載隔離標記
 #   3. 移除 lo0 位址與 LaunchDaemon（需要管理員密碼；只有這一步以 root 執行 setup-loopback.sh）
 #   4. 刪除 MacMeow.app 的設定與記錄
 # 只用 macOS 內建指令；還原只用到 scripts/ 內的檔案。打包進 MacMeow.app：
-# App 的「解除安裝⋯」執行 App 內這一份，Homebrew cask 執行安裝時複製到 Caskroom 的 scripts/（App 被刪除後仍可移除）。
+# App 的「解除安裝…」執行 App 內這一份，Homebrew cask 執行安裝時複製到 Caskroom 的 scripts/（App 被刪除後仍可移除）。
 #
 # 用法：
 #   bash scripts/uninstall.sh                  # 1–3，全部成功才 4
