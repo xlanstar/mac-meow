@@ -31,7 +31,7 @@ Docs hold reasons, contracts, invariants and procedures. Mechanics (step order, 
 
 1. NEVER modify, patch, or redistribute game/launcher files (`MapleStory.exe`, `認證器.exe`, `貓貓TMS登入器.exe`, `HostShield.exe`, `XCGUI.dll`, `*.wz`).
 2. NEVER read, print, or commit `login.txt` (game folder; may contain credentials).
-3. Every change to state outside the repo MUST be reversible: back up originals as `*.macmeow-orig` and list it in `docs/external-state.md`. Anything intentionally kept must be listed there with the reason.
+3. Every change to state outside the repo MUST be reversible: back up replaced files as `*.macmeow-orig` (other state: record the original value or how to restore it) and list it in `docs/external-state.md`. Anything intentionally kept must be listed there with the reason.
 4. `scripts/play.sh` MUST be idempotent (check, then apply only if needed) and MUST refuse to patch the engine while Wine is running.
 5. Ask before killing a user's running Wine or game session.
 6. Release only via `tools/release/release.sh`. Ask before `release.sh publish` (CI then releases publicly). Never move or reuse a pushed tag.
@@ -44,7 +44,7 @@ Rules that can be checked mechanically live in `prek.toml` and `tools/dev/lint.s
 - Folder roles: `scripts/` is the user flow (bundled into the app); `tools/` is dev-only and may use Homebrew, uv, Xcode and `python3`; `experiments/` holds one-off experiments (rules in `experiments/README.md`).
 - `app/` is a SwiftUI UI shell (macOS 13+, Swift 5 mode, system frameworks only): every action goes through `scripts/`. Never reimplement script logic, engine/prefix paths or game file lists in Swift; extend the scripts instead. Layers in `app/Sources/` depend downward only (App → UI → Features → Services → Core); `App/` holds the entry point and the only composition root.
 - Shared paths, constants and helpers live in `scripts/lib/common.sh` (user side) and `tools/lib.sh` (dev side). Source them; never redefine them. Settings come from `load_settings` (`MACMEOW_SETTINGS` in `common.sh`); never hard-code their defaults elsewhere.
-- Scripts that change external state expose `check|apply|restore` (`check` exits 0 when already applied); call other scripts with `run_script`.
+- Scripts that change external state expose `check|apply|restore` (`check` exits 0 when already applied; the root-only `setup-loopback.sh` uses `install|uninstall|check`); call other scripts with `run_script`.
 - Dev tool sources go in `tools/src/<name>/`, built by `tools/dev/build.sh` into `build/tools/`; diagnostic output goes to `debug/`.
 - Resolve paths from the script location (`$(dirname "$0")`); honor `GAME_DIR` and `CYDER_ENGINE`.
 - User-facing messages in Traditional Chinese (zh-TW); comments in zh-TW or English.
@@ -52,7 +52,7 @@ Rules that can be checked mechanically live in `prek.toml` and `tools/dev/lint.s
 ## Runtime pitfalls
 
 - GUI Wine programs hang if started from a non-Aqua shell (agent shell, SSH). Launch via Terminal.app: `tools/diag/wgui.sh` does this by default; elsewhere use `in_terminal` from `tools/lib.sh`.
-- Wine clients must use the running wineserver's sync mode: set `WINEMSYNC=1` when Cyder has `msync=true` (`export_wine_env` in `scripts/lib/common.sh` does this).
+- Wine clients must use the running wineserver's sync mode: `WINEMSYNC=1` or `WINEESYNC=1` per Cyder's `msync`/`esync` setting (`export_wine_env` in `scripts/lib/common.sh` does this).
 - After changing the launch flow, run `dist/MacMeow.app` or `scripts/play.sh`; `bash scripts/play.sh status` must then show 4 HostShield listeners on `127.x.x.1:37601-37630` and `貓貓TMS登入器.exe` running. If you could not run this, say so.
 
 ## Commits
