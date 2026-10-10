@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # 開發工具共用設定。tools/*/*.sh 以 `source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"` 載入。
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
-#   ROOT / TOOLS_BIN / DEBUG_DIR、BREW_HINT、load_env、ok、usage_doc、need_cmd、out_dir、maple_pids、need_tool、in_terminal、
+#   ROOT / TOOLS_BIN / DEBUG_DIR、BREW_HINT、load_env、ok、usage_doc、need_cmd、out_dir、TARGET_EXE / target_pids、need_tool、in_terminal、
 #   run_wine、llvm_paths（LLVM 路徑）、MINGW_CC / win_exe（Windows 程式）、
 #   APP_SWIFT_TARGET / app_sources（App 原始碼）
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
@@ -63,9 +63,15 @@ out_dir() {
   echo "$d"
 }
 
-# 執行中的 MapleStory.exe PID（以 comm 比對，不讀取命令列參數，避免碰到帳號資訊）。
-maple_pids() {
-  /bin/ps -axo pid=,comm= | /usr/bin/awk '/[Mm]aple[Ss]tory\.exe$/ {print $1}'
+# 診斷工具的目標程序（exe 檔名）；可用環境變數覆寫，預設為 common.sh 的 GAME_EXE。
+TARGET_EXE="${TARGET_EXE:-$GAME_EXE}"
+
+# target_pids [exe=TARGET_EXE]：執行中、comm 以該 exe 檔名結尾（不分大小寫）的 PID。
+# 以 comm 比對，不讀取命令列參數，避免碰到帳號資訊。
+target_pids() {
+  /bin/ps -axo pid=,comm= | EXE="${1:-$TARGET_EXE}" /usr/bin/awk '
+    BEGIN { t = tolower(ENVIRON["EXE"]); n = length(t) }
+    { c = tolower($0); if (n && length(c) >= n && substr(c, length(c) - n + 1) == t) print $1 }'
 }
 
 # need_tool <名稱...>：確保 build/tools 下的工具存在，否則先建置。

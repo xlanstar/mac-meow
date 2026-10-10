@@ -70,7 +70,7 @@ porcelain() {
   echo "wine=$(flag wine_running)"
   echo "helpers=$(flag proc_running 認證器.exe HostShield.exe)"
   echo "launcher=$(flag proc_running "$LAUNCHER_EXE")"
-  echo "game=$(flag proc_running MapleStory.exe)"
+  echo "game=$(flag proc_running "$GAME_EXE")"
   echo "launcher_pid=$(session_procs | LAUNCHER="$LAUNCHER_EXE" /usr/bin/awk '$2 == ENVIRON["LAUNCHER"] { print $1; exit }')"
   echo "watching=$(flag run_script session.sh status)"
   echo "dock_patched=$(flag run_script patch-cyder-winemac.sh check)"
@@ -114,7 +114,7 @@ cmd_start() {
 
   # 2. 前一次留下的程序：登入器或遊戲還在就不重複啟動；只剩 認證器／HostShield 殘留時，只結束本專案的程式
   #    （session.sh close）。shared bottle 內其他 Cyder 遊戲不受影響。
-  if proc_running "$LAUNCHER_EXE" MapleStory.exe; then
+  if proc_running "$LAUNCHER_EXE" "$GAME_EXE"; then
     echo "貓貓谷已在執行中（登入器或遊戲視窗仍開著）"
     start_watcher
     return 0

@@ -6,8 +6,8 @@
 #
 # 模式（第一個參數）：
 #   plain    （預設）無 trace，用於效能比較
-#   trace    記錄等待、例外、DLL 載入（程序／DLL 載入頻道對所有程序開，其餘只對 MapleStory.exe），並每 0.5 秒記錄 MapleStory 執行緒數與 socket
-#   relay    trace + MapleStory.exe 的 API 呼叫（找出各執行緒最後呼叫；量大、干擾時序）
+#   trace    記錄等待、例外、DLL 載入（程序／DLL 載入頻道對所有程序開，其餘只對目標程序），並每 0.5 秒記錄目標程序的執行緒數與 socket
+#   relay    trace + 目標程序的 API 呼叫（找出各執行緒最後呼叫；量大、干擾時序）
 #   virtual  trace + 記憶體保護／配置（查 virtual_mutex 類鎖死）
 #   server   trace + 前景 wineserver -d1 協定紀錄（含 suspend_thread 等請求者；量大，只適合短時間重現）
 #
@@ -18,6 +18,7 @@
 #   WZCACHE=0|1（預設 0：與從 認證器.exe 啟動時相同；1 = Cyder 的 WZ read-ahead 快取）
 #   WINEDEBUG=...（覆寫頻道）  EXTRA_DEBUG=...（附加頻道）
 #   EXTRA_ENV="K=V K2=V2"（額外環境變數）
+#   TARGET_EXE=...（目標程序的 exe 檔名，預設遊戲主程式：common.sh 的 GAME_EXE）
 # 紀錄：debug/run-<時間>/
 set -euo pipefail
 # shellcheck source=../lib.sh
@@ -64,7 +65,7 @@ export PATH="$CYDER_ENGINE/bin:$PATH"
 for kv in ${EXTRA_ENV:-}; do export "$kv"; done
 
 # 「程序名:+channel」只對該程序啟用（Wine debug.c parse_options），避免 HostShield／登入器灌爆紀錄。
-M=MapleStory.exe
+M="$TARGET_EXE"
 TRACE="+timestamp,+pid,+tid,+process,+loaddll,$M:+winsock,$M:+seh,$M:+thread,$M:+sync,$M:+win,$M:+msgbox"
 case "$mode" in
   plain) default_debug="-all" ;;
@@ -99,20 +100,20 @@ stop() {
 }
 trap stop INT TERM
 echo "執行中，紀錄：$OUT"
-echo "卡住時先在另一個終端機執行 bash tools/diag/stack.sh，再按 Ctrl+C（會關閉此 bottle 的所有 Windows 程式）。"
+echo "卡住時先在另一個終端機執行 bash tools/diag/stack.sh --exe ${TARGET_EXE}，再按 Ctrl+C（會關閉此 bottle 的所有 Windows 程式）。"
 
-# maple_status：MapleStory 執行緒數、CPU、狀態與 socket（comm 不含啟動參數）。
-maple_status() {
+# target_status：目標程序的執行緒數、CPU、狀態與 socket（comm 不含啟動參數）。
+target_status() {
   local pid
   date +%T
-  for pid in $(maple_pids); do
+  for pid in $(target_pids); do
     echo "threads=$(/bin/ps -M -p "$pid" 2>/dev/null | /usr/bin/sed 1d | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
     /bin/ps -p "$pid" -o pid=,etime=,pcpu=,state=,comm= || true
     LC_ALL=C /usr/sbin/lsof -nP -a -p "$pid" -iTCP -iUDP 2>/dev/null || true
   done
 }
 
-# 等 Ctrl+C；trace 類模式每 0.5 秒記錄一次 maple_status。
+# 等 Ctrl+C；trace 類模式每 0.5 秒記錄一次 target_status。
 while sleep 0.5; do
-  [[ "$mode" == plain ]] || maple_status >>"$OUT/net.log"
+  [[ "$mode" == plain ]] || target_status >>"$OUT/net.log"
 done

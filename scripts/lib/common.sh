@@ -99,7 +99,9 @@ MACMEOW_TAP_REPO="xlanstar/homebrew-tap" # brew 的 tap 名稱為 xlanstar/tap
 HOMEBREW_PREFIXES=(/opt/homebrew /usr/local)
 
 # ---------- 貓貓谷 ----------
-GAME_FILES=(認證器.exe HostShield.exe 貓貓TMS登入器.exe XCGUI.dll MapleStory.exe)
+GAME_EXE="MapleStory.exe"      # 遊戲主程式；tools/ 診斷工具的預設目標（tools/lib.sh 的 TARGET_EXE）
+GAME_WINDOW_TITLE="MapleStory" # 遊戲視窗標題（tools/diag/shot.sh 的預設值）
+GAME_FILES=(認證器.exe HostShield.exe 貓貓TMS登入器.exe XCGUI.dll "$GAME_EXE")
 # HostShield 各 token 的通道位址（app.ip），各監聽 HOSTSHIELD_PORTS。
 HOSTSHIELD_IPS=(127.145.37.1 127.152.149.1 127.143.13.1 127.162.167.1)
 HOSTSHIELD_PORTS="37601-37630"

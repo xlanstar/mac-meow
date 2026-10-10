@@ -78,7 +78,8 @@ bash tools/dev/build-wine-dlls.sh
 
 啟動與操作（GUI 類 Wine 程式需在 Terminal.app 內執行）：
 
-- `tools/game/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程；需要有效的 `GAME_DIR`，紀錄在 `debug/run-<時間>/`。啟動時與 Ctrl+C 時會關閉 shared bottle 內所有 Windows 程式。`plain` 無 trace（效能比較）；trace 類模式對所有程序開 `+timestamp,+pid,+tid,+process,+loaddll`，其餘頻道只對 `MapleStory.exe` 開，並記錄其執行緒數與 socket；`server` 另跑前景 `wineserver -d1`（所有程序，寫入 `server.log`）。`MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`（另可為 `dxvk|wined3d`；無法使用時與 `play.sh` 一樣退回可用的後端；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`MACMEOW_HUD=1`（Metal FPS HUD）（未設定時沿用 App 的設定）、`WZCACHE`、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
+- `tools/game/run-game.sh [plain|trace|relay|virtual|server]`：不經 Cyder.app 直接以 engine 啟動完整流程；需要有效的 `GAME_DIR`，紀錄在 `debug/run-<時間>/`。啟動時與 Ctrl+C 時會關閉 shared bottle 內所有 Windows 程式。`plain` 無 trace（效能比較）；trace 類模式對所有程序開 `+timestamp,+pid,+tid,+process,+loaddll`，其餘頻道只對目標程序開，並記錄其執行緒數與 socket；`server` 另跑前景 `wineserver -d1`（所有程序，寫入 `server.log`）。`MACMEOW_SYNC`、`MACMEOW_GRAPHICS_BACKEND`（另可為 `dxvk|wined3d`；無法使用時與 `play.sh` 一樣退回可用的後端；`d3dmetal` 需要 Cyder 已連結到 engine 的 GPTK）、`MACMEOW_HUD=1`（Metal FPS HUD）（未設定時沿用 App 的設定）、`WZCACHE`、`WINEDEBUG`、`EXTRA_DEBUG`、`EXTRA_ENV` 可切換。
+- 目標程序：`stack.sh`、`run-game.sh` 的對象是 `TARGET_EXE`（exe 檔名，預設為 `common.sh` 的 `GAME_EXE`）；`shot.sh` 預設擷取 `GAME_WINDOW_TITLE` 視窗。
 - `tools/diag/wgui.sh list|click|sclick|shot|fg|key`：在 bottle 內列出 Wine 視窗、點擊、按鍵、截圖。預設經 Terminal.app 執行並取回輸出，已在 Terminal.app 內可加 `--here`。
 - `tools/game/auto-start.sh [--here]`：等登入器視窗出現後以 `SendInput` 點「開始遊戲」，直到 `MapleStory.exe` 啟動。整個腳本只經 Terminal.app 執行一次，已在 Terminal.app 內可加 `--here`。
 - `tools/diag/shot.sh [輸出檔] [視窗標題]`：擷取遊戲視窗（被遮住也可，螢幕鎖定時不行）。
@@ -86,7 +87,7 @@ bash tools/dev/build-wine-dlls.sh
 堆疊與效能：
 
 - `tools/diag/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack、LLDB 需要），用完執行 `restore`。
-- `tools/diag/stack.sh mach|prof|lldb|wine`：擷取執行中 `MapleStory.exe` 的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`wine` 以 engine 的 `winedbg` 附加，逐執行緒取 Windows 端堆疊（Windows PID 與執行緒取自 `info thread`，只附加 `MapleStory.exe`；尚未實測）。`mach`、`prof` 需要 `python3`。
+- `tools/diag/stack.sh [--exe <名稱>] [--pid <pid>] mach|prof|lldb|wine`：擷取執行中目標程序的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`wine` 以 engine 的 `winedbg` 附加，逐執行緒取 Windows 端堆疊（Windows PID 與執行緒取自 `info thread`，只附加目標程序；尚未實測）。`mach`、`prof` 需要 `python3`。
 - `build/tools/symx86`（x86_64，在 Rosetta 下以 `dladdr` 解析 shared cache 符號）、`tools/src/machstack/symbolize.py`（替 machstack 輸出補符號）、`machprof.py`（`prof` 的統計）：由 `stack.sh` 呼叫。
 - `tools/src/machstack/pesym.py <區段檔> <addr...>`：Wine PE 位址轉函式名；區段檔取自 vmmap（每行「起點 路徑」），需要 LLVM（`LLVM_BIN`）。
 

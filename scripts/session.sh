@@ -87,9 +87,9 @@ close_session() {
 # 本專案程式的數量：登入器、遊戲、其他（Patcher 等，執行中就不收尾）；HostShield、認證器、
 # BlackCipher、NxOverlay 是隨登入器或遊戲啟動的附屬程式，不計入。
 count_procs() {
-  session_procs | LAUNCHER="$LAUNCHER_EXE" /usr/bin/awk '
+  session_procs | LAUNCHER="$LAUNCHER_EXE" GAME="$GAME_EXE" /usr/bin/awk '
     $2 == ENVIRON["LAUNCHER"] { l++; next }
-    $2 == "MapleStory.exe" { g++; next }
+    $2 == ENVIRON["GAME"] { g++; next }
     $2 !~ /^(HostShield\.exe|認證器\.exe|BlackCipher(64)?\.aes|BlackXchg\.aes|DwarfAxe\.exe)$/ { o++ }
     END { print l + 0, g + 0, o + 0 }'
 }

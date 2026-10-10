@@ -65,8 +65,8 @@ summary() {
   if missing="$(missing_game_file "$GAME_DIR")"; then
     echo "- 遊戲資料夾：缺少 ${missing}"
   else
-    exe="$GAME_DIR/MapleStory.exe"
-    echo "- MapleStory.exe：$(/usr/bin/stat -f %z "$exe") bytes，sha256 $(sha256 "$exe" | /usr/bin/cut -c1-16)"
+    exe="$GAME_DIR/$GAME_EXE"
+    echo "- ${GAME_EXE}：$(/usr/bin/stat -f %z "$exe") bytes，sha256 $(sha256 "$exe" | /usr/bin/cut -c1-16)"
   fi
   echo "- 修補：$({
     run_script patch-cyder-loopback.sh check
