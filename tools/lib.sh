@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # 開發工具共用設定。tools/*/*.sh 以 `source "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"` 載入。
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
-#   ROOT / TOOLS_BIN / DEBUG_DIR / CYDER_WINE_LOG、BREW_HINT、load_env、ok、usage_doc、need_cmd、out_dir、TARGET_EXE / target_pids、need_tool、in_terminal、
+#   ROOT / TOOLS_BIN / DEBUG_DIR、BREW_HINT、load_env、ok、usage_doc、need_cmd、out_dir、TARGET_EXE / target_pids、need_tool、in_terminal、
 #   run_wine、llvm_paths（LLVM 路徑）、MINGW_CC / win_exe（Windows 程式）、
 #   APP_SWIFT_TARGET / app_sources / compile_app（App 原始碼）
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
@@ -11,10 +11,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=../scripts/lib/common.sh
 source "$ROOT/scripts/lib/common.sh"
 
-TOOLS_BIN="$ROOT/build/tools" # tools/dev/build.sh 的產物
-# Cyder 收集 Wine stderr 的記錄檔（超過大小上限時只保留最新內容）；stack.sh hitch 從這裡讀 Metal HUD 的逐幀記錄
-# shellcheck disable=SC2034  # stack.sh 使用
-CYDER_WINE_LOG="$CYDER_SUPPORT_DIR/Logs/sessions/last-wine-launch.log"
+TOOLS_BIN="$ROOT/build/tools"            # tools/dev/build.sh 的產物
 DEBUG_DIR="$ROOT/debug"                  # 所有診斷輸出（.gitignore）
 APP_SWIFT_TARGET="arm64-apple-macos13.0" # App 的 swiftc target；與 Info.plist 的 LSMinimumSystemVersion 一致
 

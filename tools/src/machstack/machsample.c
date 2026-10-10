@@ -21,8 +21,8 @@
  *   E <t> <取樣次數> <落後次數> <平均取樣耗時 us> <最大取樣耗時 us>
  * t 為 epoch 微秒（與 Metal HUD 記錄的本地時間對齊）。
  *
- * 取堆疊的執行緒：自上次取樣後用了 CPU、正在執行，或累計 CPU 最多的前 ALWAYS_TOP 條
- * （遊戲主執行緒卡在等待時沒有 CPU 增量，仍要知道它在等什麼）。
+ * 取堆疊的執行緒：自上次取樣後用了 CPU、正在執行、RECENT_US 內用過 CPU，或累計 CPU 最多的前
+ * ALWAYS_TOP 條（每幀都會執行的執行緒卡在等待時沒有 CPU 增量，仍要知道它在等什麼）。
  */
 #include <mach/mach.h>
 #include <mach/mach_time.h>
@@ -45,6 +45,7 @@
 #define MAX_PROCS 8192
 #define MAX_IMAGES 4096
 #define ALWAYS_TOP 3              /* 累計 CPU 最多、每次都取堆疊的執行緒數 */
+#define RECENT_US 300000          /* 最近這段時間內用過 CPU 的執行緒，閒置時也取堆疊 */
 #define REGION_REFRESH_US 2000000 /* 區段表重掃間隔 */
 #define PROC_REFRESH_US 100000    /* 其他程序 CPU 取樣間隔 */
 #define NATIVE_DEPTH 6            /* 原生 fp 鏈最多幾層 */
@@ -63,7 +64,7 @@ static mach_timebase_info_data_t timebase;
 
 struct tinfo {
     thread_act_t port; /* 保留一個 send right，讓同一執行緒的 port 名稱不變 */
-    uint64_t tid, cpu_first, cpu_last, delta;
+    uint64_t tid, cpu_first, cpu_last, delta, active_t;
     int state, suspend, seen;
 };
 static struct tinfo threads[MAX_THREADS];
@@ -398,6 +399,7 @@ static int sample_threads(uint64_t t) {
         }
         e->cpu_last = cpu;
         e->delta = delta;
+        if (delta) e->active_t = t;
         e->state = b.run_state;
         e->suspend = b.suspend_count;
         e->seen = 1;
@@ -416,7 +418,7 @@ static int sample_threads(uint64_t t) {
 
     for (int i = 0; i < nthreads; i++) {
         struct tinfo *e = &threads[i];
-        if (e->state == TH_STATE_RUNNING || e->delta || is_top(e)) print_stack(t, e);
+        if (e->state == TH_STATE_RUNNING || e->delta || t - e->active_t < RECENT_US || is_top(e)) print_stack(t, e);
     }
     return 1;
 }

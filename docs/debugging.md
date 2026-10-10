@@ -23,11 +23,16 @@ just wgui list
 
 ## 卡頓（FPS drop）
 
-`just stack hitch` 在照常遊戲時連續取樣，事後以 Metal HUD 的逐幀時間找出掉幀，比較「掉幀期間」與「平常」。需求與參數見 `stack.sh` 開頭。報告的讀法：
+`just stack hitch` 在照常遊戲時連續取樣，同時要求 Metal HUD 產生效能報告（等同遊戲視窗選單 Metal HUD → Generate Performance Report），以報告的逐幀時間找出掉幀，比較「掉幀期間」與「平常」。需求與參數見 `stack.sh` 開頭。
+
+- Metal HUD 的「記錄」功能（`MTL_HUD_LOG_ENABLED`、`ToggleLogEnabled`）不適用：遊戲中切換後沒有輸出；Cyder 收集 Wine stderr 的程式每累積 64 KB 才寫入 `last-wine-launch.log` 一次。
+- 效能報告只有逐幀間隔、沒有時間戳，各幀時間由要求的時間推算（偏移見 `hitchprof.py` 的 `REPORT_LEAD_US`）。
+
+報告的讀法：
 
 - 「重點」只列各表增加最多的項目，是相關性，不一定是原因；先看它，再到下方的表與各次卡頓核對。
-- 幀間隔長但 GPU 時間短：CPU 端沒有及時送出畫面，看執行緒與呼叫鏈；GPU 時間也長才是 GPU 端。
-- 主執行緒（整段 CPU 最多的執行緒，推定）卡頓時 CPU 反而下降：它在等待，「狀態」的系統呼叫（`mach_msg2`、`semaphore_wait`、`__psynch_cvwait` 等）與呼叫鏈指出在等誰。
+- 「HUD 整段統計」的 Command Buffer GPU 最大值遠小於卡頓幀的長度：卡頓在 CPU 端（沒有及時送出畫面），看執行緒與呼叫鏈。
+- 主執行緒（整段 CPU 最多的執行緒，推定）卡頓時 CPU 反而下降：它在等待，「狀態」的系統呼叫（`mach_msg2`、`semaphore_wait`、`__psynch_cvwait` 等）與呼叫鏈指出在等誰。報告另外列出卡頓時狀態變化最大的執行緒（「狀態變化」0–1），CPU 用量小的執行緒也能找到。
 - 「Rosetta 執行環境」在卡頓時增加：Rosetta 在翻譯新程式碼或處理自我修改程式碼的例外（見 [fixes.md #9](fixes.md#9-人多的地方很卡themida-vm--rosetta-smc未解)），通常伴隨 page fault 倍增。
 - 其他程序的 CPU 在卡頓時增加（例如 `wineserver`、`BlackCipher64.aes`）：嫌疑在該程序。
 - 呼叫鏈來自堆疊掃描（x86 碼多半沒有 frame pointer），會混入堆疊上殘留的舊返回位址；看卡頓與平常的差距，不要只看絕對比例。沒有符號的位置顯示為「模組+偏移」，同一偏移即同一呼叫點。

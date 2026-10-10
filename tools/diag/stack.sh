@@ -7,13 +7,13 @@
 #   mach [額外 pid...]       （預設）Mach API 讀取所有執行緒的原生／x86 狀態並解析符號；程序被 task_suspend 約 1 秒。
 #                            不依賴 LLDB／Rosetta 除錯協定，對「收不到訊號、LLDB 無法暫停」的程序也有效。
 #   prof [次數=20] [間隔=0.5]  連續 mach 快照，統計各執行緒 CPU 增量與最常見呼叫鏈。
-#   hitch [秒數=60] [間隔ms=5]  卡頓（FPS drop）分析：以 Metal HUD 的逐幀時間找出掉幀，比較掉幀期間與平常的
-#                            連續取樣（machsample + hitchprof.py），報告寫到 report.txt。秒數 0 = 直到 Ctrl+C。
-#                            不暫停程序（約佔一個核心的 10%）；擷取期間照常玩，等卡頓發生。
-#                            需要遊戲開著效能 HUD（App 設定「顯示效能 HUD」，重新開遊戲後生效）；HUD 的記錄
-#                            會自動開啟、結束時關回。HUD 記錄預設讀 Cyder 的 Wine 記錄（lib.sh 的 CYDER_WINE_LOG），
-#                            以 run-game.sh 啟動時用 HUD_LOG=debug/run-<時間>/wine.log 指定。
-#                            換門檻重新分析：python3 tools/src/machstack/hitchprof.py <輸出>/samples.txt <輸出>/hud.txt --threshold-ms N
+#   hitch [秒數=60] [間隔ms=5]  卡頓（FPS drop）分析：連續取樣（machsample）同時要求 Metal HUD 產生同樣長度的
+#                            效能報告（逐幀時間），以 hitchprof.py 比較掉幀期間與平常，報告寫到 report.txt。
+#                            秒數只能是 HUD 支援的報告長度 5|30|60|300。不暫停程序（約佔一個核心的 10%）；
+#                            擷取期間照常玩，等卡頓發生。需要遊戲開著效能 HUD（App 設定「顯示效能 HUD」，
+#                            重新開遊戲後生效）。換門檻重新分析：
+#                            python3 tools/src/machstack/hitchprof.py <輸出>/samples.txt <輸出>/hud-report.html \
+#                              --start-us "$(cat <輸出>/report-start.txt)" --threshold-ms N
 #   lldb                     LLDB 附加，擷取所有執行緒原生堆疊後 detach（程序短暫停住）。
 #   wine                     winedbg 附加 Windows 程序，逐執行緒 bt（Windows 端堆疊，含 PE 符號）後 detach（尚未實測；確認可用後移除 tools/src/wthreads）。
 # mach、prof、hitch、lldb 需要先執行 bash tools/diag/sign-debug.sh apply（get-task-allow）；wine 不需要。
@@ -83,68 +83,50 @@ cmd_prof() {
 
 # ---------- hitch ----------
 
-HUD_LOG="${HUD_LOG:-$CYDER_WINE_LOG}"
-# libMTLHud 的「Enable Logging」開關（Darwin notification；每次 post 都會切換所有開著 HUD 的程序）
-HUD_LOG_TOGGLE=com.apple.metal.hud.notify.ToggleLogEnabled
-hud_toggled=0
-
-file_size() { /usr/bin/stat -f %z "$1" 2>/dev/null || echo 0; }
-
-# hud_lines <pid> <起始位元組>：記錄檔該位置之後，該程序的 metal-HUD 行
-hud_lines() {
-  local from="$2"
-  # Cyder 的記錄檔超過上限時會整個改寫（只留最新內容），位置失效就從頭讀
-  (($(file_size "$HUD_LOG") >= from)) || from=0
-  tail -c +"$((from + 1))" "$HUD_LOG" | grep -a "\\[$1:[0-9a-f]*\\] metal-HUD:" || true
+# hud_report <秒數>：要求所有開著 Metal HUD 的程序產生效能報告（同 HUD 選單的 Generate Performance Report），
+# 輸出要求的時間（epoch 微秒）。報告寫到程序的暫存資料夾：libMTLHud_<程序>_<開始時間>_<秒數>s.html
+hud_report() {
+  /usr/bin/perl -MTime::HiRes=time -e \
+    'my $t = time; system("/usr/bin/notifyutil", "-p", $ARGV[0]) == 0 or exit 1; printf "%d\n", ($t + time) / 2 * 1e6' \
+    "com.apple.metal.hud.notify.PerformanceReport-$1s"
 }
 
-hud_logging() { [[ -n "$(hud_lines "$1" "$2")" ]]; }
-
-restore_hud_log() {
-  ((hud_toggled)) || return 0
-  notifyutil -p "$HUD_LOG_TOGGLE"
-  hud_toggled=0
+# new_report <名稱前綴> <標記檔>：標記檔之後產生的最新報告
+new_report() {
+  find "$(getconf DARWIN_USER_TEMP_DIR)" -maxdepth 1 -name "libMTLHud_$1_*.html" -newer "$2" 2>/dev/null \
+    | sort | tail -1
 }
 
-# HUD 記錄的開關只能切換：先確認是否已在記錄（約每秒一行），沒有才切換，結束時再切回。
-start_hud_log() {
-  local pid="$1" from
-  from="$(file_size "$HUD_LOG")"
-  wait_until 3 hud_logging "$pid" "$from" && return 0
-  notifyutil -p "$HUD_LOG_TOGGLE"
-  hud_toggled=1
-  wait_until 5 hud_logging "$pid" "$from" && return 0
-  restore_hud_log
-  die "遊戲沒有寫出 Metal HUD 記錄（${HUD_LOG}）：請在 App 設定開啟「顯示效能 HUD」並重新開遊戲，且遊戲視窗要在畫面上"
-}
+report_ready() { [[ -n "$(new_report "$@")" ]]; }
 
 cmd_hitch() {
-  local secs="${1:-60}" gap="${2:-5}" pid out from sampler
-  [[ "$secs" =~ ^[0-9]+$ && "$gap" =~ ^[0-9]+$ && "$gap" -gt 0 ]] || usage "$USAGE"
+  local secs="${1:-60}" gap="${2:-5}" pid name out start sampler report
+  [[ "$secs" =~ ^(5|30|60|300)$ && "$gap" =~ ^[0-9]+$ && "$gap" -gt 0 ]] || usage "$USAGE"
   need_tool machsample symx86
   require_target
   pid="${pids%% *}"
-  [[ -f "$HUD_LOG" ]] || die "找不到 HUD 記錄檔：${HUD_LOG}"
+  # 報告檔名用程序名稱（不含 .exe）；--pid 指定的非遊戲程序就接受任何報告
+  name="${TARGET_EXE%.exe}"
+  [[ "$(/bin/ps -o comm= -p "$pid")" == *"$TARGET_EXE"* ]] || name="*"
   out="$(out_dir hitch)"
-  from="$(file_size "$HUD_LOG")"
-  trap restore_hud_log EXIT
-  start_hud_log "$pid"
+  touch "$out/.mark"
 
-  if ((secs)); then echo "取樣 PID ${pid} ${secs} 秒，照常遊戲；Ctrl+C 提早結束 ..."; else echo "取樣 PID ${pid}，照常遊戲；Ctrl+C 結束 ..."; fi
-  # Ctrl+C 同時送到 machsample（它會正常收尾）；本腳本忽略，繼續分析
-  trap ':' INT
-  "$TOOLS_BIN/machsample" "$pid" "$gap" "$secs" >"$out/samples.txt" &
+  echo "取樣 PID ${pid} ${secs} 秒，照常遊戲（Ctrl+C 中止）..."
+  # 取樣多跑 1 秒，涵蓋 notification 送達前後與報告的最後一幀
+  "$TOOLS_BIN/machsample" "$pid" "$gap" "$((secs + 2))" >"$out/samples.txt" &
   sampler=$!
-  while kill -0 "$sampler" 2>/dev/null; do wait "$sampler" || true; done
-  trap - INT
+  sleep 0.5
+  start="$(hud_report "$secs")" || die "無法送出 HUD 報告要求"
+  echo "$start" >"$out/report-start.txt"
+  wait "$sampler" || die "machsample 失敗（需要 sign-debug apply 後重新開遊戲）"
 
-  # HUD 約每秒才寫一行，等涵蓋取樣結束的那一行
-  local end_size
-  end_size="$(file_size "$HUD_LOG")"
-  wait_until 3 hud_logging "$pid" "$end_size" || true
-  restore_hud_log
-  hud_lines "$pid" "$from" >"$out/hud.txt"
-  python3 "$SRC/hitchprof.py" "$out/samples.txt" "$out/hud.txt" | tee "$out/report.txt"
+  # 報告在收集結束後數秒才寫出
+  wait_until 20 report_ready "$name" "$out/.mark" \
+    || die "等不到 Metal HUD 效能報告：請在 App 設定開啟「顯示效能 HUD」並重新開遊戲，且遊戲視窗要在畫面上"
+  report="$(new_report "$name" "$out/.mark")"
+  cp "$report" "$out/hud-report.html"
+  rm -f "$out/.mark"
+  python3 "$SRC/hitchprof.py" "$out/samples.txt" "$out/hud-report.html" --start-us "$start" | tee "$out/report.txt"
   echo "$out"
 }
 

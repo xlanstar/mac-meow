@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """hitchprof：找出卡頓（FPS drop）時多做了什麼。
 
-以 Metal HUD 記錄的逐幀時間找出卡頓的幀，把 machsample 的取樣分成「卡頓期間」與「平常」，
+以 Metal HUD 效能報告的逐幀時間找出卡頓的幀，把 machsample 的取樣分成「卡頓期間」與「平常」，
 比較兩者的執行緒 CPU、其他程序 CPU、程序計數（page fault 等）、執行緒狀態與呼叫鏈；
 卡頓期間明顯多出來的項目就是嫌疑最大的地方。
 
-用法：hitchprof.py <machsample 輸出> <HUD 記錄> [--threshold-ms N] [--lead-ms N] [--top N]
-  HUD 記錄：含 `metal-HUD:` 行的 Wine stderr（格式見 parse_hud）；沒有幀資料時只輸出整段擷取的統計。
+用法：hitchprof.py <machsample 輸出> <HUD 效能報告> --start-us N [--threshold-ms N] [--lead-ms N] [--top N]
+  HUD 效能報告：libMTLHud 產生的 libMTLHud_<程序>_<時間>_<秒數>s.html（格式見 parse_report）；
+  --start-us      要求產生報告的時間（epoch 微秒；stack.sh hitch 記在 report-start.txt），報告的第一幀由此起算
+  沒有幀資料時只輸出整段擷取的統計。
   --threshold-ms  卡頓門檻（預設：中位數 ×3 與中位數 +25 ms 取大者）
   --lead-ms       卡頓幀往前多算的時間（預設 2 幀）：D3DMetal 會排隊數幀，造成卡頓的工作可能早於該幀開始
   --top N         各清單列出幾項（預設 12）
@@ -18,6 +20,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import collections
+import json
 import re
 import statistics
 import subprocess
@@ -65,8 +68,17 @@ MACH_TRAPS = {
 }
 ATOS_IN = re.compile(r" \(in [^)]*\)")
 SYMBOL_SUFFIX = re.compile(r"(\s*\+\s*(0x)?[0-9a-f]+)?( \([^()]*:\d+\))?$")  # +偏移、(檔案:行號)
-HUD_LINE = re.compile(
-    r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+) .*?\[(\d+):\w+\] metal-HUD: ([-\d.,]+)"
+REPORT_JSON = re.compile(r"<script[^>]*>\s*(\{.*?\})\s*</script>", re.DOTALL)
+REPORT_ROW = re.compile(r"<tr>\s*<td[^>]*>([^<]+)</td>((?:\s*<td[^>]*>[^<]*</td>)+)\s*</tr>")
+# 報告的第一幀比要求的時間早約 0.48 秒（x86 Metal 測試程式在固定時間點停頓，5 秒與 30 秒報告中
+# 停頓幀與實際停頓的差距中位數 477–495 ms、MAD 4 ms，報告內不漂移）
+REPORT_LEAD_US = 480_000
+REPORT_METRICS = (
+    "FPS",
+    "Frame Interval",
+    "Present Delay",
+    "Command Buffer CPU",
+    "Command Buffer GPU",
 )
 
 
@@ -147,43 +159,35 @@ class Capture:
 
 
 class Frame:
-    __slots__ = ("end", "gpu", "interval", "start")
+    __slots__ = ("end", "interval", "start")
 
-    def __init__(self, end: int, interval_ms: float, gpu_ms: float) -> None:
-        self.end = end
-        self.start = end - int(interval_ms * 1000)
+    def __init__(self, start: int, interval_ms: float) -> None:
+        self.start = start
+        self.end = start + int(interval_ms * 1000)
         self.interval = interval_ms
-        self.gpu = gpu_ms
 
 
-def parse_hud(path: Path, pid: int) -> list[Frame]:
-    """Metal HUD 記錄（MTL_HUD_ENABLED=1 且開啟記錄時，libMTLHud 以 NSLog 寫到 stderr）：
-
-    `<本地時間 ms> <程序>[<pid>:<tid>] metal-HUD: <最後一幀編號>,<a>,<b>,<幀間隔 ms>,<GPU ms>,...`
-    約每秒一行，涵蓋自上一行以來的每一幀；行的時間戳約為最後一幀呈現的時間，往前累減幀間隔即得各幀時間。
-    <a>、<b> 用途未知（不使用）。
-    """
-    frames: dict[int, Frame] = {}
-    with path.open(errors="replace") as f:
-        for line in f:
-            m = HUD_LINE.search(line)
-            if not m or int(m[2]) != pid:
-                continue
-            values = m[3].strip(",").split(",")
-            try:
-                last = int(values[0])
-                pairs = [float(v) for v in values[3:]]
-                end = int(
-                    datetime.strptime(m[1], "%Y-%m-%d %H:%M:%S.%f").astimezone().timestamp() * 1e6
-                )
-            except ValueError:
-                continue  # 多個程序同時寫 stderr 時行可能交錯
-            count = len(pairs) // 2
-            for i in range(count - 1, -1, -1):
-                frame = Frame(end, pairs[2 * i], pairs[2 * i + 1])
-                frames.setdefault(last - (count - 1 - i), frame)
-                end = frame.start
-    return sorted(frames.values(), key=lambda fr: fr.start)
+def parse_report(path: Path, start_us: int) -> tuple[list[Frame], list[str]]:
+    """Metal HUD 效能報告（HUD 選單的 Generate Performance Report，或 Darwin notification
+    `com.apple.metal.hud.notify.PerformanceReport-<秒數>s`）：HTML 內的 JSON `{"frameintervals": [ns, ...]}`
+    依序列出報告期間每一幀的間隔，沒有時間戳；從要求產生報告的時間減 REPORT_LEAD_US 往後累加即得
+    各幀時間（誤差約數 ms）。
+    另回傳報告「Metrics」表中幾項整段統計（平均／最後／最小／最大）。"""
+    text = path.read_text(errors="replace")
+    m = REPORT_JSON.search(text)
+    if not m:
+        return [], []
+    frames, t = [], start_us - REPORT_LEAD_US
+    for ns in json.loads(m[1]).get("frameintervals", []):
+        frame = Frame(t, ns / 1e6)
+        frames.append(frame)
+        t = frame.end
+    metrics = []
+    for row in REPORT_ROW.finditer(text):
+        if row[1].strip() in REPORT_METRICS:
+            cells = re.findall(r"<td[^>]*>([^<]*)</td>", row[2])
+            metrics.append(f"{row[1].strip()}：" + " / ".join(c.strip() for c in cells))
+    return frames, list(dict.fromkeys(metrics))
 
 
 # ---------- 符號 ----------
@@ -351,11 +355,14 @@ def pct(part: float, whole: float) -> str:
 
 
 class Analysis:
-    def __init__(self, cap: Capture, frames: list[Frame], args: argparse.Namespace) -> None:
+    def __init__(
+        self, cap: Capture, frames: list[Frame], metrics: list[str], args: argparse.Namespace
+    ) -> None:
         self.cap, self.args = cap, args
         self.sym = Symbols(cap)
         self.syscalls = syscall_names()
         self.frames = [f for f in frames if f.start >= cap.start and f.end <= cap.end]
+        self.metrics = metrics
         intervals = [f.interval for f in self.frames]
         self.median = statistics.median(intervals) if intervals else 0
         self.threshold = args.threshold_ms or max(3 * self.median, self.median + 25)
@@ -457,8 +464,8 @@ class Analysis:
 # ---------- 報告 ----------
 
 
-def report(cap: Capture, frames: list[Frame], args: argparse.Namespace) -> None:
-    an = Analysis(cap, frames, args)
+def report(cap: Capture, frames: list[Frame], metrics: list[str], args: argparse.Namespace) -> None:
+    an = Analysis(cap, frames, metrics, args)
     top = args.top
     print(f"目標 pid {cap.pid}，擷取 {(cap.end - cap.start) / 1e6:.1f} 秒；{cap.stats}")
 
@@ -476,7 +483,9 @@ def report(cap: Capture, frames: list[Frame], args: argparse.Namespace) -> None:
         print(
             "\n沒有這個程序在擷取期間的 Metal HUD 幀資料，無法判斷哪些時間點卡頓；以下只是整段擷取的統計。"
         )
-        print("請確認遊戲開啟了效能 HUD、HUD 記錄有寫到指定的記錄檔（見 stack.sh hitch 的說明）。")
+        print(
+            "請確認報告是這個程序的、且 --start-us 是要求產生報告的時間（見 stack.sh hitch 的說明）。"
+        )
         whole_capture(an, top)
         return
 
@@ -493,7 +502,7 @@ def report(cap: Capture, frames: list[Frame], args: argparse.Namespace) -> None:
 def print_frames(an: Analysis) -> None:
     intervals = sorted(f.interval for f in an.frames)
     p99 = intervals[min(len(intervals) - 1, int(len(intervals) * 0.99))]
-    print("\n== 幀時間（Metal HUD）")
+    print("\n== 幀時間（Metal HUD 效能報告）")
     print(
         f"{len(intervals)} 幀；中位數 {an.median:.2f} ms（約 {1000 / an.median:.0f} FPS）、"
         f"p99 {p99:.2f} ms、最長 {intervals[-1]:.2f} ms"
@@ -504,14 +513,10 @@ def print_frames(an: Analysis) -> None:
         f"卡頓門檻 {an.threshold:.1f} ms：{len(hitch_frames)} 幀、合併為 {len(an.events)} 次卡頓，"
         f"共 {total / 1000:.2f} 秒"
     )
-    normal_gpu = [f.gpu for f in an.frames if f.interval < an.threshold]
-    hitch_gpu = [f.gpu for f in hitch_frames]
-    if normal_gpu and hitch_gpu:
-        print(
-            f"GPU 時間中位數：平常 {statistics.median(normal_gpu):.2f} ms、"
-            f"卡頓幀 {statistics.median(hitch_gpu):.2f} ms"
-            "（卡頓幀的 GPU 時間接近幀間隔才是 GPU 端的問題，否則是 CPU 端沒有及時送出畫面）"
-        )
+    if an.metrics:
+        print("HUD 整段統計（平均 / 最後 / 最小 / 最大）：")
+        for line in an.metrics:
+            print(f"  {line}")
 
 
 class Comparison:
@@ -532,25 +537,42 @@ class Comparison:
             for k, name in COUNTERS
             if k in hitch and k in normal
         ]
-        # 主執行緒（推定）：整段擷取 CPU 最多的執行緒；另加卡頓期間 CPU 明顯增加的執行緒。
+        # 主執行緒（推定）：整段擷取 CPU 最多的執行緒
         totals = an.totals(cap.threads)
         self.main = max(totals, key=totals.get) if totals else None
         hitch_stacks = [s for i, stacks in by_phase.items() if i >= 0 for s in stacks]
         normal_stacks = by_phase.get(-1, [])
-        sampled = {s[1] for s in hitch_stacks}
-        focus = [self.main] if self.main in sampled else []
-        focus += [r[3] for r in self.threads if r[1] >= 0.05 and r[3] in sampled]
-        self.focus = list(dict.fromkeys(focus))[:3]
+        by_thread_h, by_thread_n = collections.defaultdict(list), collections.defaultdict(list)
+        for st in hitch_stacks:
+            by_thread_h[st[1]].append(st)
+        for st in normal_stacks:
+            by_thread_n[st[1]].append(st)
+        # 各執行緒卡頓 vs 平常的狀態分布差異（總變異距離 0–1）：卡頓時改做別的事或停在等待的執行緒
+        self.shift = {}
+        for tid, hs in by_thread_h.items():
+            ns = by_thread_n.get(tid, [])
+            if len(hs) >= 5 and ns:
+                rows = count_rows(
+                    [an.state(x) for x in hs], [an.state(x) for x in ns], len(hs), len(ns)
+                )
+                self.shift[tid] = sum(abs(r[0]) for r in rows) / 2
+        focus = [self.main] if self.main in by_thread_h else []
+        # 卡頓時 CPU 明顯增加的執行緒
+        focus += [r[3] for r in self.threads if r[0] >= 0.05 and r[3] in by_thread_h][:2]
+        # 卡頓時狀態改變最多的執行緒（例如平常在跑、卡頓時停在系統呼叫；CPU 不多也找得到）
+        focus += [
+            t for t in sorted(self.shift, key=lambda t: -self.shift[t]) if self.shift[t] >= 0.3
+        ][:2]
+        self.focus = list(dict.fromkeys(focus))
         self.per_thread = {}
         for tid in self.focus:
-            hs = [s for s in hitch_stacks if s[1] == tid]
-            ns = [s for s in normal_stacks if s[1] == tid]
+            hs, ns = by_thread_h[tid], by_thread_n.get(tid, [])
             states = count_rows(
-                [an.state(s) for s in hs], [an.state(s) for s in ns], len(hs), len(ns)
+                [an.state(x) for x in hs], [an.state(x) for x in ns], len(hs), len(ns)
             )
             chains = count_rows(
-                [f for s in hs for f in set(an.chain(s))],
-                [f for s in ns for f in set(an.chain(s))],
+                [f for x in hs for f in set(an.chain(x))],
+                [f for x in ns for f in set(an.chain(x))],
                 len(hs),
                 len(ns),
             )
@@ -580,11 +602,6 @@ def count_rows(hitch: list[str], normal: list[str], nh: int, nn: int) -> list[tu
 def print_highlights(an: Analysis, cmp: Comparison) -> None:
     """各表增加最多的項目。門檻是經驗值，只用來挑出值得先看的地方。"""
     lines = []
-    hitch_gpu = [f.gpu for e in an.events for f in e["frames"]]
-    if hitch_gpu and statistics.median(hitch_gpu) >= 0.5 * an.threshold:
-        lines.append(
-            f"卡頓幀的 GPU 時間中位數 {statistics.median(hitch_gpu):.1f} ms：GPU 端可能是瓶頸"
-        )
     main = cmp.main
     for diff, h, n, tid in cmp.threads[:2]:
         if diff >= 0.05:
@@ -638,6 +655,7 @@ def print_compare(an: Analysis, cmp: Comparison, top: int) -> None:
     for tid in cmp.focus:
         nh, nn, states, chains = cmp.per_thread[tid]
         tag = "（主執行緒，推定）" if tid == cmp.main else ""
+        tag += f"；狀態變化 {cmp.shift.get(tid, 0):.2f}"
         print(f"\n{an.thread_label(tid)}{tag}：卡頓取樣 {nh} 次、平常取樣 {nn} 次")
         table("  狀態（取樣比例）", [r for r in states if r[1] or r[2] >= 0.01], str)
         table("  呼叫鏈中的函式（含呼叫者；取樣比例）", [r for r in chains if r[1]], str)
@@ -662,8 +680,8 @@ def print_events(an: Analysis, cmp: Comparison, by_phase: dict[int, list[tuple]]
         stacks = by_phase.get(i, [])
         duration = (event["end"] - event["start"]) / 1000
         print(
-            f"\n#{rank} {when}  {sum(f.interval for f in frames):.1f} ms（{len(frames)} 幀，"
-            f"GPU 最長 {max(f.gpu for f in frames):.2f} ms）；分析區間 {duration:.0f} ms、取樣 {len(stacks)} 次"
+            f"\n#{rank} {when}  {sum(f.interval for f in frames):.1f} ms（{len(frames)} 幀，最長 "
+            f"{max(f.interval for f in frames):.1f} ms）；分析區間 {duration:.0f} ms、取樣 {len(stacks)} 次"
         )
         busy = sorted(an.deltas(an.cap.threads, window).items(), key=lambda kv: -kv[1])[:4]
         others = sorted(an.deltas(an.cap.proc_cpu, window).items(), key=lambda kv: -kv[1])[:3]
@@ -677,9 +695,9 @@ def print_events(an: Analysis, cmp: Comparison, by_phase: dict[int, list[tuple]]
                 else ""
             )
         )
-        # 主執行緒，以及這次卡頓中 CPU 最多的其他執行緒
-        shown = list(dict.fromkeys([cmp.main] + [t for t, _ in busy]))
-        for tid in [t for t in shown if any(s[1] == t for s in stacks)][:2]:
+        # 重點執行緒，以及這次卡頓中 CPU 最多的其他執行緒
+        shown = list(dict.fromkeys([*cmp.focus, *(t for t, _ in busy)]))
+        for tid in [t for t in shown if any(s[1] == t for s in stacks)][:3]:
             sigs = collections.Counter(an.signature(s) for s in stacks if s[1] == tid)
             tag = "（主執行緒）" if tid == cmp.main else ""
             print(f"  {an.thread_label(tid)}{tag} {sum(sigs.values())} 次取樣，最常見的呼叫鏈：")
@@ -708,7 +726,8 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("samples", type=Path)
-    parser.add_argument("hud", type=Path)
+    parser.add_argument("report", type=Path)
+    parser.add_argument("--start-us", type=int, required=True)
     parser.add_argument("--threshold-ms", type=float)
     parser.add_argument("--lead-ms", type=float)
     parser.add_argument("--top", type=int, default=12)
@@ -716,8 +735,8 @@ def main() -> None:
     cap = Capture(args.samples)
     if not cap.pid:
         sys.exit(f"{args.samples} 不是 machsample 的輸出")
-    frames = parse_hud(args.hud, cap.pid) if args.hud.exists() else []
-    report(cap, frames, args)
+    frames, metrics = parse_report(args.report, args.start_us) if args.report.exists() else ([], [])
+    report(cap, frames, metrics, args)
 
 
 if __name__ == "__main__":
