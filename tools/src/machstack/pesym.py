@@ -3,7 +3,7 @@
 
 用法：pesym.py <vmmap 區段檔（每行：起點 路徑）> addr...
 
-以每個 DLL 檔案的最低映射位址當作 image base，搭配 COFF 符號表（section 相對）求最近符號。
+以每個 DLL 檔案的最低映射位址當作載入 base，換算成 PE 檔內的 VA 後交給 llvm-symbolizer（COFF 符號表）。
 LLVM 工具位置：環境變數 LLVM_BIN，預設 /opt/homebrew/opt/llvm/bin。
 """
 
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import bisect
 import functools
+import json
 import os
 import re
 import subprocess
@@ -19,8 +20,6 @@ from pathlib import Path
 
 LLVM_BIN = Path(os.environ.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin"))
 
-SECTION_HEADER = re.compile(r"\s*(\d+)\s+(\S+)\s+([0-9a-f]+)\s+([0-9a-f]+)")
-COFF_SYMBOL = re.compile(r"\(sec\s+(\d+)\).*?(0x[0-9a-f]+) (\S+)$")
 IMAGE_BASE = re.compile(r"ImageBase: (0x[0-9A-Fa-f]+)")
 IMAGE_ALIGNMENT_MASK = ~0xFFFF  # Wine 以 64K 對齊載入 PE 映像
 
@@ -45,23 +44,6 @@ def load_regions(vmmap_file: Path) -> list[tuple[int, str]]:
 
 
 @functools.cache
-def symbols(dll: str) -> list[tuple[int, str]]:
-    """回傳依 VA 排序的 (VA, 符號名稱)。"""
-    # COFF 符號表的 section 編號從 1 起算，objdump -h 的 Idx 從 0 起算
-    section_va: dict[int, int] = {}
-    for line in llvm("llvm-objdump", "-h", dll).splitlines():
-        section = SECTION_HEADER.match(line)
-        if section:
-            section_va[int(section[1]) + 1] = int(section[4], 16)
-    found = []
-    for line in llvm("llvm-objdump", "--syms", dll).splitlines():
-        symbol = COFF_SYMBOL.search(line)
-        if symbol and int(symbol[1]) in section_va:
-            found.append((section_va[int(symbol[1])] + int(symbol[2], 16), symbol[3]))
-    return sorted(found)
-
-
-@functools.cache
 def image_base(dll: str) -> int:
     match = IMAGE_BASE.search(llvm("llvm-readobj", "--file-headers", dll))
     if not match:
@@ -69,25 +51,43 @@ def image_base(dll: str) -> int:
     return int(match[1], 16)
 
 
-def resolve(regions: list[tuple[int, str]], address: int) -> str:
+def to_va(regions: list[tuple[int, str]], address: int) -> tuple[str, int] | None:
+    """執行時位址 → (DLL, PE 檔內 VA)；不在任何 DLL 內時回傳 None。"""
     index = bisect.bisect_right(regions, (address, chr(0x10FFFF))) - 1
     if index < 0:
-        return "?"
+        return None
     lowest_mapping, dll = regions[index]
-    # 實際載入 base = 最低映射位址向下取 64K；換算成 PE 檔內的 VA 再查符號
-    va = address - (lowest_mapping & IMAGE_ALIGNMENT_MASK) + image_base(dll)
-    table = symbols(dll)
-    nearest = bisect.bisect_right(table, (va, chr(0x10FFFF))) - 1
-    name = f"{table[nearest][1]}+{va - table[nearest][0]:#x}" if nearest >= 0 else "?"
-    return f"{Path(dll).name}!{name}"
+    # 實際載入 base = 最低映射位址向下取 64K
+    return dll, address - (lowest_mapping & IMAGE_ALIGNMENT_MASK) + image_base(dll)
+
+
+def symbolize(dll: str, addrs: list[int]) -> list[str]:
+    """回傳各 VA 的「符號+偏移」（最近的前一個符號），找不到時為 "?"。"""
+    output = llvm("llvm-symbolizer", f"--obj={dll}", "--output-style=JSON", *map(hex, addrs))
+    names = []
+    for va, entry in zip(addrs, json.loads(output)):
+        symbol = entry["Symbol"][0]
+        start = symbol.get("StartAddress")
+        if symbol.get("FunctionName") and start:
+            names.append(f"{symbol['FunctionName']}+{va - int(start, 16):#x}")
+        else:
+            names.append("?")
+    return names
 
 
 def main(argv: list[str]) -> None:
     if len(argv) < 3:
         sys.exit(__doc__)
     regions = load_regions(Path(argv[1]))
-    for address in argv[2:]:
-        print(address, resolve(regions, int(address, 16)))
+    addresses = argv[2:]
+    located = [to_va(regions, int(address, 16)) for address in addresses]
+    by_dll: dict[str, list[int]] = {}
+    for found in located:
+        if found:
+            by_dll.setdefault(found[0], []).append(found[1])
+    names = {dll: dict(zip(addrs, symbolize(dll, addrs))) for dll, addrs in by_dll.items()}
+    for address, found in zip(addresses, located):
+        print(address, f"{Path(found[0]).name}!{names[found[0]][found[1]]}" if found else "?")
 
 
 if __name__ == "__main__":
