@@ -13,7 +13,7 @@ XCGUI.dll
 MapleStory.exe*
 *.wz
 
-# 診斷工具建置產物輸出到 build/tools/（tools/build.sh），已由 /build/ 涵蓋
+# 診斷工具與實驗的建置產物輸出到 build/tools/、build/experiments/，已由 /build/ 涵蓋
 
 # app 打包輸出（app/build-app.sh）
 /dist/

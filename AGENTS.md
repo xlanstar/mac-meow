@@ -16,6 +16,7 @@ Each fact lives in exactly one file. Link to it; do not copy it.
 - `docs/technical-notes.md`: root cause and evidence for each fix.
 - `docs/known-issues.md`: details of each known issue (symptom, workaround, cause, status); `README.md` keeps only a one-line user-visible summary per issue.
 - `patches/SOURCES.md`: Wine source and LGPL info for prebuilt DLLs.
+- `experiments/README.md`: experiment conventions and index.
 - `CHANGELOG.md`, `VERSION`: user-visible changes and release version.
 
 ## Hard rules
@@ -35,6 +36,7 @@ Each fact lives in exactly one file. Link to it; do not copy it.
 - Under `set -u`, expand possibly-empty arrays as `${a[@]+"${a[@]}"}`.
 - Brace variables next to CJK text (`"${name}：…"`); zh_TW locales otherwise read full-width characters as part of the name.
 - `scripts/` is the user flow (bundled into the app) and uses macOS built-ins only (no `python3`, Homebrew, Xcode). `tools/` is dev-only and may use Homebrew, uv, Xcode and `python3`; the user flow never calls it.
+- `experiments/` holds one-off, unmaintained experiments (one folder each, any third-party tool); `scripts/`, `app/` and `tools/` must never depend on it. Rules in `experiments/README.md`.
 - `app/` is a SwiftUI app (macOS 13+, Swift 5 language mode) compiled by `swiftc` in `app/build-app.sh`; Xcode or Command Line Tools are needed to build only, the product links system frameworks only. It is a UI shell: every action goes through `scripts/` (`play.sh status --porcelain`, `progress` markers, `play.sh stop`, `setup-loopback.sh`). Never reimplement script logic, engine/prefix paths or game file lists in Swift; extend the scripts instead. Layers in `app/Sources/` depend downward only (UI → Features → Services → Core): `Core/` is pure Foundation (no AppKit/SwiftUI) and unit-tested by `tools/test-app.sh`; `scripts/` are invoked only via `Services/Scripts.swift`.
 - Shared paths, constants and helpers live in `scripts/lib/common.sh` (user side) and `tools/lib.sh` (dev side). Source them; never redefine engine/prefix paths, game file lists or loopback IPs.
 - Scripts that change external state expose `check|apply|restore` through `cmd_<sub>` functions and exit 64 via `usage` on bad arguments; call other scripts with `run_script`. Settings come from `load_settings` (`MACMEOW_SETTINGS` in `common.sh`); never hard-code their defaults elsewhere.

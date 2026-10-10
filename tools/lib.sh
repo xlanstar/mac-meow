@@ -2,7 +2,8 @@
 # 開發工具共用設定。tools/*.sh 以 `source "$(cd "$(dirname "$0")" && pwd)/lib.sh"` 載入。
 # 建立在 scripts/lib/common.sh 之上（路徑、Cyder 設定、wineserver 操作、die、usage、wait_until），另外提供：
 #   ROOT / TOOLS_BIN / DEBUG_DIR、load_env、ok、usage_doc、need_cmd、out_dir、maple_pids、need_tool、in_terminal、
-#   run_wine、llvm_paths（LLVM 路徑）、APP_SWIFT_TARGET / app_sources（App 原始碼）
+#   run_wine、llvm_paths（LLVM 路徑）、nosdk_exe / NOSDK_MSVCRT（不需 SDK 的 Windows 程式）、
+#   APP_SWIFT_TARGET / app_sources（App 原始碼）
 [[ -n "${MACMEOW_TOOLS_LOADED:-}" ]] && return 0
 MACMEOW_TOOLS_LOADED=1
 
@@ -84,6 +85,36 @@ llvm_paths() {
     return 1
   }
   export LLVM_BIN LLD_BIN
+}
+
+# 不需 SDK 的 Windows 程式與 tools/src/wincrt/crt0.c 用到的 msvcrt 匯出
+# （puts：clang 會把不帶參數的 printf("...\n") 改成 puts）
+# shellcheck disable=SC2034  # tools/build.sh、experiments/build.sh 使用
+NOSDK_MSVCRT="msvcrt:printf puts strtoul _flushall __getmainargs exit"
+
+# nosdk_exe <來源.c> <輸出.exe> <dll:匯出 匯出...>...：clang-cl 編譯來源 + tools/src/wincrt/crt0.c，
+# 依清單以 llvm-dlltool 產生 import lib，lld-link 連結（不連預設函式庫）。中間檔在輸出旁的 obj/<名稱>/。
+nosdk_exe() {
+  local src="$1" out="$2"
+  shift 2
+  local name o spec dll sym libs=()
+  name="$(basename "$src" .c)"
+  o="$(dirname "$out")/obj/$name"
+  llvm_paths || return 1
+  mkdir -p "$o"
+  for spec in "$@"; do
+    dll="${spec%%:*}"
+    {
+      echo "LIBRARY $dll.dll"
+      echo EXPORTS
+      for sym in ${spec#*:}; do echo "$sym"; done
+    } >"$o/$dll.def"
+    "$LLVM_BIN/llvm-dlltool" -m i386:x86-64 -d "$o/$dll.def" -l "$o/$dll.lib" || return 1
+    libs+=("$o/$dll.lib")
+  done
+  "$LLVM_BIN/clang-cl" --target=x86_64-pc-windows-msvc /O1 /GS- /c "/Fo$o/" -- "$src" "$ROOT/tools/src/wincrt/crt0.c" || return 1
+  "$LLD_BIN/lld-link" /subsystem:console /entry:mainCRTStartup /nodefaultlib "/out:$out" \
+    "$o/$name.obj" "$o/crt0.obj" ${libs[@]+"${libs[@]}"}
 }
 
 # in_terminal <timeout 秒> <指令...>：在新的 Terminal.app 視窗執行指令並等待完成，印出其輸出、回傳其結束碼。

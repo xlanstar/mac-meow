@@ -4,50 +4,23 @@
 # 用法：bash tools/build.sh [目標...]   （不指定則建置全部；個別失敗不中斷，最後回報）
 #
 # macOS 工具（只需 Xcode clang）：
-#   machstack callchain memdump   原生 arm64，以 Mach API 讀 Rosetta 程序（src/machstack）
-#   symx86                        x86_64，在 Rosetta 下以 dladdr 解析 shared cache 符號
-#   smctest smctest2 smctest3     x86_64，Rosetta SMC（同頁寫入）成本重現
+#   machstack                原生 arm64，以 Mach API 讀 Rosetta 程序（src/machstack）
+#   symx86                   x86_64，在 Rosetta 下以 dladdr 解析 shared cache 符號
 # Windows 工具（brew install llvm lld）：
-#   wthreads.exe reloadtest.exe   不需 Windows SDK：自行宣告 API，以 llvm-dlltool 產生 import lib
-#   wgui.exe recvcheck.exe        使用 Wine 建置樹的標頭與 import lib（先執行 tools/build-wine-dlls.sh）
+#   wthreads.exe             不需 Windows SDK：自行宣告 API，以 llvm-dlltool 產生 import lib（lib.sh 的 nosdk_exe）
+#   wgui.exe recvcheck.exe   使用 Wine 建置樹的標頭與 import lib（先執行 tools/build-wine-dlls.sh）
 set -uo pipefail
 # shellcheck source=lib.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
 SRC="$ROOT/tools/src"
-OBJ="$TOOLS_BIN/obj"
-ALL=(machstack callchain memdump symx86 smctest smctest2 smctest3 wthreads.exe reloadtest.exe wgui.exe recvcheck.exe)
-# wthreads、reloadtest 與 wincrt/crt0.c 用到的 msvcrt 匯出（puts：clang 會把不帶參數的 printf("...\n") 改成 puts）
-MSVCRT="msvcrt:printf puts strtoul _flushall __getmainargs exit"
+ALL=(machstack symx86 wthreads.exe wgui.exe recvcheck.exe)
 
 # mac_tool <名稱> <來源目錄> [clang 參數...]
 mac_tool() {
   local name="$1" dir="$2"
   shift 2
   /usr/bin/clang -O1 "$@" -o "$TOOLS_BIN/$name" "$SRC/$dir/$name.c"
-}
-
-# nosdk_exe <名稱> <dll:匯出 匯出...>...：clang-cl 編譯 src/<名稱>/<名稱>.c + wincrt/crt0.c，
-# 依清單產生 import lib，lld-link 連結（不連預設函式庫）。
-nosdk_exe() {
-  local name="$1"
-  shift
-  local o="$OBJ/$name" spec dll sym libs=()
-  llvm_paths || return 1
-  mkdir -p "$o"
-  for spec in "$@"; do
-    dll="${spec%%:*}"
-    {
-      echo "LIBRARY $dll.dll"
-      echo EXPORTS
-      for sym in ${spec#*:}; do echo "$sym"; done
-    } >"$o/$dll.def"
-    "$LLVM_BIN/llvm-dlltool" -m i386:x86-64 -d "$o/$dll.def" -l "$o/$dll.lib" || return 1
-    libs+=("$o/$dll.lib")
-  done
-  "$LLVM_BIN/clang-cl" --target=x86_64-pc-windows-msvc /O1 /GS- /c "/Fo$o/" -- "$SRC/$name/$name.c" "$SRC/wincrt/crt0.c" || return 1
-  "$LLD_BIN/lld-link" /subsystem:console /entry:mainCRTStartup /nodefaultlib "/out:$TOOLS_BIN/$name.exe" \
-    "$o/$name.obj" "$o/crt0.obj" "${libs[@]}"
 }
 
 # winetree_exe <名稱> "<連結參數>" <Wine dll...>：以 Wine 建置樹的標頭與 import lib 建置。
@@ -69,16 +42,11 @@ winetree_exe() {
 
 build_one() {
   case "$1" in
-    machstack | callchain | memdump) mac_tool "$1" machstack -g -Wall ;;
+    machstack) mac_tool machstack machstack -g -Wall ;;
     symx86) mac_tool symx86 machstack -arch x86_64 ;;
-    smctest | smctest2 | smctest3) mac_tool "$1" smctest -arch x86_64 ;;
     wthreads.exe)
-      nosdk_exe wthreads "$MSVCRT" "ntdll:NtQueryInformationThread" \
+      nosdk_exe "$SRC/wthreads/wthreads.c" "$TOOLS_BIN/wthreads.exe" "$NOSDK_MSVCRT" "ntdll:NtQueryInformationThread" \
         "kernel32:CreateToolhelp32Snapshot Thread32First Thread32Next Module32FirstW Module32NextW OpenThread OpenProcess SuspendThread ResumeThread GetThreadContext ReadProcessMemory CloseHandle GetLastError"
-      ;;
-    reloadtest.exe)
-      nosdk_exe reloadtest "$MSVCRT" "ntdll:RtlGetVersion" \
-        "kernel32:LoadLibraryA FreeLibrary GetProcAddress CreateThread GetTickCount"
       ;;
     wgui.exe) winetree_exe wgui "-Wl,-entry:start -Wl,-subsystem:console" shell32 ucrtbase user32 gdi32 kernel32 ;;
     recvcheck.exe) winetree_exe recvcheck "-Wl,-entry:main" ws2_32 kernel32 ucrtbase ;;

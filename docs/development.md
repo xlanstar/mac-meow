@@ -86,17 +86,16 @@ bash tools/build-wine-dlls.sh
 
 堆疊與效能：
 
-- `tools/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack、callchain、memdump、LLDB 需要），用完執行 `restore`。
+- `tools/sign-debug.sh status|apply|restore`：替 engine 的 `wine` 加 `get-task-allow`（machstack、LLDB 需要），用完執行 `restore`。
 - `tools/stack.sh mach|prof|lldb|sample`：擷取執行中 `MapleStory.exe` 的堆疊。`mach` 以 Mach API 讀 Rosetta 執行緒的原生／x86 狀態並解析符號；`prof` 多次快照統計 CPU 與呼叫鏈；`lldb` 附加後擷取原生堆疊；`sample` 為 macOS `sample`。`mach`、`prof` 需要 `python3`。
 - `build/tools/symx86`（x86_64，在 Rosetta 下以 `dladdr` 解析 shared cache 符號）、`tools/src/machstack/symbolize.py`（替 machstack 輸出補符號）、`machprof.py`（`prof` 的統計）：由 `stack.sh` 呼叫。
-- `build/tools/callchain <pid> <次數>`：只取樣 CPU 最高的執行緒，只輸出可信的返回位址；無入口腳本。
-- `build/tools/memdump <pid> <addr-hex> <len>`：讀記憶體字串。
 - `tools/src/machstack/pesym.py <區段檔> <addr...>`：Wine PE 位址轉函式名；區段檔取自 vmmap（每行「起點 路徑」），需要 LLVM（`LLVM_BIN`）。
 
 重現與驗證：
 
-- `smctest`、`smctest2`、`smctest3`：Rosetta 同頁寫入（SMC）成本。
-- `wthreads.exe`、`reloadtest.exe`、`recvcheck.exe`：Wine 執行緒狀態、rsaenh 重載、recv 修補。在 bottle 內執行：`bash -c 'source tools/lib.sh && run_wine build/tools/wthreads.exe <pid-hex> [n] [tid-hex]'`；`<pid-hex>` 是 Wine 內的 Windows PID；`n` 只查 suspend count、不暫停執行緒；`tid-hex` 只查該執行緒。
+- `wthreads.exe`、`recvcheck.exe`：Wine 執行緒狀態、recv 修補的回歸檢查。在 bottle 內執行：`bash -c 'source tools/lib.sh && run_wine build/tools/wthreads.exe <pid-hex> [n] [tid-hex]'`；`<pid-hex>` 是 Wine 內的 Windows PID；`n` 只查 suspend count、不暫停執行緒；`tid-hex` 只查該執行緒。
+
+一次性實驗見 [experiments/README.md](../experiments/README.md)。
 
 ## Rosetta 除錯要點
 

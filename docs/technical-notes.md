@@ -54,7 +54,7 @@
   - LLDB 取樣：遊戲世界中主執行緒 78% 時間在 `.themida`（Themida 虛擬機）。
   - VM 每次進出寫入鎖變數 `0x14aa316a4`（watchpoint 確認寫入指令 `0x14ae588a6` 等），它與 VM handler 跳躍表程式碼（`0x14aa31cae`…）同在 4 KB 頁 `0x14aa31000`。
   - 熱鬧城鎮（頻道 1）對比人少地方：VM 鎖切換 23,000 對 7,500 次/秒；page fault 75,000 對 13,700 次/秒；主執行緒 CPU 約 100% 對 32%；Rosetta exceptionserver CPU 21.5% 對 4.3%。
-  - `tools/src/smctest`：程式碼與頻繁寫入的變數同頁時慢約 11,500 倍。
+  - `experiments/smc-same-page`：程式碼與頻繁寫入的變數同頁時慢約 11,500 倍。
 - 根因：x86 CPU 以快取行偵測自我修改程式碼，不同行就沒有成本；Rosetta 以整頁保護已翻譯的程式碼，每次寫入都要「例外、讓翻譯失效、重新翻譯、重新保護」。VM 呼叫次數與畫面上的玩家、特效數量成正比。
 - 已試無效：Rosetta 隱藏環境變數（`ROSETTA_*`、`CAMBRIA_*`）、MAP_JIT、一般 RWX、共享或檔案映射、不可執行頁。
 - 結論：根治需改動遊戲記憶體，會碰到 Themida/NGS 防外掛，不採用。使用者只能避開人多的頻道與地圖。

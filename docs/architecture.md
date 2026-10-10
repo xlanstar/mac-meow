@@ -59,6 +59,7 @@ App（SwiftUI；建置需要 Xcode 或 Command Line Tools，執行時只用系�
 
 - `tools/*.sh`：啟動、診斷、自動化、DLL 重建、發佈（`release.sh`）；共用函式在 `tools/lib.sh`。
 - `tools/src/<name>/`：診斷工具原始碼，以 `tools/build.sh` 建置到 `build/tools/`。
+- `experiments/`：一次性實驗，見 [experiments/README.md](../experiments/README.md)。
 - `patches/*.patch`：Wine 原始碼修補；`patches/bin/`：預先建置的 DLL 與 `SHA256SUMS`。
 
 ## 外部狀態
