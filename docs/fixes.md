@@ -136,6 +136,19 @@
 - 可能的修正：`EditMenu` 設成 `key` 或 `message` 以外的值，這個功能就會關閉。關閉後，⌘A 會照常以 Alt＋A 送給遊戲。可以只對楓之谷設定：`HKCU\Software\Wine\AppDefaults\MapleStory.exe\Mac Driver` 的 `EditMenu="n"`。這個值在程序啟動時讀取，設定後要重開遊戲才會生效。這是 repo 以外的狀態，實作時要依 `AGENTS.md` Hard rule 3 處理，並列入 [external-state.md](external-state.md#清單)。
 - 狀態：未修正。
 
+## 15. 網路瞬斷後遊戲斷線、通道變 3/4（未解）
+
+- 症狀：遊戲中 Wi-Fi 被基地台斷開約 5 秒後自動重連（IP 不變），遊戲斷線，App 的連線通道顯示 3/4。
+- 證據：
+  - 系統記錄：基地台以 Deauth（subreason 34）斷開，`configd` 移除本機 IP；0.3 秒後、Wi-Fi 重新連上之前，一個 HostShield 正常結束（CoreAnalytics exit handler，不是當機），其餘 3 個存活。結束的是第一個 HostShield，推定是遊戲連線經過的 `127.145.37.1`（Wine 的 socket 屬於 wineserver，`lsof` 無法對應到程序）。
+  - HostShield 是以 pkg 打包的 Node.js 程式（socket.io v3 client），透過 Winsock 的 overlapped I/O 收送。
+  - `experiments/net-blip`（關閉 Wi-Fi 6 秒，系統同樣移除 IP 後以相同 IP 重連）：原生與 Wine 內的連線在中斷期間 `send` 都沒有錯誤、`SO_ERROR` 為 0，重連後繼續收到回應。同次實驗中 macOS 自動改連另一個網路（IP 改變）：舊連線同樣沒有任何錯誤，只是不再收到資料。
+- 結論：
+  - 系統與 Wine 的 socket 層在網路瞬斷時不會回報錯誤，連線本身可以撐過去；HostShield 結束是應用程式層的決定（遊戲或 HostShield 自己的逾時，未查明是哪一個）。
+  - 因此「Wine 端遇到暫時性網路錯誤就重送」的修補沒有作用，不採用。Wine 的送出路徑在 Cyder 修改過的 `ntdll.so`，本專案也無法重建。
+  - 換網路（IP 改變）時 TCP 連線必然中斷，伺服器端的遊戲階段跟著結束，只在 macOS 端無法解決。
+- 下一步（若要繼續）：遊戲執行中以 `run.sh` 不同的關閉秒數重現，分辨是遊戲先斷開本機連線、還是 HostShield 自行逾時；或在 HostShield 結束後自動以相同參數重新啟動，讓使用者不必整組重開。
+
 ## 其他觀察
 
 - 官方 `Patcher.exe` 曾被觸發一次，把 `MapleStory.exe` 換成官方 6.282.5.0，伺服器回報「不正確的版本」。觸發者未查明，之後未再發生。

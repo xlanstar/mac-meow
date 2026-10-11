@@ -7,7 +7,7 @@ set -uo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/tools/lib.sh"
 
 # 新實驗：加進 ALL 與 build_one 的 case；macOS 程式用 mac_bins，Windows 程式用 tools/lib.sh 的 win_exe。
-ALL=(smc-same-page rsaenh-reload rosetta-probes)
+ALL=(smc-same-page rsaenh-reload rosetta-probes net-blip)
 
 # mac_bins <輸出目錄> <來源目錄> <clang 參數> <名稱...>
 mac_bins() {
@@ -26,6 +26,7 @@ build_one() {
     smc-same-page) mac_bins "$out" "$src" "-arch x86_64" smctest smctest2 smctest3 ;;
     rosetta-probes) mac_bins "$out" "$src" "-g -Wall" callchain memdump ;;
     rsaenh-reload) win_exe "$src/reloadtest.c" "$out/reloadtest.exe" ;;
+    net-blip) mac_bins "$out" "$src" "-Wall" blip && win_exe "$src/blip.c" "$out/blip.exe" -lws2_32 ;;
     *)
       echo "未知實驗：$1（可用：${ALL[*]}）" >&2
       return 1
