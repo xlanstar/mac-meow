@@ -10,6 +10,7 @@
 ## 清單
 
 - [smc-same-page](smc-same-page/)：Rosetta 同頁寫入（SMC）成本（#9）。
+- [smc-cost](smc-cost/)：SMC 成本的組成、可調因素，與唯讀觀察遊戲 SMC 速率（#9）。
 - [rsaenh-reload](rsaenh-reload/)：rsaenh.dll 反覆載入／卸載是否卡死（#7）。
 - [rosetta-probes](rosetta-probes/)：熱執行緒呼叫鏈取樣、讀記憶體字串。
 - [net-blip](net-blip/)：網路瞬斷、換網路時 TCP 連線的錯誤與存活（#15）。
