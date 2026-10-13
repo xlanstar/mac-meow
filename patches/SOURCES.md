@@ -8,6 +8,7 @@
 - 修補：
   - `wsock32-distinct-recv.patch`（wsock32!recv 獨立化）
   - `advapi32-pin-csp.patch`（CSP 常駐）
+  - `mpg123-shared-dither.patch`（l3codeca.acm：MP3 解碼器共用 dither 表）
 - 目標 engine：Cyder `CX26.3.0-W11-Cyder012`（CrossOver 26.3.0 / Wine 11.0 基底）
 - 重建：`bash tools/dev/build-wine-dlls.sh`
 - 校驗：`bin/SHA256SUMS`

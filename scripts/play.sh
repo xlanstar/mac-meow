@@ -126,7 +126,8 @@ cmd_start() {
 
   # 3. Cyder engine 修補（Wine 執行中會拒絕套用）
   #    wineserver：關閉 127.x bind→127.0.0.1 改寫（否則 4 個 HostShield 互搶 port 全部退出）
-  #    DLL：wsock32（recv hook 無限遞迴凍結）、advapi32（rsaenh 常駐，避免遊戲內 <1 FPS）
+  #    DLL：wsock32（recv hook 無限遞迴凍結）、advapi32（rsaenh 常駐，避免遊戲內 <1 FPS）、
+  #    l3codeca.acm（MP3 解碼器共用 dither 表，避免打怪時的音效卡頓）
   progress patch "檢查 Cyder engine 修補 ..."
   run_script patch-cyder-loopback.sh check >/dev/null 2>&1 || run_script patch-cyder-loopback.sh apply
   run_script patch-cyder-dlls.sh check >/dev/null 2>&1 || run_script patch-cyder-dlls.sh apply

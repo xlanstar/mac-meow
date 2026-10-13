@@ -1,6 +1,6 @@
 #!/bin/bash
-# 從 CrossOver 原始碼（版本見 CX_VER）重建 patches/bin/x86_64-windows/ 的修補版 Wine DLL（wsock32、advapi32）。
-# 只建置需要的 PE 模組（不建整個 Wine）。產物會覆寫 patches/bin/x86_64-windows/*.dll。
+# 從 CrossOver 原始碼（版本見 CX_VER）重建 patches/bin/x86_64-windows/ 的修補版 Wine PE 模組（MODULES）。
+# 只建置需要的 PE 模組（不建整個 Wine）。產物會覆寫 patches/bin/x86_64-windows/ 內的同名檔案。
 #
 # 需求：Xcode（/usr/bin/clang，x86_64 host 編譯經 Rosetta）、Homebrew：llvm lld bison（brew bundle）
 # 用法：bash tools/dev/build-wine-dlls.sh
@@ -17,7 +17,7 @@ CX_SHA256=ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872
 SRC="$B/src/sources/wine"
 OBJ="$B/wine64"
 DST="$ROOT/patches/bin/x86_64-windows"
-MODULES=(wsock32 advapi32) # 新增修補時在此加入模組
+MODULES=(wsock32 advapi32 l3codeca.acm) # 新增修補時在此加入模組（沒有副檔名的是 .dll）
 
 llvm_paths || exit 1
 [[ -x "$BISON_BIN/bison" ]] || die "缺少 bison（${BREW_HINT}）"
@@ -54,9 +54,11 @@ fi
 # 4. 建置並去除除錯資訊
 mkdir -p "$DST"
 for m in "${MODULES[@]}"; do
-  (cd "$OBJ" && arch -x86_64 make -j"$(sysctl -n hw.ncpu)" "dlls/$m/x86_64-windows/$m.dll")
-  "$LLVM_BIN/llvm-strip" --strip-debug -o "$DST/$m.dll" "$OBJ/dlls/$m/x86_64-windows/$m.dll"
-  echo "完成：patches/bin/x86_64-windows/$m.dll"
+  file="$m"
+  [[ "$m" == *.* ]] || file="$m.dll"
+  (cd "$OBJ" && arch -x86_64 make -j"$(sysctl -n hw.ncpu)" "dlls/$m/x86_64-windows/$file")
+  "$LLVM_BIN/llvm-strip" --strip-debug -o "$DST/$file" "$OBJ/dlls/$m/x86_64-windows/$file"
+  echo "完成：patches/bin/x86_64-windows/$file"
 done
 echo "SHA-256（與 patches/bin/SHA256SUMS 比對；有變更時更新該檔與 patches/SOURCES.md）："
-(cd "$DST" && /usr/bin/shasum -a 256 *.dll)
+(cd "$DST" && /usr/bin/shasum -a 256 -- *)

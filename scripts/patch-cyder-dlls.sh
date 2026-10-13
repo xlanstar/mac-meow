@@ -1,7 +1,8 @@
 #!/bin/bash
-# 以 patches/bin/x86_64-windows/ 的修補版 Wine DLL 取代 Cyder engine 內建版（docs/fixes.md #6、#7）：
+# 以 patches/bin/x86_64-windows/ 的修補版 Wine PE 模組取代 Cyder engine 內建版（docs/fixes.md #6、#7、#16）：
 #   wsock32.dll   patches/wsock32-distinct-recv.patch：wsock32!recv 獨立化，避免 recv hook 無限遞迴（遊戲凍結）
 #   advapi32.dll  patches/advapi32-pin-csp.patch：CSP（rsaenh.dll）載入後常駐，避免反覆重新映射（嚴重卡頓）
+#   l3codeca.acm  patches/mpg123-shared-dither.patch：MP3 解碼器共用 dither 表，不在每次開串流時重建（打怪時卡頓）
 # DLL 由 REQUIRED_BASE 版本的 CrossOver 原始碼建置（tools/dev/build-wine-dlls.sh），只套用到同一基底版本的 engine。
 #
 # 用法：bash scripts/patch-cyder-dlls.sh check|apply|restore
@@ -26,7 +27,7 @@ verify_sources() {
 
 cmd_check() {
   local src name dst rc=0
-  for src in "$SRC_DIR"/*.dll; do
+  for src in "$SRC_DIR"/*; do
     name="${src##*/}"
     dst="$DST_DIR/$name"
     if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then echo "${name}：已套用"; else
@@ -47,7 +48,7 @@ cmd_apply() {
     return 0
   }
   require_wine_stopped "套用 DLL 修補"
-  for src in "$SRC_DIR"/*.dll; do
+  for src in "$SRC_DIR"/*; do
     name="${src##*/}"
     dst="$DST_DIR/$name"
     bak="$dst.macmeow-orig"
@@ -71,7 +72,7 @@ cmd_apply() {
 # 目前檔案雜湊等於 *.macmeow-applied（本專案裝上去的版本）時才寫回備份。
 cmd_restore() {
   local bak dst name mark
-  for bak in "$DST_DIR"/*.dll.macmeow-orig; do
+  for bak in "$DST_DIR"/*.macmeow-orig; do
     [[ -f "$bak" ]] || {
       echo "DLL 修補：無備份"
       return 0

@@ -1,6 +1,6 @@
 #!/bin/bash
 # 移除本專案對系統與 Cyder 所做的所有變更（不刪除遊戲、Cyder 或其設定）。編號是分組，不是執行順序（見 cmd_system）：
-#   1. 還原 Cyder engine：wineserver（loopback 修補）、wsock32.dll／advapi32.dll、winemac.so（Dock 圖示）、
+#   1. 還原 Cyder engine：wineserver（loopback 修補）、修補的 Wine DLL（patch-cyder-dlls.sh）、winemac.so（Dock 圖示）、
 #      開發用除錯簽章（tools/diag/sign-debug.sh）；刪除 shared bottle 登錄中登入器的 Dock 圖示設定
 #   2. 還原 Cyder 全域設定的原值，加回遊戲資料夾的下載隔離標記
 #   3. 移除 lo0 位址與 LaunchDaemon（需要管理員密碼；只有這一步以 root 執行 setup-loopback.sh）

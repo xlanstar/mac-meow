@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands.
 
 ## Unreleased
 
+- Wine 修補：MP3 音效解碼器不再每次播放都重建 dither 表，減輕打怪、撿道具時的卡頓
+
 ## 0.4.0 — 2026-10-10
 
 - `MacMeow.app` 的「已知問題」改為開啟已知問題與解法文件，並可另外查看已回報的問題

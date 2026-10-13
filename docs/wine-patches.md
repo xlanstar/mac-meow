@@ -6,7 +6,7 @@
 
 ```sh
 just build-wine-dlls
-(cd patches/bin/x86_64-windows && shasum -a 256 *.dll) > patches/bin/SHA256SUMS
+(cd patches/bin/x86_64-windows && shasum -a 256 -- *) > patches/bin/SHA256SUMS
 ```
 
 步驟、版本與需求見 `tools/dev/build-wine-dlls.sh` 開頭與各步驟註解。

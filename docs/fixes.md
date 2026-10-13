@@ -149,6 +149,12 @@
   - 換網路（IP 改變）時 TCP 連線必然中斷，伺服器端的遊戲階段跟著結束，只在 macOS 端無法解決。
 - 下一步（若要繼續）：遊戲執行中以 `run.sh` 不同的關閉秒數重現，分辨是遊戲先斷開本機連線、還是 HostShield 自行逾時；或在 HostShield 結束後自動以相同參數重新啟動，讓使用者不必整組重開。
 
+## 16. 打怪、撿道具時的音效卡頓（MP3 解碼器每次重建 dither 表）
+
+- 證據：`just stack hitch 60`（打怪、撿道具）中主執行緒 4–5% 的取樣在 `l3codeca.acm!mpg123_new` → `INT123_frame_init_par` → `INT123_frame_cpu_opt` → `INT123_frame_dither_init`，經 `winmm`／`msacm32` 從遊戲的 `Sound.dll` 呼叫；約每秒 7 群、每群 5–40 ms，超過 100 ms 的幀有三分之二含有它。城鎮站著不動時為 0。
+- 根因：Wine 以 `OPT_GENERIC_DITHER` 建置 libmpg123，`l3codeca.acm` 每開一個 ACM 串流就 `mpg123_new`，每個 handle 都重新配置 256 KB 並以 8 階 IIR 濾波產生 65,536 筆雜訊表。遊戲每個音效都開一個串流。
+- 修補：`patches/mpg123-shared-dither.patch`：雜訊表只由固定種子決定，所有 handle 共用一份（第一次產生，以 atomic compare-and-swap 發布，handle 結束時不釋放）。以同一份 libmpg123 原始碼建置的 x86_64 程式在 Rosetta 下量測：`mpg123_new` + `mpg123_delete` 0.596 → 0.002 ms；以 feed 方式（同 `l3codeca.acm`）解碼同一個 MP3 兩次，輸出 PCM 逐位元組相同。
+
 ## 其他觀察
 
 - 官方 `Patcher.exe` 曾被觸發一次，把 `MapleStory.exe` 換成官方 6.282.5.0，伺服器回報「不正確的版本」。觸發者未查明，之後未再發生。

@@ -1,0 +1,56 @@
+--- a/libs/mpg123/src/libmpg123/frame.c
++++ b/libs/mpg123/src/libmpg123/frame.c
+@@ -144,17 +144,33 @@
+ }
+ 
+ #ifdef OPT_DITHER
+-/* Also, only allocate the memory for the table on demand.
+-   In future, one could create special noise for different sampling frequencies(?). */
++/* The noise table only depends on a fixed seed, so all handles share one copy.
++   Generating it (65536 samples through an 8th order IIR filter) on every
++   mpg123_new() is slow under emulation when an application opens a decoder
++   for each sound effect. The table is read-only after creation and is kept
++   until the process exits. */
++static float *shared_dithernoise;
++
+ int INT123_frame_dither_init(mpg123_handle *fr)
+ {
+ 	/* run-time dither noise table generation */
+ 	if(fr->dithernoise == NULL)
+ 	{
+-		fr->dithernoise = malloc(sizeof(float)*DITHERSIZE);
+-		if(fr->dithernoise == NULL) return 0;
+-
+-		INT123_dither_table_init(fr->dithernoise);
++		float *table = __atomic_load_n(&shared_dithernoise, __ATOMIC_ACQUIRE);
++		if(table == NULL)
++		{
++			float *expected = NULL;
++			table = malloc(sizeof(float)*DITHERSIZE);
++			if(table == NULL) return 0;
++			INT123_dither_table_init(table);
++			if(!__atomic_compare_exchange_n(&shared_dithernoise, &expected, table, 0,
++				__ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
++			{
++				free(table);
++				table = expected;
++			}
++		}
++		fr->dithernoise = table;
+ 	}
+ 	return 1;
+ }
+@@ -604,11 +620,8 @@
+ 	INT123_fi_exit(&fr->index);
+ #endif
+ #ifdef OPT_DITHER
+-	if(fr->dithernoise != NULL)
+-	{
+-		free(fr->dithernoise);
+-		fr->dithernoise = NULL;
+-	}
++	/* shared_dithernoise: not owned by the handle */
++	fr->dithernoise = NULL;
+ #endif
+ 	INT123_exit_id3(fr);
+ 	INT123_clear_icy(&fr->icy);
