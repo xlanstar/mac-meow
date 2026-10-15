@@ -5,6 +5,7 @@ List each change under `## Unreleased` as it lands.
 
 ## Unreleased
 
+- `MacMeow.app` 的 bundle ID 改為 `dev.lanstar.macmeow`（迴路位址的 LaunchDaemon 改為 `dev.lanstar.macmeow.loopback`）：舊版無法一鍵更新到此版，請重新下載安裝；視窗位置與檢查更新設定會回到預設
 - Wine 修補：MP3 音效解碼器不再每次播放都重建 dither 表，減輕打怪、撿道具時的卡頓
 
 ## 0.4.0 — 2026-10-10

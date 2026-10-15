@@ -85,7 +85,7 @@ validate_settings() {
 # 一鍵更新（update.sh）只從這個 repo 的 Release 下載，且新版必須符合 MACMEOW_REQUIREMENT；
 # release.sh 發佈前也以此驗證。App 端的網址在 app/Sources/Services/AppPaths.swift，改 repo 時一起改。
 MACMEOW_REPO="xlanstar/mac-meow"
-MACMEOW_BUNDLE_ID="tw.macmeow.launcher"
+MACMEOW_BUNDLE_ID="dev.lanstar.macmeow"
 MACMEOW_TEAM_ID="LJJN3L2PS6"
 # 官方版的簽章需求（codesign -R，即 Developer ID 的 designated requirement）：Apple 簽發的
 # Developer ID Application 憑證、Team ID 與 bundle id 都要符合；只看 TeamIdentifier 欄位可被自簽憑證偽造。

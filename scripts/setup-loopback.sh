@@ -14,7 +14,7 @@ set -euo pipefail
 # shellcheck source=lib/common.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/common.sh"
 
-LABEL="tw.macmeow.loopback"
+LABEL="dev.lanstar.macmeow.loopback"
 PLIST="/Library/LaunchDaemons/$LABEL.plist"
 
 need_root() {

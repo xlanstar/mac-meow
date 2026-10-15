@@ -28,20 +28,20 @@ cask "macmeow" do
 
   # quit 先於 script：App 結束後才刪除它的設定。brew upgrade／reinstall 也會執行這個區塊，
   # 這時 uninstall.sh cask 什麼都不做（見 scripts/uninstall.sh）。相對路徑以 staged_path 解析。
-  uninstall quit:   "tw.macmeow.launcher",
+  uninstall quit:   "dev.lanstar.macmeow",
             script: {
               executable: "scripts/uninstall.sh",
               args:       ["cask"],
             }
 
-  zap launchctl: "tw.macmeow.loopback",
-      delete:    "/Library/LaunchDaemons/tw.macmeow.loopback.plist",
+  zap launchctl: "dev.lanstar.macmeow.loopback",
+      delete:    "/Library/LaunchDaemons/dev.lanstar.macmeow.loopback.plist",
       trash:     [
         "~/Library/Application Support/MacMeow",
         "~/Library/Caches/MacMeow",
         "~/Library/Logs/MacMeow",
-        "~/Library/Preferences/tw.macmeow.launcher.plist",
-        "~/Library/Saved Application State/tw.macmeow.launcher.savedState",
+        "~/Library/Preferences/dev.lanstar.macmeow.plist",
+        "~/Library/Saved Application State/dev.lanstar.macmeow.savedState",
       ]
 
   caveats <<~EOS
