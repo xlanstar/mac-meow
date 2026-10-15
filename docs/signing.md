@@ -14,7 +14,7 @@ Developer ID 簽章與 Apple 公證的一次性設定、`build-app.sh` 的簽章
    - 確認：`security find-identity -v -p codesigning`。
 2. 在 [appleid.apple.com](https://appleid.apple.com) 建立 App 專用密碼，存成 notarytool profile：
    ```sh
-   xcrun notarytool store-credentials macmeow-notary --apple-id <Apple ID> --team-id <Team ID> --password <App 專用密碼>
+   xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <Team ID> --password <App 專用密碼>
    ```
 3. `cp .env.example .env`，填入 `MACMEOW_SIGN_ID` 與 `MACMEOW_NOTARY_PROFILE`（第 2 步的 profile 名稱）；各鍵說明見 `.env.example`。`.env` 已列入 `.gitignore`，不提交。
    - 已存在的環境變數優先於 `.env`（`tools/lib.sh` 的 `load_env`），例如 `MACMEOW_NOTARY_PROFILE= bash app/build-app.sh` 只簽章不公證。
