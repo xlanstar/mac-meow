@@ -106,13 +106,28 @@ notarize() {
   exit 1
 }
 
+# staple <檔案>：釘上公證票證。剛公證完時 Apple 端的票證可能尚未同步，stapler 會回傳非 0
+# （CI 實測 exit 68），所以間隔漸增重試（共約 2.5 分鐘）；最後一次不加 -q，失敗原因才會出現在 log。
+# staple 釘完會自行驗證（失敗回傳非 0），不必再跑 stapler validate。
+staple() {
+  local i
+  for i in 1 2 3 4; do
+    xcrun stapler staple -q "$1" && return
+    echo "公證票證尚未就緒，$((i * 15)) 秒後重試⋯" >&2
+    sleep $((i * 15))
+  done
+  xcrun stapler staple "$1" || {
+    echo "無法釘上公證票證：$(basename "$1")" >&2
+    exit 1
+  }
+}
+
 # 先公證 App 並把票證釘進 App（離線也能通過 Gatekeeper），再放進 dmg；
 # dmg 的雜湊與 App 不同，所以 dmg 另外簽章、公證並釘上票證。
 if [[ -n "$NOTARY_PROFILE" ]]; then
   ditto -c -k --sequesterRsrc --keepParent "$APP" "$WORK/MacMeow-notarize.zip"
   notarize "$WORK/MacMeow-notarize.zip"
-  # staple 釘完會自行驗證（失敗回傳非 0），不必再跑 stapler validate
-  xcrun stapler staple -q "$APP"
+  staple "$APP"
 fi
 
 # retry <次數> <指令...>：hdiutil／diskutil 偶爾回報 Resource busy（CI 常見），失敗時稍候重試
@@ -244,7 +259,7 @@ if [[ -n "$SIGN_ID" ]]; then
 fi
 if [[ -n "$NOTARY_PROFILE" ]]; then
   notarize "$DMG"
-  xcrun stapler staple -q "$DMG"
+  staple "$DMG"
 fi
 
 if [[ -n "$NOTARY_PROFILE" ]]; then
