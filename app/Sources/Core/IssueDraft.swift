@@ -29,8 +29,7 @@ enum BugCategory: String, CaseIterable, Identifiable {
 }
 
 /// 開啟回報視窗時帶入的內容（例如啟動失敗的訊息）。
-struct BugReportContext: Identifiable {
-    let id = UUID()
+struct BugReportContext {
     var category: BugCategory?
     var details = ""
 }

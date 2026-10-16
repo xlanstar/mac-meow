@@ -1,4 +1,4 @@
-/// 首頁顯示的流程階段。
+/// 選單顯示的流程階段。
 enum LaunchPhase: Equatable {
     case idle
     /// 腳本執行中；`step` 是清單上正在處理的項目（顯示轉圈）。

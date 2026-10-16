@@ -1,6 +1,6 @@
 import Combine
 
-/// 首頁與選單列共用的顯示內容，在狀態、流程或設定改變時重新推導。
+/// 選單與選單列圖示的顯示內容，在狀態、流程或設定改變時重新推導。
 @MainActor
 final class HomeModel: ObservableObject {
     @Published private(set) var presentation = HomePresentation()

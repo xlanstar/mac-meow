@@ -74,6 +74,8 @@ cat >"$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleLocalizations</key><array><string>zh-Hant</string></array>
   <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <!-- 只在選單列（MenuBarExtra），沒有 Dock 圖示；「回報問題」視窗開著時 App 暫時切成一般 App -->
+  <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>MIT License（Wine 修補為 LGPL-2.1-or-later）</string>
 </dict>

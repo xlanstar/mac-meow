@@ -79,7 +79,7 @@ enum Step: String, CaseIterable, Identifiable {
     case cyder, prefix, gameDir, loopback, patch, vb6, tunnels
 
     var id: String { rawValue }
-    /// 首頁「環境檢查」顯示的項目（連線通道另外以進度條顯示）。
+    /// 「環境檢查」選單顯示的項目（連線通道另外顯示在選單的狀態列）。
     static let checklist: [Step] = [.cyder, .prefix, .gameDir, .loopback, .patch, .vb6]
 
     /// play.sh 的 `progress <id>` → 清單項目；沒有對應項目時為 nil。
@@ -101,18 +101,6 @@ enum Step: String, CaseIterable, Identifiable {
         case .patch: return "Wine 修補"
         case .vb6: return "VB6 執行環境"
         case .tunnels: return "連線通道"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .cyder: return "shippingbox"
-        case .prefix: return "macwindow"
-        case .gameDir: return "folder"
-        case .loopback: return "network"
-        case .patch: return "bandage"
-        case .vb6: return "puzzlepiece.extension"
-        case .tunnels: return "point.3.connected.trianglepath.dotted"
         }
     }
 }

@@ -97,7 +97,7 @@ cmd_purge() {
   fi
   rm -rf "$MACMEOW_SUPPORT" "$MACMEOW_LOGS" "$MACMEOW_CACHE" \
     "$HOME/Library/Saved Application State/$MACMEOW_BUNDLE_ID.savedState"
-  # SwiftUI 視窗位置與檢查更新設定（MACMEOW_BUNDLE_ID 的偏好設定）
+  # 檢查更新等設定（MACMEOW_BUNDLE_ID 的偏好設定）
   /usr/bin/defaults delete "$MACMEOW_BUNDLE_ID" >/dev/null 2>&1 || true
   echo "已刪除 MacMeow.app 的設定與記錄"
   # 由 stage 複製出來執行時刪除自己（整段已讀進記憶體）

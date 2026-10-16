@@ -63,7 +63,7 @@ doctor *args:
 build-wine-dlls *args:
     @bash tools/dev/build-wine-dlls.sh "$@"
 
-# 產生 repo 圖片：[--update-readme] [App 視窗截圖.png]
+# 產生 repo 圖片：[--update-readme]
 [group('dev')]
 repo-images *args:
     @bash tools/dev/repo-images.sh "$@"

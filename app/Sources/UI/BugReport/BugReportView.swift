@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// 「回報問題」視窗。
+/// 「回報問題」視窗的內容（視窗見 `BugReportWindow`）。
 struct BugReportView: View {
     @StateObject private var reporter: BugReporter
-    @Environment(\.dismiss) private var dismiss
+    /// 關閉視窗。
+    private let close: () -> Void
 
-    init(context: BugReportContext, env: [String: String]) {
+    init(context: BugReportContext, env: [String: String], close: @escaping () -> Void) {
         _reporter = StateObject(wrappedValue: BugReporter(context: context, env: env))
+        self.close = close
     }
 
     var body: some View {
@@ -17,7 +19,7 @@ struct BugReportView: View {
                 .padding(.bottom, 14)
             Divider()
             if case .done(let zip) = reporter.stage {
-                DoneView(reporter: reporter, zip: zip) { dismiss() }
+                DoneView(reporter: reporter, zip: zip, close: close)
             } else {
                 ScrollView { form.padding(22) }
                 Divider()
@@ -140,7 +142,7 @@ struct BugReportView: View {
             .help("沒有 GitHub 帳號時，可以複製後貼給協助你的人")
             .disabled(reporter.draft.environment == nil)
             Spacer()
-            Button("取消") { dismiss() }
+            Button("取消", action: close)
                 .keyboardShortcut(.cancelAction)
             Button {
                 Task { await reporter.submit() }

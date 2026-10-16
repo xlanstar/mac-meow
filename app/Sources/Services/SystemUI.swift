@@ -1,6 +1,6 @@
 import AppKit
 
-/// NSAlert（有視窗時以 sheet 顯示）。
+/// NSAlert，一律以獨立的對話框顯示：App 只在選單列，沒有可以掛 sheet 的主視窗。
 @MainActor
 enum Dialog {
     /// 回傳按下的按鈕索引。
@@ -15,14 +15,8 @@ enum Dialog {
         alert.alertStyle = style
         for title in buttons { alert.addButton(withTitle: title) }
         if destructive { alert.buttons.first?.hasDestructiveAction = true }
-        let response: NSApplication.ModalResponse
-        if let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeKey }) {
-            response = await withCheckedContinuation { continuation in
-                alert.beginSheetModal(for: window) { continuation.resume(returning: $0) }
-            }
-        } else {
-            response = alert.runModal()
-        }
+        bringAppToFront()
+        let response = alert.runModal()
         return response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
     }
 
@@ -33,8 +27,15 @@ enum Dialog {
         alert.informativeText = message
         alert.addButton(withTitle: cancel)
         alert.addButton(withTitle: confirm)
+        bringAppToFront()
         return alert.runModal() == .alertSecondButtonReturn
     }
+}
+
+/// 選單列 App 沒有 Dock 圖示，不會因為顯示對話框就到前景；不先啟用的話對話框會被其他 App 擋住。
+@MainActor
+func bringAppToFront() {
+    NSApp.activate(ignoringOtherApps: true)
 }
 
 @MainActor
@@ -70,6 +71,7 @@ enum Workspace {
         panel.prompt = "選擇"
         panel.message = message
         panel.directoryURL = URL(fileURLWithPath: directory)
+        bringAppToFront()
         return panel.runModal() == .OK ? panel.url : nil
     }
 }

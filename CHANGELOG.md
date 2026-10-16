@@ -5,6 +5,8 @@ List each change under `## Unreleased` as it lands.
 
 ## Unreleased
 
+- App 改為只在選單列：沒有主視窗與 Dock 圖示，開始遊戲、環境檢查、遊戲設定、更新與回報問題都在貓掌圖示的選單裡；啟動失敗時直接跳出錯誤訊息
+
 ## 0.5.0 — 2026-10-16
 
 - `MacMeow.app` 的 bundle ID 改為 `dev.lanstar.macmeow`（迴路位址的 LaunchDaemon 改為 `dev.lanstar.macmeow.loopback`）：舊版無法一鍵更新到此版，請重新下載安裝；視窗位置與檢查更新設定會回到預設

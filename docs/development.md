@@ -12,7 +12,7 @@
 
 ```sh
 bash app/build-app.sh                              # App 與 dmg（簽章與 Finder 排版見 app.md#建置與-dmg）
-open dist/MacMeow.app                              # 開啟 App；記錄檔見 AppPaths.logFile（選單「遊戲 → 開啟記錄檔」）
+open dist/MacMeow.app                              # 開啟 App（在選單列）；記錄檔見 AppPaths.logFile（選單「說明 → 開啟記錄檔」）
 just test
 bash scripts/play.sh status --porcelain            # App 讀取的狀態（key=value）
 GAME_DIR=~/Games/MapleStory bash scripts/play.sh   # 直接跑使用者流程

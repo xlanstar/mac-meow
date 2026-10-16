@@ -1,16 +1,20 @@
-/// 首頁與選單列要顯示的內容，由環境狀態與流程階段推導（不含畫面與動作）。
+/// 選單列要顯示的內容，由環境狀態與流程階段推導（不含畫面與動作）。
 struct HomePresentation: Equatable {
     let summary: StatusSummary
+    /// 腳本執行中時正在做的事（流程階段的訊息）。
+    let detail: String?
     let checklist: [ChecklistItem]
+    /// 需要使用者處理的清單項目的按鈕（選單最上層也列出）。
+    let setupActions: [ChecklistAction]
     /// 有流程進行中（包含它顯示的對話框）；會改變狀態的動作都停用。
     let busy: Bool
     let canStart: Bool
     /// 顯示「全部關閉／重新啟動」而不是「開始遊戲」。
     let showsStop: Bool
     let canShowLauncher: Bool
-    /// 腳本執行中時「開始遊戲」按鈕顯示的文字。
+    /// 腳本執行中時「開始遊戲」項目顯示的文字。
     let progressLabel: String?
-    /// 顯示失敗訊息的後續動作（查看記錄、回報、知道了）。
+    /// 顯示「查看錯誤訊息…」（錯誤對話框可以查看記錄、回報、知道了）。
     let failed: Bool
     let showsTunnelMeter: Bool
     let tunnels: Int
@@ -21,7 +25,9 @@ struct HomePresentation: Equatable {
         gameDirChosen: Bool = false
     ) {
         checklist = Step.checklist.map { ChecklistItem($0, status: status, phase: phase, gameDirChosen: gameDirChosen) }
+        setupActions = checklist.filter { $0.state == .action }.compactMap(\.action)
         summary = StatusSummary(status: status, phase: phase, needsSetup: checklist.contains { $0.state == .action })
+        if case .working(let message, _) = phase { detail = message } else { detail = nil }
         busy = operation != nil
         canStart = status.loaded && !busy
         showsStop = status.running && !busy
@@ -34,20 +40,17 @@ struct HomePresentation: Equatable {
     }
 }
 
-/// 主卡片的整體狀態。
+/// 整體狀態（選單第一行與選單列圖示）。
 struct StatusSummary: Equatable {
-    enum Tone { case accent, ok, error }
-
     let title: String
+    /// 選單列圖示（SF Symbol）。
     let symbol: String
-    let tone: Tone
-    /// 顯示轉圈而不是圖示。
+    /// 處理中（選單列圖示為沙漏）。
     let busy: Bool
 
-    init(title: String, symbol: String = "pawprint.fill", tone: Tone = .accent, busy: Bool = false) {
+    init(title: String, symbol: String = "pawprint.fill", busy: Bool = false) {
         self.title = title
-        self.symbol = symbol
-        self.tone = tone
+        self.symbol = busy ? "hourglass" : symbol
         self.busy = busy
     }
 
@@ -57,11 +60,11 @@ struct StatusSummary: Equatable {
         } else if !status.loaded {
             self.init(title: "檢查環境中", busy: true)
         } else if status.game {
-            self.init(title: "遊戲執行中", symbol: "gamecontroller.fill", tone: .ok)
+            self.init(title: "遊戲執行中", symbol: "gamecontroller.fill")
         } else if status.launcher {
-            self.init(title: "登入器已開啟", symbol: "checkmark.seal.fill", tone: .ok)
+            self.init(title: "登入器已開啟", symbol: "checkmark.seal.fill")
         } else if phase.failureMessage != nil {
-            self.init(title: "啟動沒有完成", symbol: "exclamationmark.triangle.fill", tone: .error)
+            self.init(title: "啟動沒有完成", symbol: "exclamationmark.triangle.fill")
         } else if needsSetup {
             self.init(title: "需要設定", symbol: "wrench.and.screwdriver.fill")
         } else {
@@ -138,7 +141,7 @@ struct ChecklistItem: Equatable, Identifiable {
     }
 }
 
-/// 清單列上的按鈕；由 `LaunchController.perform(_:)` 執行。
+/// 清單項目的選單按鈕；由 `LaunchController.perform(_:)` 執行。
 enum ChecklistAction: Equatable {
     case downloadCyder
     case revealCyder(String)
@@ -149,11 +152,11 @@ enum ChecklistAction: Equatable {
 
     var title: String {
         switch self {
-        case .downloadCyder: return "下載"
-        case .revealCyder: return "顯示"
+        case .downloadCyder: return "下載 Cyder…"
+        case .revealCyder: return "在 Finder 中顯示 Cyder"
         case .openCyder: return "開啟 Cyder"
-        case .chooseGameDir(let change): return change ? "更改…" : "選擇…"
-        case .setupLoopback: return "設定…"
+        case .chooseGameDir(let change): return change ? "更改遊戲資料夾…" : "選擇遊戲資料夾…"
+        case .setupLoopback: return "設定本機網路位址…"
         }
     }
 }

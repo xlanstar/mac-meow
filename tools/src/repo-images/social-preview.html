@@ -1,9 +1,10 @@
 <!doctype html>
-<!-- GitHub 社群預覽圖（連結卡片，1280×640）：大標語 + App 視窗。只上傳到 repo Settings，不放進 repo。 -->
+<!-- GitHub 社群預覽圖（連結卡片，1280×640）：大標語 + 選單列與選單（menu.js）。只上傳到 repo Settings，不放進 repo。 -->
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="menu.css">
 <style>
   html, body { width: 1280px; height: 640px; }
   .glow { right: -120px; top: -40px; width: 820px; height: 820px; }
@@ -20,7 +21,8 @@
   .facts { margin-top: 36px; display: flex; gap: 26px; font-size: 19px; font-weight: 600; }
   .facts li { list-style: none; display: flex; align-items: center; gap: 8px; }
   .facts li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
-  .app-window { right: 96px; top: 64px; width: 420px; }
+  /* zoom 放大選單，尺寸以放大前的單位計 */
+  .screen { zoom: 1.3; right: 60px; top: 50px; width: 330px; height: 420px; }
   .repo-url { position: absolute; left: 96px; bottom: 40px; font-size: 16px; color: var(--faint);
     font-weight: 500; letter-spacing: .3px; }
 </style>
@@ -37,7 +39,8 @@
       <li>可完整還原</li>
     </ul>
   </div>
-  <img class="app-window" src="app-window.png" alt="">
+  <div class="screen"></div>
   <div class="repo-url">github.com/xlanstar/mac-meow</div>
+  <script src="menu.js"></script>
 </body>
 </html>

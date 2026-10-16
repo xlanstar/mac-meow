@@ -1,6 +1,6 @@
 import Foundation
 
-/// App 的記錄：寫入 ~/Library/Logs/MacMeow/launcher.log，並保留最近的行數給「詳細記錄」顯示。
+/// App 的記錄：寫入 ~/Library/Logs/MacMeow/launcher.log，並保留這次開啟的最近幾行給選單「拷貝這次開啟的記錄」。
 @MainActor
 final class AppLog: ObservableObject {
     struct Line: Identifiable, Equatable {

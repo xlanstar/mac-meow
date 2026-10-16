@@ -14,7 +14,7 @@ final class Updater: ObservableObject {
         case waiting
     }
 
-    /// 首頁橫幅與選單列提示的新版本；「略過」後清除。
+    /// 選單提示的新版本；「略過」後清除。
     @Published private(set) var notice: Release?
     @Published private(set) var checking = false
     /// App 由 Homebrew 安裝時的更新指令；nil 表示使用一鍵更新。每次檢查更新時重新判斷。
