@@ -6,6 +6,7 @@ List each change under `## Unreleased` as it lands.
 ## Unreleased
 
 - App 改為只在選單列：沒有主視窗與 Dock 圖示，開始遊戲、環境檢查、遊戲設定、更新與回報問題都在貓掌圖示的選單裡；啟動失敗時直接跳出錯誤訊息
+- 開啟 App 時不再讓 macOS 進入遊戲模式
 
 ## 0.5.0 — 2026-10-16
 

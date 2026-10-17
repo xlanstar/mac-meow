@@ -72,7 +72,9 @@ cat >"$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleDevelopmentRegion</key><string>zh-Hant</string>
   <key>CFBundleLocalizations</key><array><string>zh-Hant</string></array>
-  <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
+  <!-- App 本身是啟動器不是遊戲：games 分類會讓 macOS 在 App 開啟時進入遊戲模式，GCSupportsGameMode 再明確退出 -->
+  <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+  <key>GCSupportsGameMode</key><false/>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <!-- 只在選單列（MenuBarExtra），沒有 Dock 圖示；「回報問題」視窗開著時 App 暫時切成一般 App -->
   <key>LSUIElement</key><true/>

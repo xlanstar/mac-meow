@@ -30,6 +30,7 @@
   - 唯一的視窗是「回報問題」（`UI/BugReport/BugReportWindow.swift`）：開著時暫時切成一般 App（Dock 與 ⌘Tab），關閉後回到只在選單列。
   - 對話框一律以獨立視窗顯示，並先把 App 帶到前景（`Services/SystemUI.swift` 的 `bringAppToFront`），否則會被其他 App 擋住。
   - 沒有畫面顯示失敗：流程失敗時 `AppModel` 直接跳出錯誤對話框，選單的「查看錯誤訊息…」可再開啟。
+  - 不觸發遊戲模式：Info.plist 的分類是 utilities 並設 `GCSupportsGameMode` 為 false（`build-app.sh`），App 開啟時 macOS 不會進入遊戲模式；遊戲本身在 Cyder 的 Wine 裡執行，不受此設定影響。
   - 開啟時不顯示任何提示視窗；選單列圖示的位置與被瀏海擋住時的處理寫在 README 的安裝步驟。
 - 「遊戲設定」子選單：項目見 `Core/AppConfig.swift` 的 `GameSettings`；存檔與環境變數見 [settings.md](settings.md)。選單沒有說明文字，各選項的說明寫在 README。
 - 回報問題（`Features/BugReporter.swift`）：預先填好 GitHub issue 表單，沒有後端；改 `.github/ISSUE_TEMPLATE/bug_report.yml` 的欄位 id 時同步改 `Core/IssueDraft.swift`。
