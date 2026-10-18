@@ -20,7 +20,6 @@ func testHomePresentation() {
     var needsSetup = ready
     needsSetup.loopback = false
     expectEqual(title(ready, .working("啟動中")), "處理中")
-    expect(HomePresentation(status: ready, phase: .working("啟動中")).summary.busy)
     expectEqual(title(EnvStatus()), "檢查環境中")
     expectEqual(title(game, .failed("x")), "遊戲執行中")
     expectEqual(title(launcher), "登入器已開啟")
@@ -29,7 +28,6 @@ func testHomePresentation() {
     expectEqual(HomePresentation(status: needsSetup).setupActions, [.setupLoopback])
     expectEqual(HomePresentation(status: ready).setupActions, [])
     expectEqual(HomePresentation(status: ready, phase: .working("修補中")).detail, "修補中")
-    expectEqual(HomePresentation(status: ready, phase: .working("修補中")).summary.symbol, "hourglass")
     expectEqual(HomePresentation(status: ready).detail, nil)
     expectEqual(title(ready), "準備就緒")
     expect(HomePresentation(status: ready, phase: .failed("x")).failed)

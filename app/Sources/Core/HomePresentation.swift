@@ -40,35 +40,25 @@ struct HomePresentation: Equatable {
     }
 }
 
-/// 整體狀態（選單第一行與選單列圖示）。
+/// 整體狀態（選單第一行）。
 struct StatusSummary: Equatable {
     let title: String
-    /// 選單列圖示（SF Symbol）。
-    let symbol: String
-    /// 處理中（選單列圖示為沙漏）。
-    let busy: Bool
-
-    init(title: String, symbol: String = "pawprint.fill", busy: Bool = false) {
-        self.title = title
-        self.symbol = busy ? "hourglass" : symbol
-        self.busy = busy
-    }
 
     init(status: EnvStatus, phase: LaunchPhase, needsSetup: Bool) {
         if phase.isWorking {
-            self.init(title: "處理中", busy: true)
+            title = "處理中"
         } else if !status.loaded {
-            self.init(title: "檢查環境中", busy: true)
+            title = "檢查環境中"
         } else if status.game {
-            self.init(title: "遊戲執行中", symbol: "gamecontroller.fill")
+            title = "遊戲執行中"
         } else if status.launcher {
-            self.init(title: "登入器已開啟", symbol: "checkmark.seal.fill")
+            title = "登入器已開啟"
         } else if phase.failureMessage != nil {
-            self.init(title: "啟動沒有完成", symbol: "exclamationmark.triangle.fill")
+            title = "啟動沒有完成"
         } else if needsSetup {
-            self.init(title: "需要設定", symbol: "wrench.and.screwdriver.fill")
+            title = "需要設定"
         } else {
-            self.init(title: "準備就緒")
+            title = "準備就緒"
         }
     }
 }

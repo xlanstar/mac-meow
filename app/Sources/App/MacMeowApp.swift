@@ -10,7 +10,7 @@ struct MacMeowApp: App {
         MenuBarExtra {
             MenuBarContent(model: model, home: model.home, updater: model.updater)
         } label: {
-            MenuBarIcon(home: model.home)
+            MenuBarIcon()
         }
         .menuBarExtraStyle(.menu)
     }

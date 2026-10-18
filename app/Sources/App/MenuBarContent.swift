@@ -103,12 +103,10 @@ struct MenuBarContent: View {
     }
 }
 
-/// 選單列圖示：反映整體狀態（處理中時為沙漏）。
+/// 選單列圖示：固定為貓掌，不隨狀態改變（狀態看選單第一行）。
 struct MenuBarIcon: View {
-    @ObservedObject var home: HomeModel
-
     var body: some View {
-        Image(systemName: home.presentation.summary.symbol)
+        Image(systemName: "pawprint.fill")
             .accessibilityLabel("貓貓谷 for Mac")
     }
 }

@@ -26,7 +26,7 @@
 
 - 互斥：`Core/LaunchPhase.swift` 的 `Operation` 列出的流程同一時間只執行一個（含流程中的對話框）；進行中不能更新，腳本執行中結束 App 會先確認。
 - 啟動：依 `LaunchController.launch()` 的順序檢查並引導（迴路位址以 `Scripts.installLoopback` 經 osascript 取得管理員權限設定），最後以 `Scripts.play` 執行 `play.sh`。
-- 只在選單列：Info.plist 的 `LSUIElement`（`build-app.sh`）讓 App 沒有 Dock 圖示與主視窗，功能都在選單列圖示的選單（`App/MenuBarContent.swift`）；圖示反映整體狀態（`StatusSummary.symbol`）。
+- 只在選單列：Info.plist 的 `LSUIElement`（`build-app.sh`）讓 App 沒有 Dock 圖示與主視窗，功能都在選單列圖示的選單（`App/MenuBarContent.swift`）；圖示固定為貓掌，整體狀態顯示在選單第一行（`StatusSummary`）。
   - 唯一的視窗是「回報問題」（`UI/BugReport/BugReportWindow.swift`）：開著時暫時切成一般 App（Dock 與 ⌘Tab），關閉後回到只在選單列。
   - 對話框一律以獨立視窗顯示，並先把 App 帶到前景（`Services/SystemUI.swift` 的 `bringAppToFront`），否則會被其他 App 擋住。
   - 沒有畫面顯示失敗：流程失敗時 `AppModel` 直接跳出錯誤對話框，選單的「查看錯誤訊息…」可再開啟。
