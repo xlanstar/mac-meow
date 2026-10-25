@@ -164,13 +164,27 @@ cmd_prepare() {
   echo "下一步：bash tools/release/release.sh build ${v} 並冒煙測試，再 publish ${v}（push 後由 GitHub Actions 建置並正式發佈）"
 }
 
+# stapler_validate <檔案>：確認檔案釘有有效的公證票證。從耗時看來 stapler validate 會連線 Apple：
+# v0.6.0 CI 的 release 步驟驗證下載的草稿附件時，validate 花了約 7 秒後失敗（正常不到 1 秒），而 SHA-256
+# 相同的同一個 dmg 一分鐘前在 build 步驟才通過，所以視為暫時性的網路問題，間隔漸增重試（共約 1.5 分鐘）；
+# 最後一次不加 -q，失敗原因才會出現在 log。
+stapler_validate() {
+  local i
+  for i in 1 2 3; do
+    xcrun stapler validate -q "$1" && return
+    echo "  ! 公證票證驗證失敗，$((i * 15)) 秒後重試：$(basename "$1")" >&2
+    sleep $((i * 15))
+  done
+  xcrun stapler validate "$1"
+}
+
 # verify_dmg <dmg> <X.Y.Z>：dmg（非 ad-hoc 時）已簽章、公證；掛載後 App 簽章有效、已公證且 Gatekeeper 認可、
 # 符合一鍵更新的簽章需求、版本正確
 verify_dmg() {
   local dmg="$1" v="$2" chk mnt
   if ! adhoc_release; then
     codesign --verify "$dmg" || die "dmg 簽章驗證失敗"
-    xcrun stapler validate -q "$dmg" || die "dmg 沒有公證票證"
+    stapler_validate "$dmg" || die "dmg 沒有公證票證"
     spctl --assess --type open --context context:primary-signature -vv "$dmg" 2>&1 \
       | grep 'source=Notarized Developer ID' >/dev/null \
       || die "Gatekeeper 未認可 dmg（spctl --assess --type open --context context:primary-signature -vv）"
@@ -193,7 +207,7 @@ verify_dmg() {
     || die "dmg 內 App 缺少可執行的 Contents/Resources/scripts/uninstall.sh（cask 依賴）"
   ok "App：scripts/uninstall.sh"
   if ! adhoc_release; then
-    xcrun stapler validate -q "$chk/MacMeow.app" || die "dmg 內 App 沒有公證票證"
+    stapler_validate "$chk/MacMeow.app" || die "dmg 內 App 沒有公證票證"
     spctl --assess --type exec -vv "$chk/MacMeow.app" 2>&1 | grep 'source=Notarized Developer ID' >/dev/null \
       || die "Gatekeeper 未認可 dmg 內 App（spctl --assess --type exec -vv）"
     ok "App：Notarized Developer ID"

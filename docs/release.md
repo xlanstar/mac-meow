@@ -52,5 +52,5 @@ gh run watch                 # 等 CI 完成
 
 - 測試失敗且尚未 push：`git tag -d vX.Y.Z && git reset --hard HEAD~1` 撤回「chore(release): X.Y.Z」，修正並 commit 後從 `prepare` 重來。
 - 已 push：修正後改發下一個 patch 版本（已發佈的壞版本可在說明中標註或刪除）。
-- CI 失敗但產物沒問題（例如 Secret 設錯）：修正後在 Actions 頁面 Re-run；若停在草稿，`draft` 會覆蓋同一個草稿，`release` 再正式發佈。
+- CI 失敗但產物沒問題（例如 Secret 設錯、Apple 端暫時性錯誤）：修正後在 Actions 頁面 Re-run（執行的是 tag 內的 workflow 與 `release.sh`，tag 之後才 commit 的修正不會生效）；若停在草稿，`draft` 會覆蓋同一個草稿，`release` 再正式發佈。
 - 只有 `tap` 失敗（Release 已發佈）：修正後在本機執行 `just release tap X.Y.Z`。
